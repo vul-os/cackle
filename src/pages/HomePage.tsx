@@ -27,15 +27,31 @@ interface Category {
   eventCount: number;
 }
 
-// Sample data - replace with your actual data
 const featuredEvents: Event[] = [
   {
     id: '1',
     title: 'M FEST',
     description: '26-27 OCTOBER 2024 KYALAMI GRAND PRIX CIRCUIT',
-    imageUrl: 'https://example.com/mfest.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1567&q=80',
   },
-  // Add more featured events...
+  {
+    id: '2',
+    title: 'Summer Music Festival',
+    description: 'A weekend of live performances under the sun',
+    imageUrl: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+  },
+  {
+    id: '3',
+    title: 'Tech Conference 2024',
+    description: 'Exploring the future of technology',
+    imageUrl: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+  },
+  {
+    id: '4',
+    title: 'Food & Wine Expo',
+    description: 'Taste the best cuisines from around the world',
+    imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+  },
 ];
 
 const upcomingEvents: UpcomingEvent[] = [
@@ -45,7 +61,7 @@ const upcomingEvents: UpcomingEvent[] = [
     venue: 'Ushuaia Beach Club',
     date: '24 Jul 2024 CEST (+02:00)',
     price: 'From €45.00',
-    imageUrl: 'https://example.com/elrow-ushuaia.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1574391884720-bbc3740c59d1?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
   },
   {
     id: '2',
@@ -53,7 +69,7 @@ const upcomingEvents: UpcomingEvent[] = [
     venue: 'Time Out Studio at Time Out Market Cape Town',
     date: '25 Jul 2024 SAST (+02:00)',
     price: 'Tickets R150.00',
-    imageUrl: 'https://example.com/comedy-night.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1585699324551-f6c309eedeca?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
   },
   {
     id: '3',
@@ -61,16 +77,16 @@ const upcomingEvents: UpcomingEvent[] = [
     venue: 'Katzys Live Rosebank',
     date: '26 Jul - 27 Jul SAST (+02:00)',
     price: 'From R100.00',
-    imageUrl: 'https://example.com/influencer-party.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1496024840928-4c417adf211d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
   },
 ];
 
 const categories: Category[] = [
-  { id: '1', name: 'Nightlife', imageUrl: 'https://example.com/nightlife.jpg', eventCount: 103 },
-  { id: '2', name: 'Festival', imageUrl: 'https://example.com/festival.jpg', eventCount: 88 },
-  { id: '3', name: 'Lifestyle', imageUrl: 'https://example.com/lifestyle.jpg', eventCount: 70 },
-  { id: '4', name: 'Active', imageUrl: 'https://example.com/active.jpg', eventCount: 50 },
-  { id: '5', name: 'Music', imageUrl: 'https://example.com/music.jpg', eventCount: 46 },
+  { id: '1', name: 'Nightlife', imageUrl: 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', eventCount: 103 },
+  { id: '2', name: 'Festival', imageUrl: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', eventCount: 88 },
+  { id: '3', name: 'Lifestyle', imageUrl: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', eventCount: 70 },
+  { id: '4', name: 'Active', imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', eventCount: 50 },
+  { id: '5', name: 'Music', imageUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80', eventCount: 46 },
 ];
 
 const HomePage: React.FC = () => {
@@ -128,8 +144,8 @@ const HomePage: React.FC = () => {
             <Grid item xs={12} md={6}>
               {/* Image Collage */}
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'flex-end' }}>
-                <img src="https://example.com/event1.jpg" alt="Event 1" style={{ width: '30%', height: '30%', objectFit: 'cover', borderRadius: '8px' }} />
-                <img src="https://example.com/event2.jpg" alt="Event 2" style={{ width: '30%', height: '30%', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Event 1" style={{ width: '30%', height: '30%', objectFit: 'cover', borderRadius: '8px' }} />
+                <img src="https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" alt="Event 2" style={{ width: '30%', height: '30%', objectFit: 'cover', borderRadius: '8px' }} />
                 {/* Add more images as needed */}
               </Box>
             </Grid>
@@ -140,111 +156,86 @@ const HomePage: React.FC = () => {
       {/* Navigation */}
       <Box sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', borderBottom: '1px solid rgba(255,255,255,0.1)', py: 2 }}>
         <Container maxWidth="xl">
-          <Grid container spacing={2}>
-            {['Featured Events', 'Upcoming', 'Categories', 'Artists'].map((item) => (
-              <Grid item key={item}>
-                <Button sx={{ color: 'white' }}>{item}</Button>
+          <Grid container spacing={4} justifyContent="center">
+            <Grid item>
+              <MuiLink component={Link} to="/" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>FEATURED</MuiLink>
+            </Grid>
+            <Grid item>
+              <MuiLink component={Link} to="/categories" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>CATEGORIES</MuiLink>
+            </Grid>
+            <Grid item>
+              <MuiLink component={Link} to="/artists" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>ARTISTS</MuiLink>
+            </Grid>
+            <Grid item>
+              <MuiLink component={Link} to="/organisers" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>ORGANISERS</MuiLink>
+            </Grid>
+            <Grid item>
+              <MuiLink component={Link} to="/venues" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>VENUES</MuiLink>
+            </Grid>
+          </Grid>
+        </Container>
+      </Box>
+
+      {/* Featured Events */}
+      <Box sx={{ py: 8 }}>
+        <Container maxWidth="xl">
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" gutterBottom>
+              Featured Events
+            </Typography>
+            <MuiLink component={Link} to="/all-events" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>
+              See All
+            </MuiLink>
+          </Box>
+          <Grid container spacing={4}>
+            {featuredEvents.map(event => (
+              <Grid item key={event.id} xs={12} md={3}>
+                <Card>
+                  <CardMedia
+                    component="img"
+                    height="140"
+                    image={event.imageUrl}
+                    alt={event.title}
+                  />
+                  <CardContent>
+                    <Typography variant="h6">{event.title}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {event.description}
+                    </Typography>
+                  </CardContent>
+                </Card>
               </Grid>
             ))}
           </Grid>
         </Container>
       </Box>
 
-      {/* Featured Events Section */}
-      <Box sx={{ py: 4 }}>
+      {/* Upcoming Events */}
+      <Box sx={{ py: 8, bgcolor: '#f5f5f5', color: 'black' }}>
         <Container maxWidth="xl">
-          <Typography variant="h4" gutterBottom>
-            Featured Events
-          </Typography>
-          <Typography variant="subtitle1" gutterBottom>
-            Our Favourite Picks
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={8}>
-              <Card sx={{ height: '100%', bgcolor: '#1E1E1E' }}>
-                <CardMedia
-                  component="img"
-                  height="400"
-                  image={featuredEvents[0].imageUrl}
-                  alt={featuredEvents[0].title}
-                />
-                <CardContent>
-                  <Typography gutterBottom variant="h5" component="div" color="white">
-                    {featuredEvents[0].title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {featuredEvents[0].description}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <Grid container spacing={2} direction="column">
-                {featuredEvents.slice(1, 4).map((event) => (
-                  <Grid item key={event.id}>
-                    <Card sx={{ display: 'flex', height: 120, bgcolor: '#1E1E1E' }}>
-                      <CardMedia
-                        component="img"
-                        sx={{ width: 151 }}
-                        image={event.imageUrl}
-                        alt={event.title}
-                      />
-                      <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-                        <CardContent sx={{ flex: '1 0 auto' }}>
-                          <Typography component="div" variant="h6" color="white">
-                            {event.title}
-                          </Typography>
-                          <Typography variant="subtitle1" color="text.secondary" component="div">
-                            {event.description}
-                          </Typography>
-                        </CardContent>
-                      </Box>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* Upcoming Events Section */}
-      <Box sx={{ py: 4, bgcolor: '#1E1E1E' }}>
-        <Container maxWidth="xl">
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <div>
-              <Typography variant="h4" gutterBottom>
-                Upcoming Events
-              </Typography>
-              <Typography variant="subtitle1">
-                Events happening soon
-              </Typography>
-            </div>
-            <MuiLink component={Link} to="/events" color="primary">
-              See All &gt;
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" gutterBottom>
+              Upcoming Events
+            </Typography>
+            <MuiLink component={Link} to="/all-events" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>
+              See All
             </MuiLink>
           </Box>
-          <Grid container spacing={3}>
-            {upcomingEvents.map((event) => (
-              <Grid item xs={12} md={4} key={event.id}>
-                <Card sx={{ bgcolor: '#2A2A2A' }}>
+          <Grid container spacing={4}>
+            {upcomingEvents.map(event => (
+              <Grid item key={event.id} xs={12} md={4}>
+                <Card>
                   <CardMedia
                     component="img"
-                    height="200"
+                    height="140"
                     image={event.imageUrl}
                     alt={event.title}
                   />
                   <CardContent>
-                    <Typography gutterBottom variant="h6" component="div" color="white">
-                      {event.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {event.venue}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {event.date}
-                    </Typography>
-                    <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold', mt: 1 }}>
+                    <Typography variant="h6">{event.title}</Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      {event.venue}<br />
+                      {event.date}<br />
                       {event.price}
                     </Typography>
                   </CardContent>
@@ -255,54 +246,46 @@ const HomePage: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Categories Section */}
-      <Box sx={{ py: 4 }}>
+      {/* Event Categories */}
+      <Box sx={{ py: 8 }}>
         <Container maxWidth="xl">
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <div>
-              <Typography variant="h4" gutterBottom>
-                Categories
-              </Typography>
-              <Typography variant="subtitle1">
-                Explore events that match your tastes
-              </Typography>
-            </div>
-            <MuiLink component={Link} to="/categories" color="primary">
-              See All &gt;
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h4" gutterBottom>
+              Event Categories
+            </Typography>
+            <MuiLink component={Link} to="/all-events" color="inherit" sx={{ textDecoration: 'none', fontWeight: 'bold' }}>
+              See All
             </MuiLink>
           </Box>
-          <Grid container spacing={2}>
-            {categories.map((category) => (
-              <Grid item xs={12} sm={6} md={2.4} key={category.id}>
-                <Card sx={{ position: 'relative' }}>
+          <Grid container spacing={4}>
+            {categories.map(category => (
+              <Grid item key={category.id} xs={12} md={3}>
+                <Card>
                   <CardMedia
                     component="img"
-                    height="200"
+                    height="140"
                     image={category.imageUrl}
                     alt={category.name}
                   />
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      width: '100%',
-                      bgcolor: 'rgba(0, 0, 0, 0.54)',
-                      color: 'white',
-                      padding: '10px',
-                    }}
-                  >
+                  <CardContent>
                     <Typography variant="h6">{category.name}</Typography>
-                    <Typography variant="body2">{category.eventCount} Events</Typography>
-                  </Box>
+                    <Typography variant="body2" color="textSecondary">
+                      {category.eventCount} events
+                    </Typography>
+                  </CardContent>
                 </Card>
               </Grid>
             ))}
           </Grid>
         </Container>
       </Box>
+
+      {/* Footer */}
+      <Box sx={{ py: 4, textAlign: 'center', bgcolor: '#121212', color: 'white' }}>
+        <Typography variant="body2">&copy; 2024 Howler. All rights reserved.</Typography>
+      </Box>
     </Box>
   );
-};
+}
 
 export default HomePage;
