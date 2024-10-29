@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://slipsnap.co.za/sitemap.xml
