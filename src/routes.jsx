@@ -20,6 +20,10 @@ import ProtectedRoute from './components/auth/protected-route';
 import NotFound from './pages/not-found';
 import LandingPage from './pages/landing';
 import DocsPage from './pages/docs';
+import HomePage from './pages/organizers/home';
+import EventsPage from './pages/organizers/events';
+import SettingsPage from './pages/organizers/settings';
+import EventPage from './pages/organizers/events/event';
 
 const AppRoutes = () => {
   return (
@@ -38,6 +42,11 @@ const AppRoutes = () => {
 
       {/* Protected routes */}
       <Route element={<MainLayout />}>
+        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
+        <Route path="/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
+
+        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
 
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>

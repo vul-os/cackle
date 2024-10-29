@@ -16,7 +16,7 @@ const SignIn = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard')
+      navigate('/home')
     }
   }, [user])
 
@@ -24,7 +24,7 @@ const SignIn = () => {
     event.preventDefault();
     try {
       await signIn(email, password);
-      navigate('/dashboard')
+      navigate('/home')
     } catch (error) {
       setError(error.message);
     }

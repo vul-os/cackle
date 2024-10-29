@@ -1,14 +1,15 @@
 import React from 'react';
 import {
-  LayoutDashboard,
-  FileText,
-  Package,
-  FolderTree
+  Home,
+  CalendarDays,
+  Settings
 } from 'lucide-react';
 import { NavItem } from './nav-item';
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, text: 'Dashboard' },
+  { to: '/home', icon: Home, text: 'Home' },
+  { to: '/events', icon: CalendarDays, text: 'Events' },
+  { to: '/settings', icon: Settings, text: 'Settings' }
 ];
 
 const SideNav = ({ isExpanded, isMobile }) => {
