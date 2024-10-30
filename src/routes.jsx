@@ -18,8 +18,8 @@ import UpdatePassword from './pages/auth/update-password';
 import ProtectedRoute from './components/auth/protected-route';
 
 import NotFound from './pages/not-found';
-import LandingPage from './pages/landing';
-import DocsPage from './pages/docs';
+import LandingPage from './pages/visitor/landing';
+import DocsPage from './pages/visitor/docs';
 import HomePage from './pages/organizers/home';
 import EventsPage from './pages/organizers/events';
 import SettingsPage from './pages/organizers/settings';
