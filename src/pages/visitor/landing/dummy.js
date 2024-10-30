@@ -3,19 +3,19 @@ export const FEATURED_EVENTS = [
     {
       id: 1,
       title: "Up The Creek 2025",
-      image: "/api/placeholder/800/400",
+      image: "/images/howler.jpg",
       link: "/events/upthecreek2025"
     },
     {
       id: 2,
       title: "Active Event",
-      image: "/api/placeholder/400/200",
+      image: "images/event.jpeg",
       link: "/events/active"
     },
     {
       id: 3,
       title: "Ultra Festival",
-      image: "/api/placeholder/400/200",
+      image: "/images/racing.jpeg",
       link: "/events/ultra"
     }
   ];
@@ -27,7 +27,7 @@ export const UPCOMING_EVENTS = [
       venue: "The Studio at Time Out Market Cape Town",
       date: "29 Oct 2024 SAST (+02:00)",
       price: "From R150.00",
-      image: "/api/placeholder/400/200"
+      image: "/images/quiz.jpg"
     },
     {
       id: 2,
@@ -35,7 +35,7 @@ export const UPCOMING_EVENTS = [
       venue: "Clifton 1st Beach",
       date: "30 Oct 2024 SAST (+02:00)",
       price: "Tickets R200.00",
-      image: "/api/placeholder/400/200"
+      image: "/images/yoga.jpg"
     },
     {
       id: 3,
@@ -43,7 +43,7 @@ export const UPCOMING_EVENTS = [
       venue: "Art flava studio",
       date: "31 Oct 2024 SAST (+02:00)",
       price: "Tickets R20.00",
-      image: "/api/placeholder/400/200"
+      image: "/images/coffee.jpg"
     }
   ];
   
@@ -52,51 +52,51 @@ export const CATEGORIES = [
       id: 1,
       title: "Festival",
       eventCount: 108,
-      image: "/api/placeholder/400/400"
+      image: "/images/festival.jpg"
     },
     {
       id: 2,
       title: "Nightlife",
       eventCount: 90,
-      image: "/api/placeholder/400/400"
+      image: "/images/night.jpg"
     },
     {
       id: 3,
       title: "Lifestyle",
       eventCount: 63,
-      image: "/api/placeholder/400/400"
+      image: "/images/ranch.jpg"
     },
     {
       id: 4,
       title: "Music",
       eventCount: 61,
-      image: "/api/placeholder/400/400"
+      image:  "/images/music.jpg"
     }
   ];
   
 export const ARTISTS = [
     {
       id: 1,
-      name: "Roz",
+      name: "LiL Wayne",
       eventCount: 5,
-      image: "/api/placeholder/200/200"
+      image: "/images/weezy.jpg"
     },
     {
       id: 2,
-      name: "Tristan Urwin",
+      name: "Nicki Minaj",
       eventCount: 4,
-      image: "/api/placeholder/200/200"
+      image:  "/images/nicki2.jpg"
     },
     {
       id: 3,
-      name: "Abby Nurock",
+      name: "Adele",
       eventCount: 3,
-      image: "/api/placeholder/200/200"
+      image:  "/images/adele.jpg"
     },
     {
       id: 4,
-      name: "BabyDaiz",
+      name: "Eminem",
       eventCount: 3,
-      image: "/api/placeholder/200/200"
+      image:  "/images/eminem.jpg"
     }
   ];

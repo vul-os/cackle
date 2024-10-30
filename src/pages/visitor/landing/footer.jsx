@@ -4,14 +4,14 @@ import { Facebook, Twitter, Instagram } from 'lucide-react';
 
 const Footer = () => {
   return (
-    <footer className="bg-white border-t">
+    <footer className="bg-black/50 border-t border-zinc-800 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo Column */}
           <div className="col-span-1">
-            <img 
-              src="/api/placeholder/32/32" 
-              alt="Howler Logo" 
+            <img
+              src="/api/placeholder/32/32"
+              alt="Howler Logo"
               className="h-8 w-8 mb-6"
             />
           </div>
@@ -19,40 +19,40 @@ const Footer = () => {
           {/* Links Columns */}
           <div className="col-span-2 grid grid-cols-2 gap-8">
             <div>
-              <h3 className="text-sm font-semibold mb-4">Platform</h3>
+              <h3 className="text-sm font-semibold mb-4 text-zinc-100">Platform</h3>
               <ul className="space-y-3">
                 <li>
-                  <a href="https://organisers.howler.co.za/" className="text-gray-600 hover:text-gray-900">
+                  <a href="https://organisers.howler.co.za/" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Go Cashless / Sell Tickets
                   </a>
                 </li>
                 <li>
-                  <a href="https://help.howler.co.za" className="text-gray-600 hover:text-gray-900">
+                  <a href="https://help.howler.co.za" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Help
                   </a>
                 </li>
                 <li>
-                  <a href="/contact_us" className="text-gray-600 hover:text-gray-900">
+                  <a href="/contact_us" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Contact Us
                   </a>
                 </li>
               </ul>
             </div>
             <div>
-              <h3 className="text-sm font-semibold mb-4">Legal</h3>
+              <h3 className="text-sm font-semibold mb-4 text-zinc-100">Legal</h3>
               <ul className="space-y-3">
                 <li>
-                  <a href="/terms_and_conditions" className="text-gray-600 hover:text-gray-900">
+                  <a href="/terms_and_conditions" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Terms & Conditions
                   </a>
                 </li>
                 <li>
-                  <a href="/privacy_policy" className="text-gray-600 hover:text-gray-900">
+                  <a href="/privacy_policy" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Privacy Policy
                   </a>
                 </li>
                 <li>
-                  <a href="/legal" className="text-gray-600 hover:text-gray-900">
+                  <a href="/legal" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Legal
                   </a>
                 </li>
@@ -63,33 +63,33 @@ const Footer = () => {
           {/* Social and Language Column */}
           <div className="col-span-1">
             <div className="flex space-x-4 mb-6">
-              <a 
-                href="https://www.twitter.com/HowlerApp" 
-                target="_blank" 
+              <a
+                href="https://www.twitter.com/HowlerApp"
+                target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-500"
+                className="text-zinc-400 hover:text-[#536BFF] transition-colors"
               >
                 <Twitter className="h-6 w-6" />
               </a>
-              <a 
-                href="https://www.instagram.com/howlertech/" 
-                target="_blank" 
+              <a
+                href="https://www.instagram.com/howlertech/"
+                target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-500"
+                className="text-zinc-400 hover:text-[#536BFF] transition-colors"
               >
                 <Instagram className="h-6 w-6" />
               </a>
-              <a 
-                href="https://www.facebook.com/HowlerTech" 
-                target="_blank" 
+              <a
+                href="https://www.facebook.com/HowlerTech"
+                target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-400 hover:text-gray-500"
+                className="text-zinc-400 hover:text-[#536BFF] transition-colors"
               >
                 <Facebook className="h-6 w-6" />
               </a>
             </div>
 
-            <select className="w-full p-2 border rounded text-sm">
+            <select className="w-full p-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-300 focus:border-[#536BFF] focus:ring-1 focus:ring-[#536BFF]">
               <option value="en">English</option>
               <option value="it">Italiano</option>
               <option value="es">Español</option>
