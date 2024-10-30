@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, SortAsc, Calendar } from 'lucide-react';
+import { Plus, Search, SortAsc, Calendar, Ticket, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { AuthContext } from '@/context/use-auth';
 
@@ -24,10 +24,39 @@ const EventsPage = () => {
   const [sortBy, setSortBy] = useState('start_time');
   const [sortOrder, setSortOrder] = useState('asc');
 
-  const handleEventClick = (eventId) => {
-    navigate(`/events/${eventId}`);
+  const handleCreateEvent = async () => {
+    if (!activeOrganization?.id) return;
+    
+    try {
+      // Create a new blank event with required fields
+      const { data, error } = await supabase
+        .from('events')
+        .insert([{
+          organization_id: activeOrganization.id,
+          title: 'New Event',
+          start_time: new Date().toISOString(),
+          end_time: new Date().toISOString(),
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Navigate to the new event's edit page
+      navigate(`/admin/events/${data.id}`);
+    } catch (error) {
+      console.error('Error creating event:', error);
+    }
   };
-  
+
+  const handleEventCardClick = (event, e) => {
+    // If the click target is a button or its child elements, don't navigate
+    if (e.target.closest('button')) {
+      return;
+    }
+    navigate(`/admin/events/${event.id}`);
+  };
+
   useEffect(() => {
     fetchEvents();
   }, [activeOrganization]);
@@ -111,7 +140,7 @@ const EventsPage = () => {
             <Calendar className="h-8 w-8 text-primary" />
             <h1 className="text-3xl font-bold text-gray-900">Events</h1>
           </div>
-          <Button onClick={() => window.location.href = '/events/new'}>
+          <Button onClick={handleCreateEvent}>
             <Plus className="h-4 w-4 mr-2" />
             Create Event
           </Button>
@@ -163,9 +192,9 @@ const EventsPage = () => {
             ) : (
               filteredEvents.map((event) => (
                 <Card 
-                key={event.id} 
-                className="hover:shadow-lg transition-shadow cursor-pointer" 
-                onClick={() => handleEventClick(event.id)}
+                  key={event.id} 
+                  className="hover:shadow-lg transition-shadow cursor-pointer flex flex-col" 
+                  onClick={(e) => handleEventCardClick(event, e)}
                 >                  
                   <CardHeader>
                     <CardTitle>{event.title}</CardTitle>
@@ -191,6 +220,33 @@ const EventsPage = () => {
                       )}
                     </div>
                   </CardContent>
+                  <div className="mt-auto p-4 border-t">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/events/${event.id}/tickets`);
+                        }}
+                        className="bg-white hover:bg-gray-50"
+                      >
+                        <Ticket className="h-4 w-4 mr-2" />
+                        Tickets
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/admin/events/${event.id}`);
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
                 </Card>
               ))
             )}

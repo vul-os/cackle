@@ -26,6 +26,7 @@ import SettingsPage from './pages/organizers/settings';
 import EventPage from './pages/organizers/events/event';
 
 import VisitorEventPage from './pages/visitor/events/event';
+import EventTicketTypes from './pages/organizers/events/event/tickets';
 
 
 const AppRoutes = () => {
@@ -46,11 +47,11 @@ const AppRoutes = () => {
       {/* Protected routes */}
       <Route element={<MainLayout />}>
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
-        <Route path="/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
+        <Route path="/admin/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
+        <Route path="/admin/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
+        <Route path="/admin/events/:id/tickets" element={<ProtectedRoute><EventTicketTypes /></ProtectedRoute>} />
 
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>
     </Routes>

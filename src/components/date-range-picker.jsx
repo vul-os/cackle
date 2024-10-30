@@ -1,38 +1,30 @@
 "use client"
 
-import * as React from "react"
-import { addDays, format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import React, { useState } from "react";
+import { addDays, format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 
-export function DateRangePicker({ className, onDateChange, date, setDate }) {
-  React.useEffect(() => {
-    if (onDateChange) {
-      onDateChange(date);
-    }
-  }, [date, onDateChange]);
+const DatePickerWithRange = ({ className }) => {
+  const [date, setDate] = useState({
+    from: new Date(2022, 0, 20),
+    to: addDays(new Date(2022, 0, 20), 20),
+  });
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={`grid gap-2 ${className || ''}`}>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={"outline"}
-            className={cn(
-              "w-[300px] justify-start text-left font-normal",
-              "bg-white text-black border border-gray-300",
-              "hover:bg-gray-100 hover:text-black",
-              "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
-              !date && "text-gray-500"
-            )}
+            variant="outline"
+            className={`w-[300px] justify-start text-left font-normal ${!date && 'text-muted-foreground'}`}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {date?.from ? (
@@ -49,7 +41,7 @@ export function DateRangePicker({ className, onDateChange, date, setDate }) {
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 bg-white" align="start">
+        <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             initialFocus
             mode="range"
@@ -57,10 +49,11 @@ export function DateRangePicker({ className, onDateChange, date, setDate }) {
             selected={date}
             onSelect={setDate}
             numberOfMonths={2}
-            className="text-black"
           />
         </PopoverContent>
       </Popover>
     </div>
-  )
-}
+  );
+};
+
+export default DatePickerWithRange;

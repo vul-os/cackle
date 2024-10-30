@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useContext } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { Menu, User, ChevronDown, Building2 } from 'lucide-react';
 import { AuthContext } from '@/context/use-auth';
+import Logo from '/src/assets/cackle.svg';
+import LogoFallback from '/src/assets/cackle.png';
 
 const TopBar = ({ onMenuClick }) => {
   const { user, signOut, organizations, activeOrganization, switchOrganization } = useContext(AuthContext);
@@ -58,6 +60,23 @@ const TopBar = ({ onMenuClick }) => {
         >
           <Menu size={24} />
         </button>
+        
+        {/* Logo Section */}
+        <div className="flex items-center gap-2">
+          <a href="/" className="block">
+            <picture>
+              <source srcSet={Logo} type="image/svg+xml" />
+              <img
+                src={LogoFallback}
+                alt="Howler Logo"
+                className="h-10 w-10 object-contain rounded-lg"
+              />
+            </picture>
+          </a>
+          <span className="hidden md:block text-[#FF4848] font-bold text-3xl">
+            cackle
+          </span>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 relative">

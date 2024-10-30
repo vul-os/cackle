@@ -1,0 +1,66 @@
+// src/pages/EventPage/header.jsx
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Save, Trash2, Ticket } from 'lucide-react';
+
+export const EventPageHeader = ({
+  editForm,
+  handleInputChange,
+  handleSave,
+  hasChanges,
+  setShowDeleteDialog,
+  navigate
+}) => {
+  return (
+    <div className="mb-8">
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/admin/events')}
+        className="mb-4 hover:bg-gray-100"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Events
+      </Button>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex-1">
+          <Input
+            value={editForm.title}
+            onChange={(e) => handleInputChange('title', e.target.value)}
+            className="text-2xl md:text-3xl font-bold text-gray-900 border-transparent hover:border-gray-200 transition-colors bg-transparent p-2 h-auto focus-visible:ring-1"
+            placeholder="Event Title"
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/admin/events/${editForm.id}/tickets`)}
+            className="bg-white hover:bg-gray-50 transition-colors"
+          >
+            <Ticket className="h-4 w-4 mr-2" />
+            Manage Tickets
+          </Button>
+          {hasChanges && (
+            <Button
+              variant="default"
+              onClick={handleSave}
+              className="bg-green-600 hover:bg-green-700 transition-colors"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            onClick={() => setShowDeleteDialog(true)}
+            className="hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -8,7 +8,7 @@ import { NavItem } from './nav-item';
 
 const navItems = [
   { to: '/home', icon: Home, text: 'Home' },
-  { to: '/events', icon: CalendarDays, text: 'Events' },
+  { to: '/admin/events', icon: CalendarDays, text: 'Events' },
   { to: '/settings', icon: Settings, text: 'Settings' }
 ];
 
