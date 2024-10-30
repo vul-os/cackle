@@ -4,7 +4,6 @@ import Footer from './footer';
 import Hero from './hero';
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRight } from 'lucide-react';
-import Logo from '/src/assets/logo.svg'
 
 import {FEATURED_EVENTS, UPCOMING_EVENTS, CATEGORIES, ARTISTS} from './dummy'
 
