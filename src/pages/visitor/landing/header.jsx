@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Menu, X } from 'lucide-react';
+import Logo from '/src/assets/cackle.svg'
+import LogoFallback from '/src/assets/cackle.png'
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -12,15 +14,20 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo Section */}
           <div className="flex items-center">
-            <div className="flex-shrink-0">
+            <div className="flex items-center gap-2">
               <a href="/" className="block">
-                {/* Replace with actual logo */}
-                <img
-                  src="/api/placeholder/120/40"
-                  alt="Howler Logo"
-                  className="h-8 w-auto"
-                />
+                <picture>
+                  <source srcSet={Logo} type="image/svg+xml" />
+                  <img 
+                    src={LogoFallback}
+                    alt="Howler Logo"
+                    className="h-10 w-10 object-contain rounded-lg"
+                  />
+                </picture>
               </a>
+              <span className="hidden md:block text-[#FF4848] font-bold text-3xl">
+                cackle
+              </span>
             </div>
           </div>
 
@@ -35,7 +42,7 @@ const Header = () => {
             </Button>
             <Button
               size="sm"
-              className="bg-blue-600 text-white hover:bg-blue-700"
+              className="bg-[#FF4848] text-white hover:bg-red"
             >
               Sign Up
             </Button>
@@ -73,14 +80,12 @@ const Header = () => {
               </Button>
               <Button
                 size="sm"
-                className="bg-blue-600 text-white hover:bg-blue-700"
+                className="bg-[#FF4848] text-white hover:bg-red"
               >
                 Sign Up
               </Button>
               <select className="bg-slate-800 border border-slate-700 rounded p-2 mt-2 text-slate-300 focus:border-blue-500 focus:ring-blue-500">
                 <option value="en">English</option>
-                <option value="fr">Français</option>
-                <option value="es">Español</option>
               </select>
             </div>
           </div>

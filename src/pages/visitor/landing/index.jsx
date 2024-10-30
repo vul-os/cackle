@@ -4,6 +4,7 @@ import Footer from './footer';
 import Hero from './hero';
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronRight } from 'lucide-react';
+import Logo from '/src/assets/logo.svg'
 
 import {FEATURED_EVENTS, UPCOMING_EVENTS, CATEGORIES, ARTISTS} from './dummy'
 
@@ -24,7 +25,7 @@ const SectionHeader = ({ title, subtitle, seeAllLink }) => (
 
 export default function HowlerLandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-black">
+    <div className="min-h-screen flex flex-col bg-white">
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-black via-zinc-900 to-black"/>
         <div className="absolute top-0 -left-48 w-96 h-96 bg-[#536BFF]/10 rounded-full blur-3xl animate-pulse"/>

@@ -1,19 +1,36 @@
 import React from 'react';
 import { Card } from "@/components/ui/card";
 import { Facebook, Twitter, Instagram } from 'lucide-react';
+import Logo from '/src/assets/cackle.svg'
+import LogoFallback from '/src/assets/cackle.png'
 
 const Footer = () => {
   return (
-    <footer className="bg-black/50 border-t border-zinc-800 backdrop-blur-sm">
+    <footer className="bg-slate-900 border-t border-zinc-800 backdrop-blur-sm">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo Column */}
           <div className="col-span-1">
-            <img
-              src="/api/placeholder/32/32"
-              alt="Howler Logo"
-              className="h-8 w-8 mb-6"
-            />
+            <div className="flex items-center">
+              <div className="flex items-center gap-2">
+                <a href="/" className="block">
+                  <picture>
+                    <source srcSet={Logo} type="image/svg+xml" />
+                    <img 
+                      src={LogoFallback}
+                      alt="Howler Logo"
+                      className="h-10 w-10 object-contain rounded-lg"
+                    />
+                  </picture>
+                </a>
+                {/* Removed 'hidden md:block' to show text on all screen sizes */}
+                <span className="text-[#FF4848] font-bold text-3xl">
+                  cackle
+                </span>
+              </div>
+            </div>
+
+
           </div>
 
           {/* Links Columns */}
@@ -27,8 +44,8 @@ const Footer = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="https://help.howler.co.za" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
-                    Help
+                  <a href="/docs" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                    Docs
                   </a>
                 </li>
                 <li>
@@ -91,12 +108,6 @@ const Footer = () => {
 
             <select className="w-full p-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-zinc-300 focus:border-[#536BFF] focus:ring-1 focus:ring-[#536BFF]">
               <option value="en">English</option>
-              <option value="it">Italiano</option>
-              <option value="es">Español</option>
-              <option value="nl">Nederlands</option>
-              <option value="pt">Português</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
             </select>
           </div>
         </div>
