@@ -25,6 +25,9 @@ import EventsPage from './pages/organizers/events';
 import SettingsPage from './pages/organizers/settings';
 import EventPage from './pages/organizers/events/event';
 
+import VisitorEventPage from './pages/visitor/events/event';
+
+
 const AppRoutes = () => {
   return (
     <Routes>
@@ -32,7 +35,7 @@ const AppRoutes = () => {
       <Route element={<BlankLayout />}>
         <Route exact path="/" element={<LandingPage />} />
         <Route exact path="/docs" element={<DocsPage />} />
-
+        <Route exact path="/events/" element={<VisitorEventPage />} />
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/password-reset" element={<ForgotPassword />} />
