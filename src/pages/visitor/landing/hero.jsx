@@ -3,8 +3,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Search, X } from 'lucide-react';
+import TabNavigation from './tabs';
+import { SearchOverlay } from './search';
 
-const tabs = [
+export const HERO_TABS = [
   { id: 'featured-events', label: 'Featured Events' },
   { id: 'upcoming', label: 'Upcoming' },
   { id: 'categories', label: 'Categories' },
@@ -19,39 +21,10 @@ const backgroundImages = [
   { src: '/images/yoga.jpg', style: { top: '40%', right: '25%', width: '320px', height: '240px', transform: 'rotate(15deg)' }}
 ];
 
-const SearchOverlay = ({ isOpen, onClose, onSearch }) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50">
-      <div className="bg-white p-4 w-full">
-        <div className="container mx-auto">
-          <div className="relative">
-            <Input
-              type="search"
-              placeholder="Search events, organisers, venues or artists"
-              className="w-full pl-10 pr-4 py-6 text-lg"
-              autoFocus
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-2 top-1/2 transform -translate-y-1/2"
-              onClick={onClose}
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const Hero = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('featured-events');
+  const [activeTab, setActiveTab] = useState(HERO_TABS[0].id);
 
   const handleSearchClick = () => {
     setIsSearchOpen(true);
@@ -109,32 +82,11 @@ const Hero = () => {
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 bg-black/20 backdrop-blur-sm">
-            <div className="container mx-auto px-4">
-              <div className="overflow-x-auto">
-                <nav className="flex space-x-8" aria-label="Tabs">
-                  {tabs.map((tab) => (
-                    <a
-                      key={tab.id}
-                      href={`#section-${tab.id}`}
-                      className={`
-                        whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm drop-shadow
-                        ${activeTab === tab.id 
-                          ? 'border-white text-white' 
-                          : 'border-transparent text-white/70 hover:text-white hover:border-white/50'}
-                      `}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setActiveTab(tab.id);
-                      }}
-                    >
-                      {tab.label}
-                    </a>
-                  ))}
-                </nav>
-              </div>
-            </div>
-          </div>
+          <TabNavigation 
+            tabs={HERO_TABS}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+          />
         </div>
       </div>
 
