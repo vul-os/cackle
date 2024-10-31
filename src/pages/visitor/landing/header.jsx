@@ -4,9 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Menu, X } from 'lucide-react';
 import Logo from '/src/assets/cackle.svg'
 import LogoFallback from '/src/assets/cackle.png'
+import { useTheme } from '@/components/theme-provider'
+import { Moon, Sun } from "lucide-react"
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { theme, setTheme } = useTheme()
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 border-b border-slate-800 shadow-sm">
@@ -46,6 +49,16 @@ const Header = () => {
             >
               Sign Up
             </Button>
+            <Button
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                {theme === "light" ? (
+                  <Moon className="h-5 w-5" />
+                ) : (
+                  <Sun className="h-5 w-5" />
+                )}
+              </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -83,6 +96,16 @@ const Header = () => {
                 className="bg-[#FF4848] text-white hover:bg-red"
               >
                 Sign Up
+              </Button>
+              <Button
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                {theme === "light" ? (
+                  <Moon className="h-5 w-5" />
+                ) : (
+                  <Sun className="h-5 w-5" />
+                )}
               </Button>
               <select className="bg-slate-800 border border-slate-700 rounded p-2 mt-2 text-slate-300 focus:border-blue-500 focus:ring-blue-500">
                 <option value="en">English</option>
