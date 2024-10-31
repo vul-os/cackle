@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/services/supabaseClient';
 import { AuthContext } from './use-auth';
+import { jwtDecode } from 'jwt-decode'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -54,6 +55,7 @@ export function AuthProvider({ children }) {
       setLoading(true);
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
+
         if (error) throw error;
         if (session) {
           setUser(session.user);

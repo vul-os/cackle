@@ -3,9 +3,11 @@ import { AuthContext } from '@/context/use-auth';
 import { supabase } from '@/services/supabaseClient';
 import { 
   Users, 
-  MoreVertical,
   Shield,
-  UserPlus
+  UserPlus,
+  Mail,
+  X,
+  Loader2,
 } from 'lucide-react';
 import {
   Card,
@@ -15,194 +17,287 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
+
+const AVAILABLE_ROLES = ['admin', 'viewer'];
+
+const InviteMemberDialog = ({ open, onOpenChange, onInvite, isLoading }) => {
+  const [email, setEmail] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const success = await onInvite(email, selectedRole);
+    if (success) {
+      setEmail('');
+      setSelectedRole('');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Invite New Member</DialogTitle>
+          <DialogDescription>
+            Send an invitation to join your organization
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                placeholder="Email address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role</label>
+              <Select
+                value={selectedRole}
+                onValueChange={setSelectedRole}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABLE_ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading || !email || !selectedRole}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Invitation'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const SettingsPage = () => {
   const { user, activeOrganization } = useContext(AuthContext);
   const [members, setMembers] = useState([]);
+  const [invitations, setInvitations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
-  // Fetch organization members
-  const fetchMembers = async () => {
+  const fetchData = async () => {
     if (!activeOrganization) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('organization_members')
-        .select(`
-          *,
-          profiles:profile_id (
-            email,
-            full_name
-          )
-        `)
-        .eq('organization_id', activeOrganization.id);
 
-      if (error) throw error;
-      setMembers(data || []);
+    try {
+      setLoading(true);
+      const [membersData, invitationsData] = await Promise.all([
+        supabase
+          .from('organization_members')
+          .select(`
+            id,
+            role,
+            profiles:profile_id (email, full_name)
+          `)
+          .eq('organization_id', activeOrganization.id),
+        supabase.rpc('get_organization_pending_invitations', {
+          p_organization_id: activeOrganization.id
+        }),
+      ]);
+
+      if (membersData.error) throw membersData.error;
+      if (invitationsData.error) throw invitationsData.error;
+
+      setMembers(membersData.data || []);
+      setInvitations(invitationsData.data || []);
     } catch (error) {
-      console.error('Error fetching members:', error);
-      toast.error('Failed to load members');
+      console.error('Error fetching data:', error);
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchMembers();
+    fetchData();
     
-    // Set up real-time subscription
     if (activeOrganization) {
-      const subscription = supabase
-        .channel('org-members-changes')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'organization_members',
-            filter: `organization_id=eq.${activeOrganization.id}`
-          }, 
-          () => {
-            fetchMembers();
-          }
-        )
+      // Subscribe to all relevant tables
+      const channel = supabase
+        .channel(`org-changes-${activeOrganization.id}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'organization_members',
+          filter: `organization_id=eq.${activeOrganization.id}`
+        }, () => fetchData())
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'organization_invitations',
+          filter: `organization_id=eq.${activeOrganization.id}`
+        }, () => fetchData())
         .subscribe();
 
       return () => {
-        subscription.unsubscribe();
+        supabase.removeChannel(channel);
       };
     }
   }, [activeOrganization]);
 
-  const handleInviteMember = async () => {
-    if (!inviteEmail.trim() || !activeOrganization) return;
-
+  const handleInviteMember = async (email, role) => {
+    setInviteLoading(true);
     try {
-      // In a real application, you would:
-      // 1. Check if the user exists in your system
-      // 2. Send an invitation email
-      // 3. Create a pending invitation record
-      // For now, we'll just show a success message
-      toast.success(`Invitation sent to ${inviteEmail}`);
-      setInviteEmail('');
+      const { error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email,
+          organization_id: activeOrganization.id,
+          role
+        }
+      });
+
+      if (error) throw error;
+      
+      toast.success(`Invitation sent to ${email}`);
       setInviteDialogOpen(false);
+      
+      // Manually refresh data after successful invitation
+      await fetchData();
+      return true;
     } catch (error) {
       console.error('Error inviting member:', error);
-      toast.error('Failed to send invitation');
+      toast.error(error.message || 'Failed to send invitation');
+      return false;
+    } finally {
+      setInviteLoading(false);
     }
   };
 
-  const handleUpdateRole = async (memberId, newRole) => {
+  const handleCancelInvitation = async (invitationId) => {
     try {
-      const { error } = await supabase
-        .from('organization_members')
-        .update({ role: newRole })
-        .eq('id', memberId);
+      const { error } = await supabase.rpc(
+        'cancel_organization_invitation',
+        { p_invitation_id: invitationId }
+      );
 
       if (error) throw error;
-      toast.success('Member role updated');
+      
+      toast.success('Invitation cancelled');
+      
+      // Manually refresh data after successful cancellation
+      await fetchData();
+      
+      // Update local state immediately for better UX
+      setInvitations(prev => prev.filter(inv => inv.id !== invitationId));
     } catch (error) {
-      console.error('Error updating role:', error);
-      toast.error('Failed to update role');
+      console.error('Error cancelling invitation:', error);
+      toast.error(error.message || 'Failed to cancel invitation');
     }
   };
 
-  const handleRemoveMember = async (memberId) => {
-    try {
-      const { error } = await supabase
-        .from('organization_members')
-        .delete()
-        .eq('id', memberId);
-
-      if (error) throw error;
-      toast.success('Member removed');
-    } catch (error) {
-      console.error('Error removing member:', error);
-      toast.error('Failed to remove member');
-    }
-  };
-
-  const getRoleLabel = (role) => {
-    switch (role) {
-      case 'owner':
-        return 'Owner';
-      case 'admin':
-        return 'Admin';
-      case 'member':
-        return 'Member';
-      default:
-        return 'Unknown';
-    }
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="container mx-auto bg-white py-8 max-w-6xl">
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Settings</h1>
-        </div>
-
-        {/* Members Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Members</CardTitle>
-              <CardDescription>
-                Manage your organization members and their roles
-              </CardDescription>
+    <div className="container mx-auto py-8 max-w-6xl">
+      <Card>
+        <CardHeader>
+          <CardTitle>Members</CardTitle>
+          <CardDescription>
+            Manage your organization members and their roles
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="flex justify-end">
+              <InviteMemberDialog
+                open={inviteDialogOpen}
+                onOpenChange={setInviteDialogOpen}
+                onInvite={handleInviteMember}
+                isLoading={inviteLoading}
+              />
+              <Button onClick={() => setInviteDialogOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Invite Member
+              </Button>
             </div>
-            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Invite Member
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Invite New Member</DialogTitle>
-                  <DialogDescription>
-                    Send an invitation to join your organization
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                  <Input
-                    placeholder="Email address"
-                    type="email"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                  />
+
+            {/* Pending Invitations */}
+            {invitations.length > 0 && (
+              <div className="rounded-md border">
+                <div className="bg-muted px-4 py-2 border-b">
+                  <h3 className="text-sm font-medium">Pending Invitations</h3>
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleInviteMember}>
-                    Send Invitation
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
-          <CardContent>
+                <div className="divide-y">
+                  {invitations.map((invitation) => (
+                    <div
+                      key={invitation.id}
+                      className="flex items-center justify-between p-4"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                          <Mail className="h-5 w-5 text-gray-500" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{invitation.email}</p>
+                          <p className="text-sm text-gray-500">
+                            {invitation.role.charAt(0).toUpperCase() + invitation.role.slice(1)} • Invited by {invitation.invited_by_name}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCancelInvitation(invitation.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Members List */}
             <div className="rounded-md border">
               <div className="divide-y">
                 {members.map((member) => (
@@ -227,42 +322,17 @@ const SettingsPage = () => {
                       <div className="flex items-center space-x-1">
                         <Shield className="h-4 w-4 text-gray-500" />
                         <span className="text-sm text-gray-500">
-                          {getRoleLabel(member.role)}
+                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                         </span>
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleUpdateRole(member.id, 'admin')}
-                          >
-                            Make Admin
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleUpdateRole(member.id, 'member')}
-                          >
-                            Make Member
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => handleRemoveMember(member.id)}
-                          >
-                            Remove Member
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
