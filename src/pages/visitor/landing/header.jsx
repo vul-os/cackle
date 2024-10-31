@@ -12,7 +12,7 @@ const Header = () => {
   const { theme, setTheme } = useTheme()
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-slate-900 border-b border-slate-800 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo Section */}
@@ -39,26 +39,28 @@ const Header = () => {
             <Button
               variant="ghost"
               size="sm"
-              className="text-slate-300 hover:text-slate-100 hover:bg-slate-800"
+              className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
             >
               Log In
             </Button>
             <Button
               size="sm"
-              className="bg-[#FF4848] text-white hover:bg-red"
+              className="bg-[#FF4848] text-white hover:bg-red-600"
             >
               Sign Up
             </Button>
             <Button
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                {theme === "light" ? (
-                  <Moon className="h-5 w-5" />
-                ) : (
-                  <Sun className="h-5 w-5" />
-                )}
-              </Button>
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              variant="ghost"
+              size="icon"
+              className="rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+            >
+              {theme === "light" ? (
+                <Moon className="h-5 w-5 text-gray-600" />
+              ) : (
+                <Sun className="h-5 w-5 text-slate-300" />
+              )}
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -67,7 +69,7 @@ const Header = () => {
               variant="ghost"
               size="sm"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="inline-flex items-center justify-center p-2 text-slate-300 hover:text-slate-100 hover:bg-slate-800"
+              className="inline-flex items-center justify-center p-2 text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
             >
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -81,33 +83,38 @@ const Header = () => {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-slate-900 border-t border-slate-800">
+        <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800">
           <div className="px-2 pt-2 pb-3 space-y-1">
             <div className="flex flex-col space-y-2 p-2">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-slate-300 hover:text-slate-100 hover:bg-slate-800"
+                className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
               >
                 Log In
               </Button>
               <Button
                 size="sm"
-                className="bg-[#FF4848] text-white hover:bg-red"
+                className="bg-[#FF4848] text-white hover:bg-red-600"
               >
                 Sign Up
               </Button>
               <Button
                 onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+                variant="ghost"
+                size="sm"
+                className="rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center justify-center"
               >
                 {theme === "light" ? (
-                  <Moon className="h-5 w-5" />
+                  <Moon className="h-5 w-5 text-gray-600" />
                 ) : (
-                  <Sun className="h-5 w-5" />
+                  <Sun className="h-5 w-5 text-slate-300" />
                 )}
+                <span className="ml-2">
+                  {theme === "light" ? "Dark Mode" : "Light Mode"}
+                </span>
               </Button>
-              <select className="bg-slate-800 border border-slate-700 rounded p-2 mt-2 text-slate-300 focus:border-blue-500 focus:ring-blue-500">
+              <select className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded p-2 mt-2 text-gray-600 dark:text-slate-300 focus:border-blue-500 focus:ring-blue-500">
                 <option value="en">English</option>
               </select>
             </div>

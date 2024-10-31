@@ -63,13 +63,29 @@ function Hero() {
     setActiveTab(tabId);
     const element = document.getElementById(tabId);
     if (element) {
+      // Get the viewport width to check if we're on mobile
+      const isMobile = window.innerWidth < 768; // 768px is typically the mobile breakpoint
+      
+      // Adjust header and tabs height based on mobile or desktop
       const headerHeight = 64;
       const tabsHeight = 56;
-      const totalOffset = isSticky ? headerHeight + tabsHeight : headerHeight;
       
-      window.scrollTo({
-        top: element.offsetTop - totalOffset,
-        behavior: 'smooth'
+      // On mobile, we need to consider if the tabs are sticky
+      let totalOffset;
+      if (isMobile) {
+        totalOffset = isSticky ? headerHeight + tabsHeight : headerHeight;
+        // Add additional offset for mobile to account for smaller screens
+        totalOffset += 16; // Add some extra padding for better visibility
+      } else {
+        totalOffset = isSticky ? headerHeight + tabsHeight : headerHeight;
+      }
+      
+      // Use requestAnimationFrame to ensure the DOM has updated
+      requestAnimationFrame(() => {
+        window.scrollTo({
+          top: element.offsetTop - totalOffset,
+          behavior: 'smooth'
+        });
       });
     }
   };
@@ -170,14 +186,14 @@ function Hero() {
         .particle-container:nth-child(5) { animation-delay: 0.8s; }
       `}</style>
 
-      <div className="relative min-h-[600px] bg-black dark:bg-slate-950 transition-colors duration-200 mt-16">
+      <div className="relative min-h-[400px] md:min-h-[600px] bg-black dark:bg-slate-950 transition-colors duration-200 mt-16">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute inset-0 bg-black dark:bg-slate-950 transition-colors duration-200" />
           
           {backgroundImages.map((img, index) => (
             <div
               key={index}
-              className="absolute rounded-xl overflow-hidden transition-transform duration-700 ease-in-out hover:scale-105"
+              className="absolute rounded-xl overflow-hidden transition-transform duration-700 ease-in-out hover:scale-105 hidden md:block"
               style={img.style}
             >
               <img
@@ -197,12 +213,12 @@ function Hero() {
         </div>
 
         <div className="relative z-10">
-          <div className="hero-content container mx-auto px-4 pt-24 pb-32">
+          <div className="hero-content container mx-auto px-4 md:px-6 pt-12 md:pt-24 pb-16 md:pb-32">
             <div className="max-w-2xl">
-              <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-red-400 via-red-500 to-red-600 bg-clip-text text-transparent drop-shadow-lg">
+              <h1 className="text-3xl md:text-5xl font-bold mb-4 md:mb-6 bg-gradient-to-r from-red-400 via-red-500 to-red-600 bg-clip-text text-transparent drop-shadow-lg">
                 At the heart of the best events
               </h1>
-              <p className="text-xl mb-16 text-white dark:text-slate-200 opacity-90 drop-shadow transition-colors duration-200">
+              <p className="text-lg md:text-xl mb-8 md:mb-16 text-white dark:text-slate-200 opacity-90 drop-shadow transition-colors duration-200">
                 Less work, more play. Whether you're into online streams, weekend festivals 
                 or daytime get-togethers; we have something for you. Find what you're 
                 looking for and join the movement.
@@ -212,9 +228,9 @@ function Hero() {
                 className="bg-white/90 dark:bg-slate-900/90 backdrop-blur cursor-pointer hover:shadow-lg transition-all duration-200"
                 onClick={handleSearchClick}
               >
-                <CardContent className="p-4 flex items-center text-gray-600 dark:text-slate-300">
-                  <Search className="h-5 w-5 mr-3" />
-                  <span>Search events, organisers, venues or artists</span>
+                <CardContent className="p-3 md:p-4 flex items-center text-gray-600 dark:text-slate-300">
+                  <Search className="h-4 md:h-5 w-4 md:w-5 mr-2 md:mr-3" />
+                  <span className="text-sm md:text-base">Search events, organisers, venues or artists</span>
                 </CardContent>
               </Card>
             </div>
@@ -231,14 +247,14 @@ function Hero() {
           }`}
         >
           <div className="container mx-auto">
-            <div className="flex space-x-12">
+            <div className="grid grid-cols-4 w-full">
               {HERO_TABS.map((tab) => (
                 <div key={tab.id} className="relative">
                   <button
                     onClick={() => handleTabClick(tab.id)}
                     onMouseEnter={() => setHoveredTab(tab.id)}
                     onMouseLeave={() => setHoveredTab(null)}
-                    className={`px-6 py-4 text-lg font-medium transition-all duration-300 relative
+                    className={`w-full px-2 md:px-6 py-3 md:py-4 text-xs md:text-lg font-medium whitespace-nowrap transition-all duration-300 relative
                       ${activeTab === tab.id 
                         ? 'text-white border-b-2 border-red-500 scale-105 transform' 
                         : 'text-gray-400 hover:text-white hover:scale-105 transform'
