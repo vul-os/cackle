@@ -134,7 +134,7 @@ const EventTicketTypes = () => {
         sale_end_time: formData.sale_end_time,
       };
 
-      if (state.editingTicketType) {
+      if (state.editingTicketType?.id) {
         await ticketTypeService.updateTicketType(state.editingTicketType.id, ticketTypeData);
         toast({
           title: "Success",
@@ -190,6 +190,7 @@ const EventTicketTypes = () => {
     setState(prev => ({
       ...prev,
       editingTicketType: {
+        id: null, // Explicitly set id to null for new ticket types
         ...getInitialTicketDates()
       },
       isDialogOpen: true
@@ -208,7 +209,15 @@ const EventTicketTypes = () => {
   }, [getInitialTicketDates]);
 
   const handleDialogOpenChange = useCallback((open) => {
-    setState(prev => ({ ...prev, isDialogOpen: open }));
+    if (!open) {
+      setState(prev => ({ 
+        ...prev, 
+        isDialogOpen: false,
+        editingTicketType: null // Reset editing ticket type when dialog is closed
+      }));
+    } else {
+      setState(prev => ({ ...prev, isDialogOpen: true }));
+    }
   }, []);
 
   if (state.loading) return <Spinner />;
