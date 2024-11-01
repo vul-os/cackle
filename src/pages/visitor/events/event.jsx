@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import ReactMarkdown from 'react-markdown';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '@/services/supabaseClient';
@@ -13,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Info, Ticket, Clock, ArrowRight } from 'lucide-react';
 
-// Custom marker icon
+// Custom marker icon configuration remains the same
 const customIcon = L.divIcon({
   className: 'custom-div-icon',
   html: `
@@ -43,6 +44,7 @@ const customIcon = L.divIcon({
   popupAnchor: [0, -42],
 });
 
+// Image slider component remains the same
 const ImageSlider = ({ images, currentImage }) => (
   <div className="h-screen max-h-[500px] relative overflow-hidden">
     {images.map((image, index) => (
@@ -64,6 +66,7 @@ const ImageSlider = ({ images, currentImage }) => (
   </div>
 );
 
+// Event header component remains the same
 const EventHeader = ({ category, title }) => (
   <div className="absolute bottom-0 left-0 right-0 p-12 bg-gradient-to-t from-black/80 to-transparent">
     <div className="max-w-4xl mx-auto">
@@ -77,6 +80,7 @@ const EventHeader = ({ category, title }) => (
   </div>
 );
 
+// Quick info components remain the same
 const EventQuickInfo = ({ date, time, location }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
     <QuickInfoItem 
@@ -114,82 +118,107 @@ const QuickInfoItem = ({ icon, title, subtitle }) => (
   </div>
 );
 
-const LocationSection = ({ location, latitude, longitude }) => (
-  <div className="rounded-2xl overflow-hidden bg-gray-900 shadow-lg border border-gray-800">
-    <div className="aspect-video">
-      <MapContainer 
-        center={[latitude, longitude]} 
-        zoom={15} 
-        style={{ height: '100%', width: '100%' }}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        <Marker position={[latitude, longitude]} icon={customIcon}>
-          <Popup>
-            <div className="p-2">
-              <h3 className="font-semibold">{location}</h3>
-            </div>
-          </Popup>
-        </Marker>
-      </MapContainer>
-    </div>
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold text-[#7766F7]">Event Location</h3>
-        <Button 
-          variant="outline" 
-          className="text-[#7766F7] border-[#7766F7] hover:bg-[#7766F7]/10"
-          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`)}
-        >
-          <MapPin className="h-4 w-4 mr-2" />
-          Get Directions
-        </Button>
-      </div>
-      <p className="text-gray-300">{location}</p>
-    </div>
-  </div>
-);
-
+// Updated EventDetailsSection with markdown support
 const EventDetailsSection = ({ description }) => (
   <div className="bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-gray-800">
     <div className="p-6">
       <h2 className="text-2xl font-semibold text-[#7766F7] mb-4">Event Details</h2>
-      <div className="prose prose-lg prose-invert">
-        <p className="text-gray-300 leading-relaxed">{description}</p>
+      <div className="prose prose-lg prose-invert max-w-none">
+        <ReactMarkdown>{description || ''}</ReactMarkdown>
       </div>
     </div>
   </div>
 );
 
-const InformationSection = ({ policyInfo }) => {
+// Updated InformationSection with markdown support
+const InformationSection = ({ information, policyInfo }) => {
   return (
-    <div className="bg-gray-900 rounded-2xl shadow-lg border border-gray-800">
-      <div className="p-6">
-        <h2 className="text-2xl font-semibold text-[#7766F7] mb-6">Information</h2>
-        <div className="space-y-8">
-          {policyInfo && Object.entries(policyInfo).map(([category, items]) => (
-            <div key={category} className="border-b border-gray-800 last:border-0 pb-6 last:pb-0">
-              <h3 className="text-lg font-medium mb-4 text-gray-100">{category}</h3>
-              <ul className="space-y-3">
-                {Array.isArray(items) && items.map((item, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <div className="mt-1">
-                      <Info className="h-4 w-4 text-[#7766F7]" />
-                    </div>
-                    <span className="text-gray-300">{item}</span>
-                  </li>
-                ))}
-              </ul>
+    <div className="space-y-8">
+      {information && (
+        <div className="bg-gray-900 rounded-2xl shadow-lg border border-gray-800">
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold text-[#7766F7] mb-4">Information</h2>
+            <div className="prose prose-invert max-w-none">
+              <ReactMarkdown>{information}</ReactMarkdown>
             </div>
-          ))}
+          </div>
         </div>
+      )}
+      
+      {policyInfo && (
+        <div className="bg-gray-900 rounded-2xl shadow-lg border border-gray-800">
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold text-[#7766F7] mb-6">Policies</h2>
+            <div className="space-y-8">
+              {Object.entries(policyInfo).map(([category, items]) => (
+                <div key={category} className="border-b border-gray-800 last:border-0 pb-6 last:pb-0">
+                  <h3 className="text-lg font-medium mb-4 text-gray-100">{category}</h3>
+                  <ul className="space-y-3">
+                    {Array.isArray(items) && items.map((item, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <div className="mt-1">
+                          <Info className="h-4 w-4 text-[#7766F7]" />
+                        </div>
+                        <span className="text-gray-300">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const LocationSection = ({ location, latitude, longitude }) => {
+  const handleGetDirections = () => {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`);
+  };
+
+  return (
+    <div className="rounded-2xl overflow-hidden bg-gray-900 shadow-lg border border-gray-800">
+      <div className="aspect-video relative">
+        <MapContainer 
+          center={[latitude, longitude]} 
+          zoom={15} 
+          className="h-full w-full"
+          zoomControl={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <Marker position={[latitude, longitude]} icon={customIcon}>
+            <Popup>
+              <div className="p-2">
+                <h3 className="font-semibold">{location}</h3>
+              </div>
+            </Popup>
+          </Marker>
+        </MapContainer>
+      </div>
+      <div className="p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-[#7766F7]">Event Location</h3>
+          <Button 
+            variant="outline" 
+            className="text-[#7766F7] border-[#7766F7] hover:bg-[#7766F7]/10"
+            onClick={handleGetDirections}
+          >
+            <MapPin className="h-4 w-4 mr-2" />
+            Get Directions
+          </Button>
+        </div>
+        <p className="text-gray-300">{location}</p>
       </div>
     </div>
   );
 };
 
+// Main EventPage component
 const EventPage = () => {
   const { id } = useParams();
   const [event, setEvent] = useState(null);
@@ -197,7 +226,6 @@ const EventPage = () => {
   const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
 
-  // Placeholder images - replace with actual event images
   const images = [
     '/api/placeholder/1200/600',
     '/api/placeholder/1200/600',
@@ -214,6 +242,16 @@ const EventPage = () => {
           .single();
 
         if (error) throw error;
+        
+        // Parse policy_info if it's a string
+        if (typeof data.policy_info === 'string') {
+          try {
+            data.policy_info = JSON.parse(data.policy_info);
+          } catch (e) {
+            console.error('Error parsing policy_info:', e);
+          }
+        }
+        
         setEvent(data);
       } catch (err) {
         setError(err.message);
@@ -281,7 +319,10 @@ const EventPage = () => {
           />
         </div>
         <div className="col-span-1">
-          <InformationSection policyInfo={event.policy_info} />
+          <InformationSection 
+            information={event.information}
+            policyInfo={event.policy_info} 
+          />
         </div>
       </div>
     </div>
