@@ -10,8 +10,7 @@ import SignIn from './pages/auth/signin';
 import SignUp from './pages/auth/signup';
 import ForgotPassword from './pages/auth/forgot-password';
 import UpdatePassword from './pages/auth/update-password';
-
-// Protected Pages
+import AcceptInvite from './pages/auth/accept-invite';
 
 
 // Components
@@ -32,8 +31,8 @@ import EventTicketTypes from './pages/organizers/events/event/tickets';
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Public routes */}
       <Route element={<BlankLayout />}>
+        {/* Public routes */}
         <Route exact path="/" element={<LandingPage />} />
         <Route exact path="/docs" element={<DocsPage />} />
         <Route exact path="/events/" element={<VisitorEventPage />} />
@@ -42,6 +41,9 @@ const AppRoutes = () => {
         <Route path="/password-reset" element={<ForgotPassword />} />
         <Route path="/update-password" element={<UpdatePassword />} />
         <Route path="*" element={<NotFound />} />
+
+        {/* Protected routes */}
+        <Route path="/accept-invite" element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
       </Route>
 
       {/* Protected routes */}
@@ -54,6 +56,7 @@ const AppRoutes = () => {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>
+
     </Routes>
   );
 };
