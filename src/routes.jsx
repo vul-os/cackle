@@ -25,8 +25,10 @@ import SettingsPage from './pages/organizers/settings';
 import EventPage from './pages/organizers/events/event';
 
 import VisitorEventPage from './pages/visitor/events/event';
-import EventTicketTypes from './pages/organizers/events/event/tickets';
-
+import EventTicketsLayout from './pages/organizers/events/event/tickets';
+import TicketsView from './pages/organizers/events/event/tickets/tickets-view';
+import TicketTypesView from './pages/organizers/events/event/tickets/ticket-types-view';
+import ScannerPage from './pages/organizers/scanner';
 
 const AppRoutes = () => {
   return (
@@ -52,9 +54,15 @@ const AppRoutes = () => {
       {/* Protected routes */}
       <Route element={<MainLayout />}>
         <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/scanner" element={<ProtectedRoute><ScannerPage /></ProtectedRoute>} />
+
         <Route path="/admin/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/admin/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
-        <Route path="/admin/events/:id/tickets" element={<ProtectedRoute><EventTicketTypes /></ProtectedRoute>} />
+        {/* <Route path="/admin/events/:id/tickets" element={<ProtectedRoute><EventTicketTypes /></ProtectedRoute>} /> */}
+        <Route path="/admin/events/:id/tickets" element={<EventTicketsLayout />}>
+          <Route index element={<TicketsView />} />
+          <Route path="types" element={<TicketTypesView />} />
+        </Route>
 
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />

@@ -2,13 +2,15 @@ import React from 'react';
 import {
   Home,
   CalendarDays,
-  Settings
+  Settings,
+  QrCode  // Add this import
 } from 'lucide-react';
 import { NavItem } from './nav-item';
 
 const navItems = [
   { to: '/home', icon: Home, text: 'Home' },
   { to: '/admin/events', icon: CalendarDays, text: 'Events' },
+  { to: '/scanner', icon: QrCode, text: 'Scanner' },  // Add this line
   { to: '/settings', icon: Settings, text: 'Settings' }
 ];
 
