@@ -31,24 +31,37 @@ const SectionHeader = ({ title, subtitle, seeAllLink }) => (
 
 function HowlerLandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-r from-gray-200 via-white to-gray-200 dark:from-navy-950 dark:via-slate-950 dark:to-navy-950 transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-gradient-to-r from-white via-red-50 to-white dark:from-black dark:via-red-950 dark:to-black transition-colors duration-200">
       {/* Background Gradients */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-900 via-gray-950 to-black dark:from-navy-900 dark:via-navy-950 dark:to-slate-950 transition-colors duration-200" />
+        {/* Main gradient overlay */}
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-100 via-white to-red-50 dark:from-red-950 dark:via-black dark:to-red-900 transition-colors duration-200" />
         
-        <div className="absolute top-0 -left-48 w-96 h-96 bg-gray-800/40 dark:bg-navy-800/20 rounded-full blur-3xl animate-pulse" />
+        {/* Animated floating orbs */}
+        <div className="absolute top-0 -left-48 w-96 h-96 bg-red-500/20 dark:bg-red-800/30 rounded-full blur-3xl animate-pulse" />
         
         <div 
-          className="absolute top-1/4 -right-48 w-96 h-96 bg-gray-900/40 dark:bg-navy-700/20 rounded-full blur-3xl animate-pulse" 
+          className="absolute top-1/4 -right-48 w-96 h-96 bg-black/10 dark:bg-red-600/20 rounded-full blur-3xl animate-pulse" 
           style={{ animationDelay: '1s' }}
         />
         
         <div 
-          className="absolute bottom-0 left-1/3 w-96 h-96 bg-black/30 dark:bg-navy-600/10 rounded-full blur-3xl animate-pulse" 
+          className="absolute bottom-0 left-1/3 w-96 h-96 bg-red-300/20 dark:bg-red-950/30 rounded-full blur-3xl animate-pulse" 
           style={{ animationDelay: '2s' }}
         />
         
-        <div className="absolute inset-0 bg-[url('/api/placeholder/8/8')] opacity-[0.02] bg-repeat" />
+        {/* Geometric patterns */}
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,black_25%,transparent_25%,transparent_75%,black_75%)] bg-[length:60px_60px] opacity-[0.03] dark:opacity-[0.05]" />
+        
+        {/* Additional decorative elements */}
+        <div className="absolute top-1/2 left-1/4 w-32 h-32 border border-red-200 dark:border-red-800 rounded-full opacity-20 animate-spin" style={{ animationDuration: '20s' }} />
+        
+        <div className="absolute bottom-1/4 right-1/4 w-48 h-48 border border-red-300 dark:border-red-700 rounded-full opacity-10 animate-spin" style={{ animationDuration: '30s', animationDirection: 'reverse' }} />
+        
+        {/* Subtle texture overlay */}
+        <div className="absolute inset-0 mix-blend-overlay bg-[url('/api/placeholder/8/8')] opacity-[0.02] bg-repeat" />
+        
+        {/* Blur effect */}
         <div className="absolute inset-0 backdrop-blur-[100px]" />
       </div>
 
@@ -144,13 +157,13 @@ function HowlerLandingPage() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                   
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#800020]/80 to-[#FF4D6A]/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-black/70 to-black/40" />
                   
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 to-black/20 flex flex-col justify-end p-6 transition-colors duration-200">
-                    <h3 className="font-bold text-xl text-white drop-shadow-md tracking-wide">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 space-y-2">
+                    <h3 className="font-black text-xl text-white drop-shadow-lg tracking-widest uppercase transition-colors duration-300 font-futura">
                       {category.title}
                     </h3>
-                    <p className="text-sm font-medium text-white/80 drop-shadow">
+                    <p className="text-sm font-extrabold text-white/75 drop-shadow-lg tracking-wider uppercase transition-all duration-300 font-orbitron">
                       {category.eventCount} Events
                     </p>
                   </div>

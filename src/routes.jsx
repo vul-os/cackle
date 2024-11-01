@@ -35,11 +35,14 @@ const AppRoutes = () => {
         {/* Public routes */}
         <Route exact path="/" element={<LandingPage />} />
         <Route exact path="/docs" element={<DocsPage />} />
-        <Route exact path="/events/" element={<VisitorEventPage />} />
+        {/* <Route exact path="/events/" element={<VisitorEventPage />} /> */}
+        <Route path="/events/:id" element={<VisitorEventPage />} />
+
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/password-reset" element={<ForgotPassword />} />
         <Route path="/update-password" element={<UpdatePassword />} />
+
         <Route path="*" element={<NotFound />} />
 
         {/* Protected routes */}

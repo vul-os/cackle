@@ -24,7 +24,7 @@ const backgroundImages = [
 const Firework = memo(() => {
   return (
     <div className="firework">
-      {Array.from({ length: 5 }, (_, i) => (
+      {Array.from({ length: 4 }, (_, i) => (
         <div key={i} className="particle-container">
           {Array.from({ length: 24 }, (_, j) => (
             <div key={j} className={`particle particle-${j}`} />
@@ -104,31 +104,45 @@ function Hero() {
   const handleTabClick = useCallback((tabId) => {
     setActiveTab(tabId);
     
-    // Always scroll to section, regardless of device type
     const element = document.getElementById(tabId);
-    if (element) {
-      const headerHeight = 64;
-      const tabsHeight = 56;
-      const totalOffset = isSticky ? headerHeight + tabsHeight + 16 : headerHeight + 16;
-      
-      window.scrollTo({
-        top: element.offsetTop - totalOffset,
-        behavior: 'smooth'
-      });
+    if (!element) {
+      console.warn(`Section with id ${tabId} not found`);
+      return;
     }
+
+    const headerHeight = 64;
+    const tabsHeight = 56;
+    const totalOffset = isSticky ? headerHeight + tabsHeight : headerHeight;
+    
+    requestAnimationFrame(() => {
+      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+      const offsetPosition = elementPosition - totalOffset;
+      
+      // Only scroll if the element is not already in view
+      const currentScroll = window.pageYOffset;
+      const viewportHeight = window.innerHeight;
+      const elementHeight = element.offsetHeight;
+      
+      if (elementPosition < headerHeight || elementPosition + elementHeight > viewportHeight) {
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    });
   }, [isSticky]);
 
   return (
     <>      
       <style jsx>{`
-        @keyframes explode {
+        @keyframes burstOut {
           0% {
-            transform: translate(-50%, -50%) scale(0);
+            transform: translate(-50%, -50%) scale(0.2);
             opacity: 1;
           }
           50% {
-            transform: translate(-50%, -50%) scale(0.6);
-            opacity: 1;
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 0.8;
           }
           100% {
             transform: translate(-50%, -50%) scale(1.2);
@@ -136,13 +150,16 @@ function Hero() {
           }
         }
 
-        @keyframes particle {
+        @keyframes particleExplosion {
           0% {
-            transform: translate(0, 0) scale(1);
+            transform: translate(0, 0) scale(0.2);
+            opacity: 0;
+          }
+          15% {
             opacity: 1;
           }
           50% {
-            transform: translate(calc(var(--tx) * 0.6), calc(var(--ty) * 0.6)) scale(0.8);
+            transform: translate(calc(var(--tx) * 0.5), calc(var(--ty) * 0.5)) scale(0.8);
             opacity: 0.8;
           }
           100% {
@@ -163,7 +180,7 @@ function Hero() {
           position: absolute;
           top: 0;
           left: 0;
-          animation: explode 1.5s ease-out forwards;
+          animation: burstOut 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         }
 
         .particle {
@@ -173,19 +190,22 @@ function Hero() {
           width: 6px;
           height: 6px;
           border-radius: 50%;
-          background: linear-gradient(to right, #ff4d4d, #ff0000);
-          animation: particle 1.8s ease-out forwards;
-          box-shadow: 0 0 8px #ff4d4d;
+          background: linear-gradient(45deg, #ff0000, #ff4d4d);
+          animation: particleExplosion 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+          box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
         }
 
-        .particle:nth-child(1) { --tx: 80px; --ty: -80px; }
-        .particle:nth-child(2) { --tx: 80px; --ty: 80px; }
-        .particle:nth-child(3) { --tx: -80px; --ty: -80px; }
-        .particle:nth-child(4) { --tx: -80px; --ty: 80px; }
-        .particle:nth-child(5) { --tx: 100px; --ty: 0px; }
-        .particle:nth-child(6) { --tx: -100px; --ty: 0px; }
-        .particle:nth-child(7) { --tx: 0px; --ty: 100px; }
-        .particle:nth-child(8) { --tx: 0px; --ty: -100px; }
+        /* First ring - close range */
+        .particle:nth-child(1) { --tx: 60px; --ty: -60px; }
+        .particle:nth-child(2) { --tx: 60px; --ty: 60px; }
+        .particle:nth-child(3) { --tx: -60px; --ty: -60px; }
+        .particle:nth-child(4) { --tx: -60px; --ty: 60px; }
+        .particle:nth-child(5) { --tx: 85px; --ty: 0px; }
+        .particle:nth-child(6) { --tx: -85px; --ty: 0px; }
+        .particle:nth-child(7) { --tx: 0px; --ty: 85px; }
+        .particle:nth-child(8) { --tx: 0px; --ty: -85px; }
+
+        /* Second ring - medium range */
         .particle:nth-child(9) { --tx: 120px; --ty: -120px; }
         .particle:nth-child(10) { --tx: 120px; --ty: 120px; }
         .particle:nth-child(11) { --tx: -120px; --ty: -120px; }
@@ -194,6 +214,8 @@ function Hero() {
         .particle:nth-child(14) { --tx: 150px; --ty: 50px; }
         .particle:nth-child(15) { --tx: -150px; --ty: -50px; }
         .particle:nth-child(16) { --tx: -150px; --ty: 50px; }
+
+        /* Third ring - long range */
         .particle:nth-child(17) { --tx: 180px; --ty: -180px; }
         .particle:nth-child(18) { --tx: 180px; --ty: 180px; }
         .particle:nth-child(19) { --tx: -180px; --ty: -180px; }
@@ -203,10 +225,16 @@ function Hero() {
         .particle:nth-child(23) { --tx: -200px; --ty: -100px; }
         .particle:nth-child(24) { --tx: -200px; --ty: 100px; }
 
-        .particle-container:nth-child(2) { animation-delay: 0.2s; }
-        .particle-container:nth-child(3) { animation-delay: 0.4s; }
-        .particle-container:nth-child(4) { animation-delay: 0.6s; }
-        .particle-container:nth-child(5) { animation-delay: 0.8s; }
+        /* Stagger container animations */
+        .particle-container:nth-child(2) { animation-delay: 0.15s; }
+        .particle-container:nth-child(3) { animation-delay: 0.3s; }
+        .particle-container:nth-child(4) { animation-delay: 0.45s; }
+
+        /* Stagger particle animations within each container */
+        .particle-container:nth-child(1) .particle { animation-delay: calc(var(--index) * 0.05s); }
+        .particle-container:nth-child(2) .particle { animation-delay: calc(var(--index) * 0.05s + 0.15s); }
+        .particle-container:nth-child(3) .particle { animation-delay: calc(var(--index) * 0.05s + 0.3s); }
+        .particle-container:nth-child(4) .particle { animation-delay: calc(var(--index) * 0.05s + 0.45s); }
 
         @media (hover: none) {
           .particle {
@@ -218,19 +246,19 @@ function Hero() {
         }
 
         @media (min-width: 768px) {
-          .tabs-container {
-            overflow-y: hidden !important;
+          .hide-scrollbar {
+            overflow: hidden !important;
           }
         }
 
-        @media (max-width: 767px) {
-          .tabs-container {
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
-          }
-          .tabs-container::-webkit-scrollbar {
-            display: none;
-          }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
         }
       `}</style>
 
@@ -284,51 +312,53 @@ function Hero() {
             isSticky ? 'fixed top-16 left-0 right-0 z-40' : ''
           }`}
         >
-          <div className="container mx-auto tabs-container">
-            <div 
-              className={`flex md:grid md:grid-cols-4 w-full ${
-                isMobile ? 'min-w-[480px]' : ''
-              }`}
-            >
-              {HERO_TABS.map((tab) => (
-                <div 
-                  key={tab.id} 
-                  className="relative flex-shrink-0 md:flex-shrink"
-                >
-                  <button
-                    onClick={() => handleTabClick(tab.id)}
-                    onMouseEnter={() => !isMobile && setHoveredTab(tab.id)}
-                    onMouseLeave={() => !isMobile && setHoveredTab(null)}
-                    onTouchStart={() => isMobile && setHoveredTab(tab.id)}
-                    onTouchEnd={() => isMobile && setHoveredTab(null)}
-                    className={`
-                      w-full 
-                      px-2 sm:px-4 md:px-6 
-                      py-2 sm:py-3 md:py-4 
-                      text-xs sm:text-sm md:text-lg 
-                      font-medium 
-                      whitespace-nowrap 
-                      transition-all 
-                      duration-300 
-                      relative
-                      ${
-                        activeTab === tab.id 
-                          ? 'text-white border-b-2 border-red-500 scale-105 transform' 
-                          : 'text-gray-400 hover:text-white hover:scale-105 transform'
-                      }
-                      hover:bg-gradient-to-b 
-                      hover:from-transparent 
-                      hover:to-red-500/10
-                    `}
+          <div className="container mx-auto">
+            <div className="overflow-x-auto hide-scrollbar">
+              <div 
+                className={`flex md:grid md:grid-cols-4 w-full ${
+                  isMobile ? 'min-w-[480px]' : ''
+                }`}
+              >
+                {HERO_TABS.map((tab) => (
+                  <div 
+                    key={tab.id} 
+                    className="relative flex-shrink-0 md:flex-shrink"
                   >
-                    {tab.label}
-                    {activeTab === tab.id && (
-                      <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-400 to-red-600" />
-                    )}
-                  </button>
-                  {hoveredTab === tab.id && <Firework />}
-                </div>
-              ))}
+                    <button
+                      onClick={() => handleTabClick(tab.id)}
+                      onMouseEnter={() => !isMobile && setHoveredTab(tab.id)}
+                      onMouseLeave={() => !isMobile && setHoveredTab(null)}
+                      onTouchStart={() => isMobile && setHoveredTab(tab.id)}
+                      onTouchEnd={() => isMobile && setHoveredTab(null)}
+                      className={`
+                        w-full
+                        px-3 md:px-4
+                        py-2 md:py-3
+                        text-sm md:text-base
+                        font-medium
+                        whitespace-nowrap
+                        transition-all
+                        duration-300
+                        relative
+                        ${
+                          activeTab === tab.id
+                            ? 'text-white border-b-2 border-red-500 scale-105 transform'
+                            : 'text-gray-400 hover:text-white hover:scale-105 transform'
+                        }
+                        hover:bg-gradient-to-b
+                        hover:from-transparent
+                        hover:to-red-500/10
+                      `}
+                    >
+                      {tab.label}
+                      {activeTab === tab.id && (
+                        <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-red-400 to-red-600" />
+                      )}
+                    </button>
+                    {hoveredTab === tab.id && <Firework />}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

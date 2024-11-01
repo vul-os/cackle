@@ -1,4 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { supabase } from '@/services/supabaseClient';
 import {
   Card,
   CardContent,
@@ -8,38 +13,35 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Info, Ticket, Clock, ArrowRight } from 'lucide-react';
 
-const EventMap = () => (
-  <svg viewBox="0 0 800 400" className="w-full h-full">
-    <rect width="800" height="400" fill="#111827"/>
-    <path d="M0 200 H800" stroke="#1f2937" strokeWidth="20"/>
-    <path d="M400 0 V400" stroke="#1f2937" strokeWidth="15"/>
-    <path d="M100 50 H700 V350 H100 Z" fill="#1f2937" stroke="#7766F7" strokeWidth="2"/>
-    <rect x="150" y="100" width="500" height="200" fill="#7766F7" fillOpacity="0.1" stroke="#7766F7" strokeWidth="2"/>
-    <g fill="#7766F7" fillOpacity="0.2">
-      <rect x="200" y="120" width="60" height="40"/>
-      <rect x="540" y="120" width="60" height="40"/>
-      <rect x="200" y="240" width="60" height="40"/>
-      <rect x="540" y="240" width="60" height="40"/>
-    </g>
-    <g fill="#374151">
-      <rect x="150" y="320" width="100" height="20"/>
-      <rect x="550" y="320" width="100" height="20"/>
-    </g>
-    <g fontSize="12" fill="#e5e7eb" textAnchor="middle">
-      <text x="400" y="30">RIVERSIDE PARK</text>
-      <text x="230" y="140">MAIN STAGE</text>
-      <text x="570" y="140">ELECTRONIC</text>
-      <text x="230" y="260">ROCK STAGE</text>
-      <text x="570" y="260">INDIE STAGE</text>
-      <text x="200" y="350">PARKING</text>
-      <text x="600" y="350">PARKING</text>
-    </g>
-    <g fontSize="10" fill="#9ca3af">
-      <text x="410" y="190">River Road</text>
-      <text x="380" y="210" transform="rotate(90 380 210)">Park Avenue</text>
-    </g>
-  </svg>
-);
+// Custom marker icon
+const customIcon = L.divIcon({
+  className: 'custom-div-icon',
+  html: `
+    <div style="
+      background-color: #7766F7;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      position: relative;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    ">
+      <div style="
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-top: 8px solid #7766F7;
+      "></div>
+    </div>
+  `,
+  iconSize: [30, 42],
+  iconAnchor: [15, 42],
+  popupAnchor: [0, -42],
+});
 
 const ImageSlider = ({ images, currentImage }) => (
   <div className="h-screen max-h-[500px] relative overflow-hidden">
@@ -51,7 +53,7 @@ const ImageSlider = ({ images, currentImage }) => (
         }`}
         style={{
           backgroundImage: `url(${image})`,
-          backgroundSize: 'contain',
+          backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           backgroundColor: '#000'
@@ -77,10 +79,20 @@ const EventHeader = ({ category, title }) => (
 
 const EventQuickInfo = ({ date, time, location }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-    <QuickInfoItem icon={<Calendar className="h-6 w-6 text-[#7766F7]" />} 
-      title={date} subtitle={time} />
-    <QuickInfoItem icon={<MapPin className="h-6 w-6 text-[#7766F7]" />} 
-      title={location} subtitle={<span className="text-[#7766F7] group-hover:underline">View on map</span>} />
+    <QuickInfoItem 
+      icon={<Calendar className="h-6 w-6 text-[#7766F7]" />} 
+      title={new Date(date).toLocaleDateString('en-US', { 
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      })} 
+      subtitle={time} 
+    />
+    <QuickInfoItem 
+      icon={<MapPin className="h-6 w-6 text-[#7766F7]" />} 
+      title={location} 
+      subtitle={<span className="text-[#7766F7] group-hover:underline">View on map</span>} 
+    />
     <div className="flex items-center justify-end">
       <Button className="bg-[#7766F7] hover:bg-[#7766F7]/90 text-lg px-6 py-6 shadow-lg hover:shadow-xl transition-all text-white">
         <Ticket className="h-5 w-5 mr-2" />
@@ -102,30 +114,40 @@ const QuickInfoItem = ({ icon, title, subtitle }) => (
   </div>
 );
 
-const LocationSection = ({ location }) => (
+const LocationSection = ({ location, latitude, longitude }) => (
   <div className="rounded-2xl overflow-hidden bg-gray-900 shadow-lg border border-gray-800">
     <div className="aspect-video">
-      <EventMap />
+      <MapContainer 
+        center={[latitude, longitude]} 
+        zoom={15} 
+        style={{ height: '100%', width: '100%' }}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        <Marker position={[latitude, longitude]} icon={customIcon}>
+          <Popup>
+            <div className="p-2">
+              <h3 className="font-semibold">{location}</h3>
+            </div>
+          </Popup>
+        </Marker>
+      </MapContainer>
     </div>
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold text-[#7766F7]">Event Location</h3>
-        <Button variant="outline" className="text-[#7766F7] border-[#7766F7] hover:bg-[#7766F7]/10">
+        <Button 
+          variant="outline" 
+          className="text-[#7766F7] border-[#7766F7] hover:bg-[#7766F7]/10"
+          onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`)}
+        >
           <MapPin className="h-4 w-4 mr-2" />
           Get Directions
         </Button>
       </div>
       <p className="text-gray-300">{location}</p>
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <h4 className="font-medium mb-2 text-gray-100">Parking Areas</h4>
-          <p className="text-sm text-gray-400">Available at North and South entrance</p>
-        </div>
-        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700">
-          <h4 className="font-medium mb-2 text-gray-100">Entry Gates</h4>
-          <p className="text-sm text-gray-400">4 gates around the venue</p>
-        </div>
-      </div>
     </div>
   </div>
 );
@@ -136,76 +158,22 @@ const EventDetailsSection = ({ description }) => (
       <h2 className="text-2xl font-semibold text-[#7766F7] mb-4">Event Details</h2>
       <div className="prose prose-lg prose-invert">
         <p className="text-gray-300 leading-relaxed">{description}</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-            <h3 className="font-medium text-lg mb-4 text-gray-100">Schedule Highlights</h3>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-2 text-gray-300">
-                <Clock className="h-4 w-4 text-[#7766F7]" />
-                <span>Day 1: Opening Ceremony</span>
-              </li>
-              <li className="flex items-center gap-2 text-gray-300">
-                <Clock className="h-4 w-4 text-[#7766F7]" />
-                <span>Day 2: Main Performances</span>
-              </li>
-              <li className="flex items-center gap-2 text-gray-300">
-                <Clock className="h-4 w-4 text-[#7766F7]" />
-                <span>Day 3: Special Events</span>
-              </li>
-            </ul>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-            <h3 className="font-medium text-lg mb-4 text-gray-100">Amenities</h3>
-            <ul className="space-y-3">
-              <li className="flex items-center gap-2 text-gray-300">
-                <Info className="h-4 w-4 text-[#7766F7]" />
-                <span>Food & Beverage Stations</span>
-              </li>
-              <li className="flex items-center gap-2 text-gray-300">
-                <Info className="h-4 w-4 text-[#7766F7]" />
-                <span>First Aid Stations</span>
-              </li>
-              <li className="flex items-center gap-2 text-gray-300">
-                <Info className="h-4 w-4 text-[#7766F7]" />
-                <span>Rest Areas</span>
-              </li>
-            </ul>
-          </div>
-        </div>
       </div>
     </div>
   </div>
 );
 
-const InformationSection = () => {
-  const requirements = {
-    "Event Rules": [
-      "18+ only",
-      "No outside food or drinks", 
-      "No pets allowed"
-    ],
-    "What to Bring": [
-      "Valid ID",
-      "Comfortable shoes",
-      "Cash for vendors"
-    ],
-    "Safety": [
-      "First aid stations available",
-      "Security checkpoints at all entrances",
-      "Emergency exits clearly marked"
-    ]
-  };
-
+const InformationSection = ({ policyInfo }) => {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-lg border border-gray-800">
       <div className="p-6">
         <h2 className="text-2xl font-semibold text-[#7766F7] mb-6">Information</h2>
         <div className="space-y-8">
-          {Object.entries(requirements).map(([category, items]) => (
+          {policyInfo && Object.entries(policyInfo).map(([category, items]) => (
             <div key={category} className="border-b border-gray-800 last:border-0 pb-6 last:pb-0">
               <h3 className="text-lg font-medium mb-4 text-gray-100">{category}</h3>
               <ul className="space-y-3">
-                {items.map((item, index) => (
+                {Array.isArray(items) && items.map((item, index) => (
                   <li key={index} className="flex items-start gap-3">
                     <div className="mt-1">
                       <Info className="h-4 w-4 text-[#7766F7]" />
@@ -223,23 +191,41 @@ const InformationSection = () => {
 };
 
 const EventPage = () => {
+  const { id } = useParams();
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
+
+  // Placeholder images - replace with actual event images
   const images = [
-    '/images/event.jpeg',
-    '/images/music.jpg',
-    '/images/ranch.jpg',
-    '/images/coffee.jpg'
+    '/api/placeholder/1200/600',
+    '/api/placeholder/1200/600',
+    '/api/placeholder/1200/600'
   ];
 
-  const eventData = {
-    title: "Summer Music Festival 2024",
-    date: "Aug 15 - Aug 18 2024",
-    time: "11:00 AM - 11:00 PM",
-    location: "Riverside Park, Green Valley",
-    description: "4 days, 4 stages, 50+ live bands! Join us for the biggest music festival of the year. Featuring top artists from around the world, amazing food vendors, and unforgettable experiences.",
-    category: "Festival",
-    organizer: "Valley Events Ltd."
-  };
+  useEffect(() => {
+    const fetchEvent = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        setEvent(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchEvent();
+    }
+  }, [id]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -248,30 +234,54 @@ const EventPage = () => {
     return () => clearInterval(timer);
   }, []);
 
+  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="text-white">Loading...</div>
+  </div>;
+
+  if (error) return <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="text-red-500">Error: {error}</div>
+  </div>;
+
+  if (!event) return <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="text-white">Event not found</div>
+  </div>;
+
+  const getTimeString = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-black">
       <div className="relative">
         <ImageSlider images={images} currentImage={currentImage} />
-        <EventHeader category={eventData.category} title={eventData.title} />
+        <EventHeader category={event.category} title={event.title} />
       </div>
 
       <div className="bg-gray-900/50 backdrop-blur shadow-lg border-t border-gray-800">
         <div className="max-w-4xl mx-auto p-6">
           <EventQuickInfo 
-            date={eventData.date} 
-            time={eventData.time} 
-            location={eventData.location} 
+            date={event.start_time}
+            time={`${getTimeString(event.start_time)} - ${getTimeString(event.end_time)}`}
+            location={event.venue_name}
           />
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
         <div className="col-span-2 space-y-8">
-          <EventDetailsSection description={eventData.description} />
-          <LocationSection location={eventData.location} />
+          <EventDetailsSection description={event.description} />
+          <LocationSection 
+            location={event.venue_address}
+            latitude={event.venue_latitude}
+            longitude={event.venue_longitude}
+          />
         </div>
         <div className="col-span-1">
-          <InformationSection />
+          <InformationSection policyInfo={event.policy_info} />
         </div>
       </div>
     </div>
