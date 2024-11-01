@@ -58,7 +58,7 @@ function HowlerLandingPage() {
         <Hero />
 
         {/* Featured Events Section */}
-        <section id="section-featured-events" className="py-16 relative">
+        <section id="section-featured-events" className="relative">
           {/* Featured events content */}
         </section>
 
