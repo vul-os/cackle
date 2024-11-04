@@ -1,5 +1,5 @@
 import React from 'react';
-import Header from './header';
+import Header from '@/pages/visitor/header';
 import Footer from './footer';
 import Hero from './hero';
 import { Card, CardContent } from "@/components/ui/card";

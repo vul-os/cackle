@@ -4,17 +4,20 @@ import { AuthProvider } from './context/auth-context';
 import AppRoutes from './routes';
 import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from '@/components/theme-provider';
+import { CartProvider } from './context/cart';
 
 const App = () => {
 
   return (
       <AuthProvider>
+        <CartProvider>
           <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
-          <Router>
-            <AppRoutes />
-          </Router>
-          <Toaster />
-        </ThemeProvider>
+            <Router>
+              <AppRoutes />
+            </Router>
+            <Toaster />
+          </ThemeProvider>
+        </CartProvider>
       </AuthProvider>
   );
 };

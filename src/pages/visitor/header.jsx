@@ -1,15 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut } from 'lucide-react';
 import Logo from '/src/assets/cackle.svg'
 import LogoFallback from '/src/assets/cackle.png'
 import { useTheme } from '@/components/theme-provider'
-import { Moon, Sun } from "lucide-react"
+import CartDropdown from '@/pages/visitor/cart/dropdown';
+import { AuthContext } from '../../context/use-auth';
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme } = useTheme();
+  const { user, loading, signOut } = useContext(AuthContext);
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const handleNavigation = (path) => {
+    navigate(path);
+    setIsMobileMenuOpen(false); // Close mobile menu after navigation
+  };
+
+  const AuthButtons = ({ isMobile = false }) => {
+    if (loading) {
+      return null;
+    }
+
+    if (user) {
+      return (
+        <Button
+          onClick={handleSignOut}
+          variant="ghost"
+          size={isMobile ? "sm" : "default"}
+          className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sign Out
+        </Button>
+      );
+    }
+
+    return (
+      <>
+        <Button
+          variant="ghost"
+          size={isMobile ? "sm" : "default"}
+          className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
+          onClick={() => handleNavigation('/login')}
+        >
+          Log In
+        </Button>
+        <Button
+          size={isMobile ? "sm" : "default"}
+          className="bg-[#FF4848] text-white hover:bg-red-600"
+          onClick={() => handleNavigation('/signup')}
+        >
+          Sign Up
+        </Button>
+      </>
+    );
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm">
@@ -34,21 +91,10 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Language Selector and Auth Buttons */}
+          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
-            >
-              Log In
-            </Button>
-            <Button
-              size="sm"
-              className="bg-[#FF4848] text-white hover:bg-red-600"
-            >
-              Sign Up
-            </Button>
+            <CartDropdown />
+            <AuthButtons />
             <Button
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
               variant="ghost"
@@ -63,8 +109,9 @@ const Header = () => {
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden">
+          {/* Mobile Navigation */}
+          <div className="flex md:hidden items-center gap-2">
+            <CartDropdown isMobile />
             <Button
               variant="ghost"
               size="sm"
@@ -86,19 +133,7 @@ const Header = () => {
         <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800">
           <div className="px-2 pt-2 pb-3 space-y-1">
             <div className="flex flex-col space-y-2 p-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
-              >
-                Log In
-              </Button>
-              <Button
-                size="sm"
-                className="bg-[#FF4848] text-white hover:bg-red-600"
-              >
-                Sign Up
-              </Button>
+              <AuthButtons isMobile />
               <Button
                 onClick={() => setTheme(theme === "light" ? "dark" : "light")}
                 variant="ghost"

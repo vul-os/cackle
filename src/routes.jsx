@@ -29,6 +29,7 @@ import EventTicketsLayout from './pages/organizers/events/event/tickets';
 import TicketsView from './pages/organizers/events/event/tickets/tickets-view';
 import TicketTypesView from './pages/organizers/events/event/tickets/ticket-types-view';
 import ScannerPage from './pages/organizers/scanner';
+import CartPage from './pages/visitor/cart';
 
 const AppRoutes = () => {
   return (
@@ -39,7 +40,9 @@ const AppRoutes = () => {
         <Route exact path="/docs" element={<DocsPage />} />
         {/* <Route exact path="/events/" element={<VisitorEventPage />} /> */}
         <Route path="/events/:id" element={<VisitorEventPage />} />
+        <Route path="/checkout" element={<CartPage />} />
 
+        
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/password-reset" element={<ForgotPassword />} />
