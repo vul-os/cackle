@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Moon, Sun, LogOut } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut, ShieldCheck } from 'lucide-react';
 import Logo from '/src/assets/cackle.svg'
 import LogoFallback from '/src/assets/cackle.png'
 import { useTheme } from '@/components/theme-provider'
@@ -11,7 +11,7 @@ import { AuthContext } from '../../context/use-auth';
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { user, loading, signOut } = useContext(AuthContext);
+  const { user, loading, signOut, activeOrganization } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -35,15 +35,28 @@ const Header = () => {
 
     if (user) {
       return (
-        <Button
-          onClick={handleSignOut}
-          variant="ghost"
-          size={isMobile ? "sm" : "default"}
-          className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Sign Out
-        </Button>
+        <>
+          {activeOrganization && (
+            <Button
+              variant="ghost"
+              size={isMobile ? "sm" : "default"}
+              className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
+              onClick={() => handleNavigation('/home')}
+            >
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Admin
+            </Button>
+          )}
+          <Button
+            onClick={handleSignOut}
+            variant="ghost"
+            size={isMobile ? "sm" : "default"}
+            className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Sign Out
+          </Button>
+        </>
       );
     }
 

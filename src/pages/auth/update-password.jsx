@@ -5,11 +5,17 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
+
+import { useAuthRedirect } from './auth-redirect';
 
 const UpdatePassword = () => {
   const { updateUserPassword } = useContext(AuthContext);
+  const handleSuccessfulAuth = useAuthRedirect();
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast()
 
@@ -24,6 +30,8 @@ const UpdatePassword = () => {
       });
       return;
     }
+
+    setIsLoading(true);
     try {
       await updateUserPassword(newPassword);
       toast({
@@ -31,8 +39,7 @@ const UpdatePassword = () => {
         description: "Your password has been successfully updated.",
         duration: 5000,
       });
-      // Redirect to profile or dashboard
-      navigate('/dashboard');
+      handleSuccessfulAuth();
     } catch (error) {
       toast({
         title: "Password Update Failed",
@@ -40,6 +47,8 @@ const UpdatePassword = () => {
         variant: "destructive",
         duration: 5000,
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -58,6 +67,7 @@ const UpdatePassword = () => {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -68,16 +78,29 @@ const UpdatePassword = () => {
                 type="password"
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Update Password
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Password'
+              )}
             </Button>
           </form>
           <div className="mt-4">
-            <Button variant="link" className="w-full" onClick={() => navigate('/dashboard')}>
-              Cancel
+            <Button 
+              variant="link" 
+              className="w-full" 
+              onClick={() => navigate('/login')}
+              disabled={isLoading}
+            >
+              Back to Sign In
             </Button>
           </div>
         </CardContent>

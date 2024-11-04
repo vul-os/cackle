@@ -1,6 +1,5 @@
-// SignIn.jsx
-import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '@/context/use-auth';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,28 +8,19 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 
+import { useAuthRedirect } from './auth-redirect';
+
+
 const SignIn = () => {
-  const { user, signIn, signInWithGoogle } = useContext(AuthContext);
-  const [searchParams] = useSearchParams();
+  const { signIn, signInWithGoogle } = useContext(AuthContext);
+  const handleSuccessfulAuth = useAuthRedirect();
   const navigate = useNavigate();
 
-  const inviteToken = searchParams.get('token');
-  const inviteEmail = searchParams.get('email');
-
-  const [email, setEmail] = useState(inviteEmail || '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      if (inviteToken) {
-        navigate(`/accept-invite?token=${inviteToken}`);
-      } else {
-        navigate('/home');
-      }
-    }
-  }, [user, inviteToken, navigate]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -39,7 +29,7 @@ const SignIn = () => {
 
     try {
       await signIn(email, password);
-      // Navigation handled by useEffect when user state updates
+      handleSuccessfulAuth();
     } catch (error) {
       console.error('Sign in error:', error);
       setError(error.message);
@@ -49,12 +39,14 @@ const SignIn = () => {
 
   const handleGoogleSignIn = async () => {
     setError('');
+    setIsLoading(true);
     try {
       await signInWithGoogle();
-      // Navigation handled by useEffect when user state updates
+      handleSuccessfulAuth();
     } catch (error) {
       console.error('Google sign in error:', error);
       setError(error.message);
+      setIsLoading(false);
     }
   };
 
@@ -65,15 +57,6 @@ const SignIn = () => {
           <CardTitle className="text-2xl font-bold text-center">Sign in to your account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {inviteToken && (
-            <Alert>
-              <AlertDescription>
-                Sign in to accept your organization invitation
-                {inviteEmail && ` for ${inviteEmail}`}
-              </AlertDescription>
-            </Alert>
-          )}
-
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -89,8 +72,7 @@ const SignIn = () => {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading || (inviteEmail && inviteToken)}
-                className={inviteEmail && inviteToken ? "bg-muted" : ""}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -149,7 +131,7 @@ const SignIn = () => {
           <Button 
             variant="link" 
             className="text-sm text-muted-foreground"
-            onClick={() => navigate('/signup' + (inviteToken ? `?token=${inviteToken}&email=${inviteEmail}` : ''))}
+            onClick={() => navigate('/signup')}
             disabled={isLoading}
           >
             Don't have an account? Sign Up

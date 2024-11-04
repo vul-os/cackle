@@ -8,13 +8,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [organizations, setOrganizations] = useState([]);
   const [activeOrganization, setActiveOrganization] = useState(null);
+  const [hasLoadedOrganizations, setHasLoadedOrganizations] = useState(false);
 
   window.addEventListener('unhandledrejection', function(event) {
     console.error('Unhandled rejection (promise: ', event.promise, ', reason: ', event.reason, ').'); 
   });
 
   const fetchOrganizations = useCallback(async () => {
-    if (!user) return; // Don't fetch if no user is logged in
+    if (!user) {
+      setHasLoadedOrganizations(true); // Mark as loaded even if user is null
+      return;
+    }
     
     try {
       const { data, error } = await supabase
@@ -30,8 +34,10 @@ export function AuthProvider({ children }) {
       }
     } catch (error) {
       console.error('Error fetching organizations:', error);
+    } finally {
+      setHasLoadedOrganizations(true);
     }
-  }, [user]); // Only depend on user, not activeOrganization
+  }, [user, activeOrganization]);
 
   const handleAuthStateChange = useCallback((event, session) => {
     console.log('Auth state changed:', event);
@@ -39,16 +45,18 @@ export function AuthProvider({ children }) {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser(session.user);
+          setHasLoadedOrganizations(false); // Reset flag when user signs in
         }
       } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
         setUser(null);
         setOrganizations([]);
         setActiveOrganization(null);
+        setHasLoadedOrganizations(true); // Mark as loaded when user signs out
       } else if (event === 'USER_UPDATED') {
         setUser(session?.user ?? null);
       }
     }, 0);
-  }, []); // Remove fetchOrganizations from dependencies
+  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -76,8 +84,10 @@ export function AuthProvider({ children }) {
   }, [handleAuthStateChange]);
 
   useEffect(() => {
-    fetchOrganizations()
-  }, [user])
+    if (!hasLoadedOrganizations) {
+      fetchOrganizations();
+    }
+  }, [user, hasLoadedOrganizations, fetchOrganizations]);
 
   const signUp = async (email, password) => {
     const { data, error } = await supabase.auth.signUp({
@@ -148,6 +158,8 @@ export function AuthProvider({ children }) {
     user,
     organizations,
     activeOrganization,
+    hasLoadedOrganizations,
+    setHasLoadedOrganizations,
     switchOrganization,
     signUp,
     signIn,
@@ -155,7 +167,7 @@ export function AuthProvider({ children }) {
     signOut,
     forgotPassword,
     updateUserPassword,
-  }), [loading, user, organizations, activeOrganization]);
+  }), [loading, user, organizations, activeOrganization, hasLoadedOrganizations]);
 
   return (
     <AuthContext.Provider value={contextValue}>

@@ -7,8 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
+import { useAuthRedirect } from './auth-redirect';
+
 const AcceptInvite = () => {
-  const { user, signOut} = useContext(AuthContext);
+  const { user, setHasLoadedOrganizations } = useContext(AuthContext);
+  const handleSuccessfulAuth = useAuthRedirect();
   const [searchParams] = useSearchParams();
   
   const [inviteToken] = useState(searchParams.get('token'));
@@ -73,7 +76,11 @@ const AcceptInvite = () => {
       );
 
       if (error) throw error;
-      await signOut()
+      
+      // Trigger a refresh of organizations by setting hasLoadedOrganizations to false
+      setHasLoadedOrganizations(false);
+      
+      await handleSuccessfulAuth();
     } catch (error) {
       setError(error.message);
       setAccepting(false);

@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/use-auth';
 import { Button } from "@/components/ui/button"
@@ -6,20 +6,20 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
+import { Loader2 } from "lucide-react"
+
+import { useAuthRedirect } from './auth-redirect';
 
 const SignUp = () => {
-  const { user, signUp, signInWithGoogle } = useContext(AuthContext);
+  const { signUp, signInWithGoogle } = useContext(AuthContext);
+  const handleSuccessfulAuth = useAuthRedirect();
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (user) {
-      navigate('/dashboard')
-    }
-  }, [user, navigate])
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -27,10 +27,28 @@ const SignUp = () => {
       setError("Passwords don't match");
       return;
     }
+
+    setIsLoading(true);
+    setError('');
+
     try {
       await signUp(email, password);
+      handleSuccessfulAuth();
     } catch (error) {
       setError(error.message);
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await signInWithGoogle();
+      handleSuccessfulAuth();
+    } catch (error) {
+      setError(error.message);
+      setIsLoading(false);
     }
   };
 
@@ -55,6 +73,7 @@ const SignUp = () => {
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -66,6 +85,7 @@ const SignUp = () => {
                 placeholder="Create a password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
@@ -77,11 +97,19 @@ const SignUp = () => {
                 placeholder="Confirm your password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={isLoading}
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              Sign Up
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                'Sign Up'
+              )}
             </Button>
           </form>
           <div className="relative">
@@ -97,7 +125,8 @@ const SignUp = () => {
           <Button
             variant="outline"
             className="w-full"
-            onClick={signInWithGoogle}
+            onClick={handleGoogleSignUp}
+            disabled={isLoading}
           >
             <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512">
               <path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path>
@@ -106,7 +135,12 @@ const SignUp = () => {
           </Button>
         </CardContent>
         <CardFooter>
-          <Button variant="link" className="w-full text-sm text-muted-foreground" onClick={() => navigate('/login')}>
+          <Button 
+            variant="link" 
+            className="w-full text-sm text-muted-foreground" 
+            onClick={() => navigate('/login')}
+            disabled={isLoading}
+          >
             Already have an account? Sign In
           </Button>
         </CardFooter>
