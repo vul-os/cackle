@@ -58,7 +58,7 @@ const EventQuickInfo = ({ event, ticketTypes }) => {
       <div className="flex items-center justify-end">
         <TicketSelection 
           ticketTypes={ticketTypes}
-          eventId={event.id}
+          event={event}
         />
       </div>
     </div>

@@ -1,4 +1,3 @@
-// components/TicketSelection.jsx
 import React, { useState } from 'react';
 import { useCart } from '@/context/cart';
 import { Plus, Minus, Ticket } from 'lucide-react';
@@ -12,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-const TicketSelection = ({ ticketTypes }) => {
+const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
   const { addItem } = useCart();
   const [open, setOpen] = useState(false);
   const [quantities, setQuantities] = useState(
@@ -34,7 +33,10 @@ const TicketSelection = ({ ticketTypes }) => {
     Object.entries(quantities).forEach(([ticketId, quantity]) => {
       if (quantity > 0) {
         const ticketType = ticketTypes.find(tt => tt.id === ticketId);
-        addItem(ticketType, quantity);
+        if (ticketType) {
+          // Pass both ticketType and event to addItem
+          addItem(ticketType, event, quantity);
+        }
       }
     });
     

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '@/context/cart';
 import { AuthContext } from '@/context/use-auth';
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowLeft, Clock, MapPin } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import Header from '@/pages/visitor/header';
+import { format } from 'date-fns';
 
 const CartPage = () => {
-  const { items, total, updateQuantity, removeItem } = useCart();
+  const { items, itemsByEvent, total, updateQuantity, removeItem } = useCart();
   const { user, loading } = useContext(AuthContext);
   const navigate = useNavigate();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
@@ -26,6 +27,10 @@ const CartPage = () => {
     } else {
       navigate('/checkout');
     }
+  };
+
+  const formatDateTime = (dateString) => {
+    return format(new Date(dateString), 'EEE, MMM d, yyyy h:mm a');
   };
 
   if (items.length === 0) {
@@ -61,60 +66,89 @@ const CartPage = () => {
           <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-8 dark:text-white">Shopping Cart</h1>
             
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm">
-              {items.map((item) => (
-                <div 
-                  key={`${item.id}-${item.ticket_type.name}`}
-                  className="flex items-center gap-4 p-4 border-b border-gray-200 dark:border-slate-700 last:border-0"
-                >
-                  <div className="flex-1">
-                    <h3 className="font-medium dark:text-white">{item.ticket_type.name}</h3>
-                    <p className="text-sm text-gray-500 dark:text-slate-400">
-                      ${item.unit_price} each
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1}
-                        className="h-8 w-8"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center dark:text-white">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="h-8 w-8"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+            <div className="space-y-6">
+              {Object.entries(itemsByEvent).map(([eventId, eventItems]) => {
+                const event = eventItems[0].event;
+                
+                return (
+                  <div key={eventId} className="bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+                    {/* Event Header */}
+                    <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+                      <h2 className="text-xl font-semibold dark:text-white mb-2">
+                        {event.title}
+                      </h2>
+                      <div className="space-y-1 text-sm text-gray-500 dark:text-slate-400">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatDateTime(event.start_time)}</span>
+                        </div>
+                        {event.venue_name && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            <span>{event.venue_name}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    
-                    <div className="w-24 text-right font-medium dark:text-white">
-                      ${(item.quantity * item.unit_price).toFixed(2)}
-                    </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeItem(item.id)}
-                      className="text-gray-400 hover:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                    {/* Event Items */}
+                    {eventItems.map((item) => (
+                      <div 
+                        key={`${item.ticket_type_id}-${item.ticket_type.name}`}
+                        className="flex items-center gap-4 p-4 border-b border-gray-200 dark:border-slate-700 last:border-0"
+                      >
+                        <div className="flex-1">
+                          <h3 className="font-medium dark:text-white">{item.ticket_type.name}</h3>
+                          <p className="text-sm text-gray-500 dark:text-slate-400">
+                            ${item.unit_price.toFixed(2)} each
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQuantity(item.ticket_type_id, item.quantity - 1)}
+                              disabled={item.quantity <= 1}
+                              className="h-8 w-8"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center dark:text-white">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => updateQuantity(item.ticket_type_id, item.quantity + 1)}
+                              className="h-8 w-8"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          <div className="w-24 text-right font-medium dark:text-white">
+                            ${(item.quantity * item.unit_price).toFixed(2)}
+                          </div>
+                          
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeItem(item.ticket_type_id)}
+                            className="text-gray-400 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
+                );
+              })}
               
-              <div className="p-4 border-t border-gray-200 dark:border-slate-700">
+              {/* Cart Summary */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm p-4">
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-lg font-medium dark:text-white">Total</p>

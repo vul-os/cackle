@@ -12,6 +12,11 @@ const ACTIONS = {
   SET_CART: 'SET_CART',
 };
 
+const initialState = {
+  id: null,
+  items: [],
+};
+
 const cartReducer = (state, action) => {
   switch (action.type) {
     case ACTIONS.SET_CART: {
@@ -21,61 +26,73 @@ const cartReducer = (state, action) => {
         items: action.payload.items,
       };
     }
+
     case ACTIONS.ADD_ITEM: {
-      const { ticketType, quantity } = action.payload;
-      console.log('Adding item:', ticketType, 'quantity:', quantity);
-      
-      const existingItem = state.items.find(
+      const { ticketType, event, quantity } = action.payload;
+      const existingItemIndex = state.items.findIndex(
         item => item.ticket_type_id === ticketType.id
       );
 
-      if (existingItem) {
-        return {
-          ...state,
-          items: state.items.map(item =>
-            item.ticket_type_id === ticketType.id
-              ? {
-                  ...item,
-                  quantity: item.quantity + quantity,
-                  subtotal: (item.quantity + quantity) * item.unit_price,
-                }
-              : item
-          ),
-        };
-      }
+      const newItems = [...state.items];
+      const itemQuantity = parseInt(quantity);
+      const itemPrice = parseFloat(ticketType.price);
 
-      const newItem = {
-        ticket_type_id: ticketType.id,
-        ticket_type: ticketType,
-        quantity,
-        unit_price: ticketType.price,
-        discount_amount: 0,
-        subtotal: quantity * ticketType.price,
-      };
+      if (existingItemIndex >= 0) {
+        const updatedQuantity = newItems[existingItemIndex].quantity + itemQuantity;
+        newItems[existingItemIndex] = {
+          ...newItems[existingItemIndex],
+          quantity: updatedQuantity,
+          subtotal: updatedQuantity * itemPrice,
+        };
+      } else {
+        newItems.push({
+          event_id: event.id,
+          event: {
+            id: event.id,
+            title: event.title,
+            start_time: event.start_time,
+            end_time: event.end_time,
+            venue_name: event.venue_name,
+            venue_address: event.venue_address,
+          },
+          ticket_type_id: ticketType.id,
+          ticket_type: {
+            id: ticketType.id,
+            name: ticketType.name,
+            price: ticketType.price,
+          },
+          quantity: itemQuantity,
+          unit_price: itemPrice,
+          discount_amount: 0,
+          subtotal: itemQuantity * itemPrice,
+        });
+      }
 
       return {
         ...state,
-        items: [...state.items, newItem],
+        items: newItems,
       };
     }
 
     case ACTIONS.UPDATE_QUANTITY: {
       const { itemId, quantity } = action.payload;
-      if (quantity <= 0) {
+      const newQuantity = parseInt(quantity);
+
+      if (newQuantity <= 0) {
         return {
           ...state,
-          items: state.items.filter(item => item.id !== itemId),
+          items: state.items.filter(item => item.ticket_type_id !== itemId),
         };
       }
 
       return {
         ...state,
         items: state.items.map(item =>
-          item.id === itemId
+          item.ticket_type_id === itemId
             ? {
                 ...item,
-                quantity,
-                subtotal: quantity * item.unit_price,
+                quantity: newQuantity,
+                subtotal: newQuantity * parseFloat(item.unit_price),
               }
             : item
         ),
@@ -85,7 +102,7 @@ const cartReducer = (state, action) => {
     case ACTIONS.REMOVE_ITEM: {
       return {
         ...state,
-        items: state.items.filter(item => item.id !== action.payload.itemId),
+        items: state.items.filter(item => item.ticket_type_id !== action.payload.itemId),
       };
     }
 
@@ -105,30 +122,31 @@ const cartReducer = (state, action) => {
 export function CartProvider({ children }) {
   const { user, organization } = useContext(AuthContext);
   const [previousUser, setPreviousUser] = useState(null);
-
-  const initialState = {
-    id: null,
+  const [state, dispatch] = useReducer(cartReducer, {
+    ...initialState,
     items: JSON.parse(localStorage.getItem('cart') || '[]'),
-  };
-
-  const [state, dispatch] = useReducer(cartReducer, initialState);
+  });
 
   // Calculate derived values
   const itemCount = state.items.reduce((sum, item) => sum + item.quantity, 0);
-  const total = state.items.reduce(
-    (sum, item) => sum + item.subtotal - item.discount_amount,
-    0
-  );
+  const total = state.items.reduce((sum, item) => sum + item.subtotal, 0);
+
+  const itemsByEvent = state.items.reduce((groups, item) => {
+    const eventId = item.event_id;
+    if (!groups[eventId]) {
+      groups[eventId] = [];
+    }
+    groups[eventId].push(item);
+    return groups;
+  }, {});
 
   // Watch for user login and migrate localStorage cart to DB
   useEffect(() => {
     const migrateCartToDb = async () => {
-      // Only run when user first logs in
       if (!previousUser && user && organization) {
         try {
           console.log('User logged in, migrating localStorage cart to DB');
           
-          // Create new cart
           const { data: newCart, error: createError } = await supabase
             .from('carts')
             .insert({
@@ -144,11 +162,11 @@ export function CartProvider({ children }) {
             return;
           }
 
-          // Insert local items into DB if they exist
           if (state.items.length > 0) {
             const cartItems = state.items.map(item => ({
               cart_id: newCart.id,
               organization_id: organization.id,
+              event_id: item.event_id,
               ticket_type_id: item.ticket_type_id,
               quantity: item.quantity,
               unit_price: item.unit_price,
@@ -166,7 +184,6 @@ export function CartProvider({ children }) {
             }
           }
 
-          // Update state with new cart ID
           dispatch({
             type: ACTIONS.SET_CART,
             payload: {
@@ -179,7 +196,6 @@ export function CartProvider({ children }) {
           console.error('Error migrating cart to DB:', error);
         }
       }
-
       setPreviousUser(user);
     };
 
@@ -199,7 +215,6 @@ export function CartProvider({ children }) {
       try {
         console.log('Updating DB cart:', state.items);
 
-        // Delete existing cart items
         await supabase
           .from('cart_items')
           .delete()
@@ -209,6 +224,7 @@ export function CartProvider({ children }) {
           const cartItems = state.items.map(item => ({
             cart_id: state.id,
             organization_id: organization.id,
+            event_id: item.event_id,
             ticket_type_id: item.ticket_type_id,
             quantity: item.quantity,
             unit_price: item.unit_price,
@@ -225,7 +241,6 @@ export function CartProvider({ children }) {
           }
         }
 
-        // Update cart timestamp
         await supabase
           .from('carts')
           .update({ updated_at: new Date().toISOString() })
@@ -241,19 +256,29 @@ export function CartProvider({ children }) {
     }
   }, [state.items, user, organization]);
 
-  const addItem = (ticketType, quantity) => {
-    console.log('Adding item to cart:', ticketType, quantity);
-    dispatch({ type: ACTIONS.ADD_ITEM, payload: { ticketType, quantity } });
+  const addItem = (ticketType, event, quantity) => {
+    if (!ticketType || !event) {
+      console.error('Missing required data:', { ticketType, event });
+      return;
+    }
+    dispatch({ 
+      type: ACTIONS.ADD_ITEM, 
+      payload: { ticketType, event, quantity }
+    });
   };
 
   const updateQuantity = (itemId, quantity) => {
-    console.log('Updating quantity:', itemId, quantity);
-    dispatch({ type: ACTIONS.UPDATE_QUANTITY, payload: { itemId, quantity } });
+    dispatch({ 
+      type: ACTIONS.UPDATE_QUANTITY, 
+      payload: { itemId, quantity }
+    });
   };
 
   const removeItem = (itemId) => {
-    console.log('Removing item:', itemId);
-    dispatch({ type: ACTIONS.REMOVE_ITEM, payload: { itemId } });
+    dispatch({ 
+      type: ACTIONS.REMOVE_ITEM, 
+      payload: { itemId }
+    });
   };
 
   const clearCart = async () => {
@@ -275,6 +300,7 @@ export function CartProvider({ children }) {
     items: state.items,
     itemCount,
     total,
+    itemsByEvent,
     addItem,
     updateQuantity,
     removeItem,
