@@ -96,23 +96,20 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo Section */}
           <div className="flex items-center">
-            <div className="flex items-center gap-2">
-              <a href="/" className="block">
-                <picture>
-                  <source srcSet={Logo} type="image/svg+xml" />
-                  <img 
-                    src={LogoFallback}
-                    alt="Howler Logo"
-                    className="h-10 w-10 object-contain rounded-lg"
-                  />
-                </picture>
-              </a>
-              <span className="hidden md:block text-[#FF4848] font-bold text-3xl">
-                cackle
-              </span>
-            </div>
-          </div>
-
+  <a href="/" className="flex items-center gap-2">
+    <picture>
+      <source srcSet={Logo} type="image/svg+xml" />
+      <img 
+        src={LogoFallback}
+        alt="Howler Logo"
+        className="h-10 w-10 object-contain rounded-lg"
+      />
+    </picture>
+    <span className="hidden md:block text-[#FF4848] font-bold text-3xl">
+      cackle
+    </span>
+  </a>
+</div>
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-4">
             <CartDropdown />

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from "@/components/ui/card";
 import { Facebook, Twitter, Instagram } from 'lucide-react';
 import Logo from '/src/assets/cackle.svg'
@@ -13,7 +14,7 @@ const Footer = () => {
           <div className="col-span-1">
             <div className="flex items-center">
               <div className="flex items-center gap-2">
-                <a href="/" className="block">
+                <Link to="/" className="block">
                   <picture>
                     <source srcSet={Logo} type="image/svg+xml" />
                     <img 
@@ -22,15 +23,12 @@ const Footer = () => {
                       className="h-10 w-10 object-contain rounded-lg"
                     />
                   </picture>
-                </a>
-                {/* Removed 'hidden md:block' to show text on all screen sizes */}
+                </Link>
                 <span className="text-[#FF4848] font-bold text-3xl">
                   cackle
                 </span>
               </div>
             </div>
-
-
           </div>
 
           {/* Links Columns */}
@@ -44,14 +42,14 @@ const Footer = () => {
                   </a>
                 </li>
                 <li>
-                  <a href="/docs" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                  <Link to="/docs" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Docs
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="/contact_us" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                  <Link to="/contact" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Contact Us
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -59,19 +57,19 @@ const Footer = () => {
               <h3 className="text-sm font-semibold mb-4 text-zinc-100">Legal</h3>
               <ul className="space-y-3">
                 <li>
-                  <a href="/terms_and_conditions" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                  <Link to="/terms" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Terms & Conditions
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="/privacy_policy" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                  <Link to="/privacy" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Privacy Policy
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="/legal" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                  <Link to="/legal" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
                     Legal
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>

@@ -23,7 +23,8 @@ import HomePage from './pages/organizers/home';
 import EventsPage from './pages/organizers/events';
 import SettingsPage from './pages/organizers/settings';
 import EventPage from './pages/organizers/events/event';
-
+import ContactPage from'./pages/visitor/contact';
+import PricingPage from './pages/organizers/pricing';
 import VisitorEventPage from './pages/visitor/events/event';
 import EventTicketsLayout from './pages/organizers/events/event/tickets';
 import TicketsView from './pages/organizers/events/event/tickets/tickets-view';
@@ -44,6 +45,8 @@ const AppRoutes = () => {
         {/* <Route exact path="/events/" element={<VisitorEventPage />} /> */}
         <Route path="/events/:id" element={<VisitorEventPage />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route exact path="/pricing" element={<PricingPage />} />
 
         
         <Route path="/login" element={<SignIn />} />

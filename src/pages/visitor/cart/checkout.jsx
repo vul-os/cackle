@@ -43,7 +43,7 @@ const CheckoutPage = () => {
       city: '',
       state: '',
       postal_code: '',
-      country: 'US'
+      country: 'ZA'
     }
   });
 
@@ -128,7 +128,7 @@ const CheckoutPage = () => {
       }
 
       // Navigate to confirmation
-      navigate(`/order-confirmation/${orderId}`);
+      navigate(`/order/${orderId}`);
     } catch (error) {
       console.error('Checkout failed:', error);
       
@@ -238,7 +238,7 @@ const CheckoutPage = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="address.state">State</Label>
+                        <Label htmlFor="address.state">Province</Label>
                         <Input
                           id="address.state"
                           name="address.state"
@@ -274,8 +274,7 @@ const CheckoutPage = () => {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="US">United States</SelectItem>
-                            <SelectItem value="CA">Canada</SelectItem>
+                            <SelectItem value="ZA">South Africa</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -333,7 +332,7 @@ const CheckoutPage = () => {
                                 {item.quantity}x {item.ticket_type.name}
                               </span>
                               <span className="dark:text-white">
-                                ${(item.quantity * item.unit_price).toFixed(2)}
+                                R{(item.quantity * item.unit_price).toFixed(2)}
                               </span>
                             </div>
                           ))}
@@ -344,14 +343,14 @@ const CheckoutPage = () => {
                   <CardFooter className="flex-col space-y-4">
                     <div className="w-full flex justify-between items-center text-lg font-medium">
                       <span>Total</span>
-                      <span>${total.toFixed(2)}</span>
+                      <span>R{total.toFixed(2)}</span>
                     </div>
                     <Button
                       className="w-full bg-[#FF4848] text-white hover:bg-red-600"
                       onClick={handleCheckout}
                       disabled={isProcessing}
                     >
-                      {isProcessing ? 'Processing...' : `Pay $${total.toFixed(2)}`}
+                      {isProcessing ? 'Processing...' : `Pay R${total.toFixed(2)}`}
                     </Button>
                   </CardFooter>
                 </Card>

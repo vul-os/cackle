@@ -133,7 +133,7 @@ const CartDropdown = ({ isMobile = false }) => {
                               {item.ticket_type?.name || 'Unnamed Ticket'}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-slate-400">
-                              ${(item.unit_price || 0).toFixed(2)} each
+                              R{(item.unit_price || 0).toFixed(2)} each
                             </p>
                           </div>
                           <Button
@@ -170,7 +170,7 @@ const CartDropdown = ({ isMobile = false }) => {
                             <Plus className="h-4 w-4" />
                           </Button>
                           <span className="ml-auto font-medium text-gray-900 dark:text-slate-100">
-                            ${((item.quantity * (item.unit_price || 0)) || 0).toFixed(2)}
+                            R{((item.quantity * (item.unit_price || 0)) || 0).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -185,7 +185,7 @@ const CartDropdown = ({ isMobile = false }) => {
         <div className="border-t border-gray-200 dark:border-slate-800 mt-4 pt-4">
           <div className="flex justify-between font-semibold text-gray-900 dark:text-slate-100">
             <span>Total:</span>
-            <span>${(total || 0).toFixed(2)}</span>
+            <span>R{(total || 0).toFixed(2)}</span>
           </div>
         </div>
         

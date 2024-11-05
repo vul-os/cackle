@@ -100,7 +100,7 @@ const CartPage = () => {
                         <div className="flex-1">
                           <h3 className="font-medium dark:text-white">{item.ticket_type.name}</h3>
                           <p className="text-sm text-gray-500 dark:text-slate-400">
-                            ${item.unit_price.toFixed(2)} each
+                            R{item.unit_price.toFixed(2)} each
                           </p>
                         </div>
                         
@@ -129,7 +129,7 @@ const CartPage = () => {
                           </div>
                           
                           <div className="w-24 text-right font-medium dark:text-white">
-                            ${(item.quantity * item.unit_price).toFixed(2)}
+                            R{(item.quantity * item.unit_price).toFixed(2)}
                           </div>
                           
                           <Button
@@ -157,7 +157,7 @@ const CartPage = () => {
                     </p>
                   </div>
                   <div className="text-2xl font-bold dark:text-white">
-                    ${total.toFixed(2)}
+                    R{total.toFixed(2)}
                   </div>
                 </div>
                 
