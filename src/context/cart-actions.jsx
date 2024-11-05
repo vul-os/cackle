@@ -3,210 +3,263 @@ import { useCallback, useContext } from 'react';
 import { supabase } from '@/services/supabaseClient';
 import CartContext, { ACTIONS } from './cart-context';
 
+/**
+ * Custom hook for cart actions
+ * @param {Object} state - Current cart state
+ * @param {Function} dispatch - Cart state dispatch function
+ * @param {Object} user - Current user object
+ * @param {Object} syncConfig - Synchronization configuration
+ * @param {boolean} syncConfig.syncInProgress - Whether sync is in progress
+ * @param {Function} syncConfig.setSyncInProgress - Function to set sync status
+ * @param {Function} syncConfig.setSyncError - Function to set sync error
+ * @param {Function} syncConfig.syncCart - Function to trigger cart sync
+ * @param {Object} cartOperations - Cart database operations
+ * @returns {Object} Cart action methods
+ */
 export function useCartActions(
   state, 
   dispatch, 
   user, 
-  { syncInProgress, setSyncInProgress, setSyncError }, 
+  { syncInProgress, setSyncInProgress, setSyncError, syncCart }, 
   cartOperations
 ) {
   const { getOrCreateCart, updateCartInDb } = cartOperations;
 
+  /**
+   * Force save the cart to both localStorage and database
+   * @returns {Promise<void>}
+   */
   const saveCart = useCallback(async () => {
-    if (!user) {
-      console.log('CartProvider - No user available for save');
-      return null;
-    }
-    
-    if (syncInProgress) {
-      console.log('CartProvider - Sync already in progress, skipping save');
-      return null;
-    }
-
-    let cartId;
     try {
-      console.log('CartProvider - Starting cart save');
-      setSyncInProgress(true);
-      setSyncError(null);
-
-      cartId = await getOrCreateCart(user.id);
-      console.log('CartProvider - Got cart ID for save:', cartId);
-      
-      await updateCartInDb(cartId, state.items);
-      console.log('CartProvider - Updated DB successfully');
-
-      return cartId;
+      return await syncCart(true); // Force immediate sync
     } catch (error) {
-      console.error('CartProvider - Error saving cart:', error);
+      console.error('CartActions - Error in saveCart:', error);
+      setSyncError(error);
+      throw new Error('Failed to save cart');
+    }
+  }, [syncCart, setSyncError]);
+
+  /**
+   * Add item to cart
+   * @param {Object} ticketType - Ticket type object
+   * @param {Object} event - Event object
+   * @param {number} [quantity=1] - Quantity to add
+   * @returns {Promise<void>}
+   */
+  const addItem = useCallback(async (ticketType, event, quantity = 1) => {
+    if (!ticketType?.id || !event?.id) {
+      const error = new Error('Invalid ticket type or event data');
       setSyncError(error);
       throw error;
-    } finally {
-      // Only update the cart ID if we successfully saved
-      if (cartId) {
-        dispatch({
-          type: ACTIONS.SET_CART_ID,
-          payload: { id: cartId }
-        });
-      }
-      setSyncInProgress(false);
-      console.log('CartProvider - Save complete');
-    }
-  }, [user, state.items, getOrCreateCart, updateCartInDb, setSyncError, setSyncInProgress, syncInProgress, dispatch]);
-
-  const addItem = useCallback(async (ticketType, event, quantity = 1) => {
-    if (!ticketType || !event) {
-      console.error('CartProvider - Missing required data:', { ticketType, event });
-      return;
-    }
-    
-    if (syncInProgress) {
-      console.log('CartProvider - Sync in progress, skipping add');
-      return;
     }
 
     try {
-      console.log('CartProvider - Adding item:', { ticketType, event, quantity });
-      setSyncInProgress(true);
+      console.log('CartActions - Adding item:', { ticketType, event, quantity });
       
-      // First update local state
+      // Validate quantity
+      const validQuantity = Math.max(1, parseInt(quantity) || 1);
+      
+      // Check for existing item
+      const existingItem = state.items.find(
+        item => item.ticket_type_id === ticketType.id
+      );
+      
+      if (existingItem && existingItem.quantity + validQuantity > 10) {
+        const error = new Error('Cannot add more than 10 tickets per type');
+        setSyncError(error);
+        throw error;
+      }
+      
       dispatch({ 
         type: ACTIONS.ADD_ITEM, 
         payload: {
           ticketType,
           event,
-          quantity,
+          quantity: validQuantity,
           unit_price: ticketType.price,
-          subtotal: ticketType.price * quantity
+          subtotal: ticketType.price * validQuantity
         }
       });
 
-      // Then save to DB if logged in
-      if (user) {
-        console.log('CartProvider - User present, saving cart after add');
-        await saveCart();
-      }
+      // Sync will be triggered by useEffect
     } catch (error) {
-      console.error('CartProvider - Error adding item:', error);
+      console.error('CartActions - Error adding item:', error);
       setSyncError(error);
       throw error;
-    } finally {
-      setSyncInProgress(false);
     }
-  }, [user, saveCart, setSyncInProgress, setSyncError, dispatch, syncInProgress]);
+  }, [state.items, dispatch, setSyncError]);
 
+  /**
+   * Update item quantity
+   * @param {string} ticketTypeId - Ticket type ID
+   * @param {number} quantity - New quantity
+   * @returns {Promise<void>}
+   */
   const updateQuantity = useCallback(async (ticketTypeId, quantity) => {
     if (!ticketTypeId) {
-      console.error('CartProvider - Missing ticket type ID for quantity update');
-      return;
-    }
-
-    if (syncInProgress) {
-      console.log('CartProvider - Sync in progress, skipping quantity update');
-      return;
+      const error = new Error('Missing ticket type ID');
+      setSyncError(error);
+      throw error;
     }
 
     try {
-      console.log('CartProvider - Updating quantity:', { ticketTypeId, quantity });
-      setSyncInProgress(true);
+      console.log('CartActions - Updating quantity:', { ticketTypeId, quantity });
       const newQuantity = Math.max(0, parseInt(quantity) || 0);
       
-      // First update local state
+      // Validate quantity limit
+      if (newQuantity > 10) {
+        const error = new Error('Cannot exceed 10 tickets per type');
+        setSyncError(error);
+        throw error;
+      }
+      
       dispatch({ 
         type: ACTIONS.UPDATE_QUANTITY, 
         payload: { ticketTypeId, quantity: newQuantity }
       });
 
-      // Then save to DB if logged in
-      if (user) {
-        console.log('CartProvider - User present, saving cart after quantity update');
-        await saveCart();
-      }
+      // Sync will be triggered by useEffect
     } catch (error) {
-      console.error('CartProvider - Error updating quantity:', error);
+      console.error('CartActions - Error updating quantity:', error);
       setSyncError(error);
       throw error;
-    } finally {
-      setSyncInProgress(false);
     }
-  }, [user, saveCart, setSyncInProgress, setSyncError, dispatch, syncInProgress]);
+  }, [dispatch, setSyncError]);
 
+  /**
+   * Remove item from cart
+   * @param {string} ticketTypeId - Ticket type ID
+   * @returns {Promise<void>}
+   */
   const removeItem = useCallback(async (ticketTypeId) => {
     if (!ticketTypeId) {
-      console.error('CartProvider - Missing ticket type ID for removal');
-      return;
-    }
-
-    if (syncInProgress) {
-      console.log('CartProvider - Sync in progress, skipping remove');
-      return;
+      const error = new Error('Missing ticket type ID');
+      setSyncError(error);
+      throw error;
     }
 
     try {
-      console.log('CartProvider - Removing item:', ticketTypeId);
-      setSyncInProgress(true);
+      console.log('CartActions - Removing item:', ticketTypeId);
       
-      // First update local state
       dispatch({ 
         type: ACTIONS.REMOVE_ITEM, 
         payload: { ticketTypeId }
       });
 
-      // Then save to DB if logged in
-      if (user) {
-        console.log('CartProvider - User present, saving cart after removal');
-        await saveCart();
-      }
+      // Sync will be triggered by useEffect
     } catch (error) {
-      console.error('CartProvider - Error removing item:', error);
+      console.error('CartActions - Error removing item:', error);
       setSyncError(error);
       throw error;
-    } finally {
-      setSyncInProgress(false);
     }
-  }, [user, saveCart, setSyncInProgress, setSyncError, dispatch, syncInProgress]);
+  }, [dispatch, setSyncError]);
 
+  /**
+   * Clear the entire cart
+   * @returns {Promise<void>}
+   */
   const clearCart = useCallback(async () => {
-    if (syncInProgress) {
-      console.log('CartProvider - Sync in progress, skipping clear');
-      return;
-    }
-
     try {
-      console.log('CartProvider - Clearing cart');
-      setSyncInProgress(true);
+      console.log('CartActions - Clearing cart');
 
       if (user && state.id) {
-        console.log('CartProvider - Updating cart status to abandoned in DB');
-        await supabase
+        console.log('CartActions - Updating cart status to abandoned in DB');
+        const { error: updateError } = await supabase
           .from('carts')
           .update({ 
             status: 'abandoned',
             updated_at: new Date().toISOString()
           })
           .eq('id', state.id);
+
+        if (updateError) throw updateError;
       }
 
       dispatch({ type: ACTIONS.CLEAR_CART });
       localStorage.removeItem('cart');
-      console.log('CartProvider - Cart cleared successfully');
+      console.log('CartActions - Cart cleared successfully');
     } catch (error) {
-      console.error('CartProvider - Error clearing cart:', error);
+      console.error('CartActions - Error clearing cart:', error);
       setSyncError(error);
       throw error;
-    } finally {
-      setSyncInProgress(false);
     }
-  }, [user, state.id, setSyncInProgress, setSyncError, dispatch, syncInProgress]);
+  }, [user, state.id, dispatch, setSyncError]);
+
+  /**
+   * Get cart items for a specific event
+   * @param {string} eventId - Event ID
+   * @returns {Array} Array of cart items for the event
+   */
+  const getEventItems = useCallback((eventId) => {
+    return state.items.filter(item => item.event_id === eventId);
+  }, [state.items]);
+
+  /**
+   * Calculate total quantity for a specific event
+   * @param {string} eventId - Event ID
+   * @returns {number} Total quantity
+   */
+  const getEventQuantity = useCallback((eventId) => {
+    return state.items
+      .filter(item => item.event_id === eventId)
+      .reduce((sum, item) => sum + (item.quantity || 0), 0);
+  }, [state.items]);
+
+  /**
+   * Calculate total price for a specific event
+   * @param {string} eventId - Event ID
+   * @returns {number} Total price
+   */
+  const getEventTotal = useCallback((eventId) => {
+    return state.items
+      .filter(item => item.event_id === eventId)
+      .reduce((sum, item) => sum + (item.subtotal || 0), 0);
+  }, [state.items]);
+
+  /**
+   * Check if a specific ticket type is in the cart
+   * @param {string} ticketTypeId - Ticket type ID
+   * @returns {boolean} Whether the ticket type is in cart
+   */
+  const hasTicketType = useCallback((ticketTypeId) => {
+    return state.items.some(item => item.ticket_type_id === ticketTypeId);
+  }, [state.items]);
+
+  /**
+   * Get quantity of a specific ticket type in cart
+   * @param {string} ticketTypeId - Ticket type ID
+   * @returns {number} Quantity in cart
+   */
+  const getTicketTypeQuantity = useCallback((ticketTypeId) => {
+    const item = state.items.find(item => item.ticket_type_id === ticketTypeId);
+    return item ? item.quantity : 0;
+  }, [state.items]);
 
   return {
+    // Core cart operations
     saveCart,
     addItem,
     updateQuantity,
     removeItem,
-    clearCart
+    clearCart,
+    
+    // Helper methods
+    getEventItems,
+    getEventQuantity,
+    getEventTotal,
+    hasTicketType,
+    getTicketTypeQuantity,
+    
+    // Sync status
+    syncInProgress
   };
 }
 
+/**
+ * Hook to access cart context and actions
+ * @returns {Object} Cart context and actions
+ * @throws {Error} If used outside CartProvider
+ */
 export function useCart() {
   const context = useContext(CartContext);
   if (!context) {

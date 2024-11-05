@@ -33,7 +33,12 @@ import {
   AlertCircle,
   Calendar,
   CircleUser,
-  Ticket
+  Ticket,
+  Clock,
+  Users,
+  ArrowUpRight,
+  Tag,
+  MapPin  // Add this
 } from 'lucide-react';
 
 function formatCurrency(amount) {
@@ -52,11 +57,34 @@ function formatCurrency(amount) {
 }
 
 function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString('en-ZA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    return date.toLocaleDateString('en-ZA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return 'N/A';
+  }
+}
+
+function formatTime(dateString) {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'N/A';
+    
+    return date.toLocaleTimeString('en-ZA', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    return 'N/A';
+  }
 }
 
 const ORDER_STATUS = {
@@ -69,21 +97,22 @@ const ORDER_STATUS = {
 export default function OrdersPage() {
   const { user } = useContext(AuthContext);
   const [orders, setOrders] = useState([]);
+  const [validTickets, setValidTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date_desc');
-  const [uniqueEvents, setUniqueEvents] = useState([]);
-  const [selectedEvent, setSelectedEvent] = useState('all');
-
+  console.log(validTickets)
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrdersAndTickets = async () => {
       if (!user) return;
 
       try {
         setLoading(true);
-        let query = supabase
+        
+        // Fetch orders
+        let orderQuery = supabase
           .from('orders')
           .select(`
             *,
@@ -98,56 +127,75 @@ export default function OrdersPage() {
           .eq('profile_id', user.id);
 
         if (statusFilter !== 'all') {
-          query = query.eq('status', statusFilter);
+          orderQuery = orderQuery.eq('status', statusFilter);
         }
 
         switch (sortBy) {
           case 'date_asc':
-            query = query.order('created_at', { ascending: true });
+            orderQuery = orderQuery.order('created_at', { ascending: true });
             break;
           case 'date_desc':
-            query = query.order('created_at', { ascending: false });
+            orderQuery = orderQuery.order('created_at', { ascending: false });
             break;
           case 'amount_asc':
-            query = query.order('total_amount', { ascending: true });
+            orderQuery = orderQuery.order('total_amount', { ascending: true });
             break;
           case 'amount_desc':
-            query = query.order('total_amount', { ascending: false });
+            orderQuery = orderQuery.order('total_amount', { ascending: false });
             break;
           default:
-            query = query.order('created_at', { ascending: false });
+            orderQuery = orderQuery.order('created_at', { ascending: false });
         }
 
-        const { data, error: fetchError } = await query;
+        // Fetch valid tickets with ticket type and event info
+        const ticketQuery = supabase
+          .from('tickets')
+          .select(`
+            *,
+            ticket_type:ticket_types (
+              *,
+              event:events (
+                *
+              )
+            )
+          `)
+          .eq('profile_id', user.id)
+          .eq('status', 'valid');
 
-        if (fetchError) throw fetchError;
+        const [ordersResult, ticketsResult] = await Promise.all([
+          orderQuery,
+          ticketQuery
+        ]);
 
-        const eventsMap = new Map();
-        data.forEach(order => {
-          order.order_items?.forEach(item => {
-            if (item.ticket_type?.event) {
-              const event = item.ticket_type.event;
-              if (!eventsMap.has(event.id)) {
-                eventsMap.set(event.id, {
-                  id: event.id,
-                  title: event.title,
-                  orderCount: 1,
-                  totalTickets: 1
-                });
-              } else {
-                const eventStats = eventsMap.get(event.id);
-                eventStats.totalTickets += 1;
-                if (order.id !== eventStats.lastOrderId) {
-                  eventStats.orderCount += 1;
-                  eventStats.lastOrderId = order.id;
-                }
-              }
-            }
-          });
-        });
+        if (ordersResult.error) throw ordersResult.error;
+        if (ticketsResult.error) throw ticketsResult.error;
 
-        setUniqueEvents(Array.from(eventsMap.values()));
-        setOrders(data);
+        // Group tickets by event and then by ticket type
+        const ticketsByEvent = ticketsResult.data.reduce((acc, ticket) => {
+          if (!ticket.ticket_type?.event) return acc;
+          
+          const eventId = ticket.ticket_type.event.id;
+          if (!acc[eventId]) {
+            acc[eventId] = {
+              event: ticket.ticket_type.event,
+              ticketTypes: {}
+            };
+          }
+
+          const typeId = ticket.ticket_type.id;
+          if (!acc[eventId].ticketTypes[typeId]) {
+            acc[eventId].ticketTypes[typeId] = {
+              type: ticket.ticket_type,
+              tickets: []
+            };
+          }
+
+          acc[eventId].ticketTypes[typeId].tickets.push(ticket);
+          return acc;
+        }, {});
+
+        setOrders(ordersResult.data);
+        setValidTickets(Object.values(ticketsByEvent));
       } catch (err) {
         setError(err.message);
       } finally {
@@ -155,7 +203,7 @@ export default function OrdersPage() {
       }
     };
 
-    fetchOrders();
+    fetchOrdersAndTickets();
   }, [user, statusFilter, sortBy]);
 
   const filteredOrders = orders.filter(order => {
@@ -164,12 +212,7 @@ export default function OrdersPage() {
       item.ticket_type?.event?.title?.toLowerCase().includes(searchLower)
     ) || order.id.toLowerCase().includes(searchLower);
 
-    const matchesEventFilter = selectedEvent === 'all' || 
-      order.order_items?.some(item => 
-        item.ticket_type?.event?.id === selectedEvent
-      );
-
-    return matchesSearch && matchesEventFilter;
+    return matchesSearch;
   });
 
   if (loading) {
@@ -206,29 +249,81 @@ export default function OrdersPage() {
     <>
       <Header />
       <main className="max-w-7xl mx-auto p-4 pt-20 space-y-6">
-        {/* Events Summary Card */}
+        {/* Valid Tickets Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Events Summary</CardTitle>
+            <CardTitle>My Valid Tickets</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uniqueEvents.map(event => (
-                <div
-                  key={event.id}
-                  className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Ticket className="h-5 w-5 text-blue-500" />
-                    <h3 className="font-medium text-lg">{event.title}</h3>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    <p>Orders: {event.orderCount}</p>
-                    <p>Total Tickets: {event.totalTickets}</p>
-                  </div>
+          {validTickets.map(({ event, ticketTypes }) => (
+            <div
+              key={event.id}
+              className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <Ticket className="h-5 w-5 text-blue-500" />
+                  <h3 className="font-medium text-lg truncate">{event.title}</h3>
                 </div>
-              ))}
+                <Link to={`/event/${event.id}`}>
+                  <Button variant="ghost" size="sm" className="p-1">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              
+              <div className="space-y-2 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <span>
+                    {formatDate(event.start_time)} - {formatTime(event.start_time)}
+                  </span>
+                </div>
+                
+                <div className="flex items-center">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  <span className="truncate">
+                    {event.venue_name} - {event.venue_address}
+                  </span>
+                </div>
+
+                <div className="flex items-center">
+                  <Tag className="h-4 w-4 mr-2" />
+                  <span className="capitalize">
+                    {event.category}{event.subcategory ? ` • ${event.subcategory}` : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ticket Types Section */}
+              <div className="mt-4 space-y-3">
+                {Object.values(ticketTypes).map(({ type, tickets }) => (
+                  <div key={type.id} className="border-t pt-2">
+                    <div className="flex items-center justify-between text-sm font-medium">
+                      <div className="flex items-center">
+                        <Ticket className="h-4 w-4 mr-2 text-gray-500" />
+                        <span>{type.name}</span>
+                      </div>
+                      <span className="text-gray-500">
+                        {tickets.length} ticket{tickets.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {tickets.map((ticket) => (
+                        <Link 
+                          key={ticket.id}
+                          to={`/ticket/${ticket.id}`}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
+                        >
+                          {ticket.ticket_code}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+          ))}
           </CardContent>
         </Card>
 
@@ -251,19 +346,6 @@ export default function OrdersPage() {
                   />
                 </div>
               </div>
-              <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by event" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {uniqueEvents.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="Filter by status" />

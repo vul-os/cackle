@@ -52,6 +52,12 @@ Deno.serve(async (req) => {
       }
     )
 
+    // Initialize admin client for fetching additional data
+    const supabaseAdminClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+      
     // Parse request body
     const { cartId, billingName, billingEmail, billingAddress }: CreateOrderPayload = await req.json()
 
@@ -99,7 +105,7 @@ Deno.serve(async (req) => {
     )
 
     // Create order
-    const { data: order, error: orderError } = await supabaseClient
+    const { data: order, error: orderError } = await supabaseAdminClient
       .from('orders')
       .insert({
         profile_id: (await supabaseClient.auth.getUser()).data.user?.id,
@@ -140,14 +146,14 @@ Deno.serve(async (req) => {
       subtotal: (item.quantity * item.unit_price) - (item.discount_amount || 0)
     }))
 
-    const { error: itemsError } = await supabaseClient
+    const { error: itemsError } = await supabaseAdminClient
       .from('order_items')
       .insert(orderItems)
 
     if (itemsError) {
       console.error('Order items creation error:', itemsError)
       // Rollback order
-      await supabaseClient.from('orders').delete().eq('id', order.id)
+      await supabaseAdminClient.from('orders').delete().eq('id', order.id)
       return new Response(
         JSON.stringify({ error: 'Failed to create order items', details: itemsError.message }),
         {
@@ -181,7 +187,7 @@ Deno.serve(async (req) => {
     if (!paystackResponse.ok) {
       const paystackError = await paystackResponse.json()
       // Rollback order and items
-      await supabaseClient.from('orders').delete().eq('id', order.id)
+      await supabaseAdminClient.from('orders').delete().eq('id', order.id)
       
       return new Response(
         JSON.stringify({ 

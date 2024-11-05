@@ -17,10 +17,10 @@ export const EventDetailsCard = ({
   availableSubcategories
 }) => {
   const [date, setDate] = React.useState(() => {
-    if (editForm?.start_date && editForm?.end_date) {
+    if (editForm?.start_time && editForm?.end_time) {
       return {
-        from: new Date(editForm.start_date),
-        to: new Date(editForm.end_date)
+        from: new Date(editForm.start_time),
+        to: new Date(editForm.end_time)
       };
     }
     return undefined;
@@ -28,21 +28,21 @@ export const EventDetailsCard = ({
 
   // Keep date in sync with editForm
   React.useEffect(() => {
-    if (editForm?.start_date && editForm?.end_date) {
+    if (editForm?.start_time && editForm?.end_time) {
       setDate({
-        from: new Date(editForm.start_date),
-        to: new Date(editForm.end_date)
+        from: new Date(editForm.start_time),
+        to: new Date(editForm.end_time)
       });
     }
-  }, [editForm?.start_date, editForm?.end_date]);
+  }, [editForm?.start_time, editForm?.end_time]);
 
   // Watch for date changes and update form
   React.useEffect(() => {
     if (date?.from) {
-      handleInputChange('start_date', date.from.toISOString());
+      handleInputChange('start_time', date.from.toISOString());
     }
     if (date?.to) {
-      handleInputChange('end_date', date.to.toISOString());
+      handleInputChange('end_time', date.to.toISOString());
     }
   }, [date, handleInputChange]);
 

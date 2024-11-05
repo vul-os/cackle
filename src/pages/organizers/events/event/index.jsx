@@ -40,13 +40,13 @@ const EventPage = () => {
 
   // Update dateRange whenever editForm's dates change
   useEffect(() => {
-    if (editForm.start_date && editForm.end_date) {
+    if (editForm.start_time && editForm.end_time) {
       setDateRange({
-        from: new Date(editForm.start_date),
-        to: new Date(editForm.end_date)
+        from: new Date(editForm.start_time),
+        to: new Date(editForm.end_time)
       });
     }
-  }, [editForm.start_date, editForm.end_date]);
+  }, [editForm.start_time, editForm.end_time]);
 
   const fetchEvent = async () => {
     try {
@@ -64,8 +64,8 @@ const EventPage = () => {
       initializeForm({
         ...data,
         // Ensure dates are properly formatted
-        start_date: data.start_date ? new Date(data.start_date).toISOString() : null,
-        end_date: data.end_date ? new Date(data.end_date).toISOString() : null,
+        start_time: data.start_time ? new Date(data.start_time).toISOString() : null,
+        end_time: data.end_time ? new Date(data.end_time).toISOString() : null,
       });
       
     } catch (error) {
@@ -114,8 +114,8 @@ const EventPage = () => {
       // Ensure dates are in the correct format
       const updatedForm = {
         ...editForm,
-        start_date: editForm.start_date ? new Date(editForm.start_date).toISOString() : null,
-        end_date: editForm.end_date ? new Date(editForm.end_date).toISOString() : null,
+        start_time: editForm.start_time ? new Date(editForm.start_time).toISOString() : null,
+        end_time: editForm.end_time ? new Date(editForm.end_time).toISOString() : null,
       };
 
       const { error } = await supabase
@@ -147,10 +147,10 @@ const EventPage = () => {
 
   const handleDateChange = (newDateRange) => {
     if (newDateRange?.from) {
-      handleInputChange('start_date', newDateRange.from.toISOString());
+      handleInputChange('start_time', newDateRange.from.toISOString());
     }
     if (newDateRange?.to) {
-      handleInputChange('end_date', newDateRange.to.toISOString());
+      handleInputChange('end_time', newDateRange.to.toISOString());
     }
     setDateRange(newDateRange);
   };
