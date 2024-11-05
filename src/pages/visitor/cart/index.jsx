@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '@/context/cart';
+import { useCart } from '@/context/use-cart';
 import { AuthContext } from '@/context/use-auth';
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, ArrowLeft, Clock, MapPin } from 'lucide-react';

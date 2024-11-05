@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useCart } from '@/context/cart';
+import { useCart } from '@/context/use-cart';
 import { Plus, Minus, Ticket } from 'lucide-react';
 import {
   Dialog,

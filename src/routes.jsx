@@ -30,6 +30,9 @@ import TicketsView from './pages/organizers/events/event/tickets/tickets-view';
 import TicketTypesView from './pages/organizers/events/event/tickets/ticket-types-view';
 import ScannerPage from './pages/organizers/scanner';
 import CartPage from './pages/visitor/cart';
+import CheckoutPage from './pages/visitor/cart/checkout';
+import OrderPage from './pages/visitor/orders/order';
+import OrdersPage from './pages/visitor/orders';
 
 const AppRoutes = () => {
   return (
@@ -40,7 +43,7 @@ const AppRoutes = () => {
         <Route exact path="/docs" element={<DocsPage />} />
         {/* <Route exact path="/events/" element={<VisitorEventPage />} /> */}
         <Route path="/events/:id" element={<VisitorEventPage />} />
-        <Route path="/checkout" element={<CartPage />} />
+        <Route path="/cart" element={<CartPage />} />
 
         
         <Route path="/login" element={<SignIn />} />
@@ -52,6 +55,10 @@ const AppRoutes = () => {
 
         {/* Protected routes */}
         <Route path="/accept-invite" element={<ProtectedRoute><AcceptInvite /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/order/:id" element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
+        <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+
       </Route>
 
       {/* Protected routes */}
