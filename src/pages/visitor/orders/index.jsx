@@ -32,19 +32,27 @@ import {
   Search,
   AlertCircle,
   Calendar,
-  DollarSign,
+  CircleUser,
   Ticket
 } from 'lucide-react';
 
 function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
+  if (amount == null) return 'R0.00';
+  
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  if (isNaN(numericAmount)) return 'R0.00';
+  
+  const formatted = new Intl.NumberFormat('en-ZA', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numericAmount);
+  
+  return numericAmount < 0 ? `-R${formatted.replace('-', '')}` : `R${formatted}`;
 }
 
 function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  return new Date(dateString).toLocaleDateString('en-ZA', {
     year: 'numeric',
     month: 'long',
     day: 'numeric'
@@ -89,12 +97,10 @@ export default function OrdersPage() {
           `)
           .eq('profile_id', user.id);
 
-        // Apply status filter
         if (statusFilter !== 'all') {
           query = query.eq('status', statusFilter);
         }
 
-        // Apply sorting
         switch (sortBy) {
           case 'date_asc':
             query = query.order('created_at', { ascending: true });
@@ -116,7 +122,6 @@ export default function OrdersPage() {
 
         if (fetchError) throw fetchError;
 
-        // Extract all unique events with their details
         const eventsMap = new Map();
         data.forEach(order => {
           order.order_items?.forEach(item => {
@@ -330,7 +335,7 @@ export default function OrdersPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end">
-                            <DollarSign className="mr-1 h-4 w-4 text-gray-500" />
+                            <CircleUser className="mr-1 h-4 w-4 text-gray-500" />
                             {formatCurrency(order.total_amount)}
                           </div>
                         </TableCell>

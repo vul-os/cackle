@@ -31,9 +31,10 @@ import TicketsView from './pages/organizers/events/event/tickets/tickets-view';
 import TicketTypesView from './pages/organizers/events/event/tickets/ticket-types-view';
 import ScannerPage from './pages/organizers/scanner';
 import CartPage from './pages/visitor/cart';
-import CheckoutPage from './pages/visitor/cart/checkout';
+import CheckoutPage from './pages/visitor/checkout';
 import OrderPage from './pages/visitor/orders/order';
 import OrdersPage from './pages/visitor/orders';
+import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
 
 const AppRoutes = () => {
   return (
@@ -61,6 +62,7 @@ const AppRoutes = () => {
         <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
         <Route path="/order/:id" element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+        <Route path="/payment/verify" element={<ProtectedRoute><PaymentConfirmationPage /></ProtectedRoute>} />
 
       </Route>
 
