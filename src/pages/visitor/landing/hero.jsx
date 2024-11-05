@@ -281,13 +281,13 @@ function Hero() {
         <div className="relative z-10">
           <div className="hero-content container mx-auto px-4 md:px-6 pt-8 sm:pt-12 md:pt-24 pb-12 sm:pb-16 md:pb-32">
             <div className="max-w-2xl">
-              <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4 md:mb-6 bg-gradient-to-r from-red-400 via-red-500 to-red-600 bg-clip-text text-transparent drop-shadow-lg">
-                At the heart of the best events
+              <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold mb-3 sm:mb-4 md:mb-6 bg-gradient-to-r from-purple-400 via-pink-500 to-orange-500 bg-clip-text text-transparent drop-shadow-lg">
+                Creating Unforgettable Moments Together
               </h1>
               <p className="text-base sm:text-lg md:text-xl mb-6 sm:mb-8 md:mb-16 text-white dark:text-slate-200 opacity-90 drop-shadow transition-colors duration-200">
-                Less work, more play. Whether you're into online streams, weekend festivals 
-                or daytime get-togethers; we have something for you. Find what you're 
-                looking for and join the movement.
+                Turn every occasion into an experience. From vibrant virtual gatherings to 
+                sunset festivals and laid-back social meetups, there's an adventure waiting 
+                for everyone. Discover your next favorite memory and be part of our growing community.
               </p>
 
               <Card 

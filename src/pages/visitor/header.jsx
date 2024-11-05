@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Menu, X, Moon, Sun, LogOut, ShieldCheck } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut, ShieldCheck, Package } from 'lucide-react';
 import Logo from '/src/assets/cackle.svg'
 import LogoFallback from '/src/assets/cackle.png'
 import { useTheme } from '@/components/theme-provider'
@@ -36,6 +36,15 @@ const Header = () => {
     if (user) {
       return (
         <>
+          <Button
+            variant="ghost"
+            size={isMobile ? "sm" : "default"}
+            className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
+            onClick={() => handleNavigation('/orders')}
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Orders
+          </Button>
           {activeOrganization && (
             <Button
               variant="ghost"
