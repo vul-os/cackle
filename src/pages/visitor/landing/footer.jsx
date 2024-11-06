@@ -51,6 +51,11 @@ const Footer = () => {
                     Contact Us
                   </Link>
                 </li>
+                <li>
+                  <Link to="/pricing" className="text-zinc-400 hover:text-[#536BFF] transition-colors">
+                    Fees
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

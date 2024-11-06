@@ -72,29 +72,18 @@ function Hero() {
   }, []);
 
   useEffect(() => {
-    let timeoutId;
     const handleScroll = () => {
-      if (timeoutId) {
-        window.cancelAnimationFrame(timeoutId);
+      const tabsElement = document.getElementById('navigation-tabs');
+      if (tabsElement) {
+        const headerHeight = 64; // Height of your fixed header
+        const heroBottom = tabsElement.getBoundingClientRect().bottom;
+        setIsSticky(heroBottom <= headerHeight);
       }
-
-      timeoutId = window.requestAnimationFrame(() => {
-        const tabsElement = document.getElementById('navigation-tabs');
-        if (tabsElement) {
-          const headerHeight = 64;
-          const tabsPosition = tabsElement.getBoundingClientRect().top + window.scrollY;
-          setIsSticky(window.scrollY > tabsPosition - headerHeight);
-        }
-      });
     };
 
+    handleScroll(); // Initial check
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      if (timeoutId) {
-        window.cancelAnimationFrame(timeoutId);
-      }
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const handleSearchClick = useCallback(() => {
@@ -105,30 +94,18 @@ function Hero() {
     setActiveTab(tabId);
     
     const element = document.getElementById(tabId);
-    if (!element) {
-      console.warn(`Section with id ${tabId} not found`);
-      return;
-    }
+    if (!element) return;
 
-    const headerHeight = 64;
-    const tabsHeight = 56;
-    const totalOffset = isSticky ? headerHeight + tabsHeight : headerHeight;
+    const headerHeight = 64; // Fixed header height
+    const tabsHeight = 56; // Height of tabs
+    const totalOffset = headerHeight + (isSticky ? tabsHeight : 0);
     
-    requestAnimationFrame(() => {
-      const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
-      const offsetPosition = elementPosition - totalOffset;
-      
-      // Only scroll if the element is not already in view
-      const currentScroll = window.pageYOffset;
-      const viewportHeight = window.innerHeight;
-      const elementHeight = element.offsetHeight;
-      
-      if (elementPosition < headerHeight || elementPosition + elementHeight > viewportHeight) {
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-      }
+    const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+    const offsetPosition = elementPosition - totalOffset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
     });
   }, [isSticky]);
 
@@ -195,7 +172,6 @@ function Hero() {
           box-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
         }
 
-        /* First ring - close range */
         .particle:nth-child(1) { --tx: 60px; --ty: -60px; }
         .particle:nth-child(2) { --tx: 60px; --ty: 60px; }
         .particle:nth-child(3) { --tx: -60px; --ty: -60px; }
@@ -205,7 +181,6 @@ function Hero() {
         .particle:nth-child(7) { --tx: 0px; --ty: 85px; }
         .particle:nth-child(8) { --tx: 0px; --ty: -85px; }
 
-        /* Second ring - medium range */
         .particle:nth-child(9) { --tx: 120px; --ty: -120px; }
         .particle:nth-child(10) { --tx: 120px; --ty: 120px; }
         .particle:nth-child(11) { --tx: -120px; --ty: -120px; }
@@ -215,7 +190,6 @@ function Hero() {
         .particle:nth-child(15) { --tx: -150px; --ty: -50px; }
         .particle:nth-child(16) { --tx: -150px; --ty: 50px; }
 
-        /* Third ring - long range */
         .particle:nth-child(17) { --tx: 180px; --ty: -180px; }
         .particle:nth-child(18) { --tx: 180px; --ty: 180px; }
         .particle:nth-child(19) { --tx: -180px; --ty: -180px; }
@@ -225,12 +199,10 @@ function Hero() {
         .particle:nth-child(23) { --tx: -200px; --ty: -100px; }
         .particle:nth-child(24) { --tx: -200px; --ty: 100px; }
 
-        /* Stagger container animations */
         .particle-container:nth-child(2) { animation-delay: 0.15s; }
         .particle-container:nth-child(3) { animation-delay: 0.3s; }
         .particle-container:nth-child(4) { animation-delay: 0.45s; }
 
-        /* Stagger particle animations within each container */
         .particle-container:nth-child(1) .particle { animation-delay: calc(var(--index) * 0.05s); }
         .particle-container:nth-child(2) .particle { animation-delay: calc(var(--index) * 0.05s + 0.15s); }
         .particle-container:nth-child(3) .particle { animation-delay: calc(var(--index) * 0.05s + 0.3s); }
@@ -242,12 +214,6 @@ function Hero() {
           }
           .particle-container {
             animation-duration: 1.2s;
-          }
-        }
-
-        @media (min-width: 768px) {
-          .hide-scrollbar {
-            overflow: hidden !important;
           }
         }
 
@@ -304,21 +270,11 @@ function Hero() {
         </div>
       </div>
 
-      <div className="relative -mt-8" id="navigation-tabs">
-        {isSticky && <div style={{ height: '56px' }} />}
-        
-        <div 
-          className={`w-full bg-black border-b border-gray-800 transition-all duration-300 ${
-            isSticky ? 'fixed top-16 left-0 right-0 z-40' : ''
-          }`}
-        >
+      <div id="navigation-tabs" className="sticky top-16 z-40 -mt-8">
+        <div className="w-full bg-black border-b border-gray-800 transition-all duration-300">
           <div className="container mx-auto">
             <div className="overflow-x-auto hide-scrollbar">
-              <div 
-                className={`flex md:grid md:grid-cols-4 w-full ${
-                  isMobile ? 'min-w-[480px]' : ''
-                }`}
-              >
+              <div className={`flex md:grid md:grid-cols-4 w-full ${isMobile ? 'min-w-[480px]' : ''}`}>
                 {HERO_TABS.map((tab) => (
                   <div 
                     key={tab.id} 

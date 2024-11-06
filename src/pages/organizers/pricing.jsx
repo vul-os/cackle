@@ -1,153 +1,246 @@
-import React, { useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Info } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React from 'react';
+import { CreditCard, Banknote, Wallet, ArrowRight } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import PaymentCalculator from './payment-calculator';
 
 const PricingPage = () => {
-  const [expandedMethod, setExpandedMethod] = useState(null);
-
-  const paymentMethods = [
+  const paymentOptions = [
     {
-      type: 'PayFast',
-      description: 'Multiple payment options in one',
-      logo: '/api/placeholder/120/40',
-      methods: [
+      type: 'Cards',
+      description: 'Credit and Debit card payments',
+      icon: <CreditCard className="h-12 w-12 text-red-500" />,
+      logos: [
         {
-          name: 'Credit and Cheque Card',
-          description: "The world's most popular online payment method.",
-          fee: '3.2% plus R2.00'
+          name: 'Visa',
+          src: '/images/visa.jpg',
+          alt: 'Visa logo'
         },
         {
-          name: 'Instant EFT',
-          description: 'An electronic funds transfer that gets verified instantly.',
-          fee: '2.0% (min R2.00)'
+          name: 'Mastercard',
+          src: '/images/master.jpg',
+          alt: 'Mastercard logo'
+        }
+      ],
+      provider: {
+        name: 'Paystack',
+        logo: '/images/paystack.jpg',
+      },
+      rates: [
+        {
+          name: 'Local Transactions',
+          description: 'South African cards',
+          fee: '2.9% + R1.00'
         },
         {
-          name: 'Debit Card',
-          description: 'A popular payment option for many South African shoppers.',
-          fee: '3.5% plus R2.00'
-        },
-        {
-          name: 'Apple Pay',
-          description: "A popular mobile wallet that's linked to an online shopper's Apple device.",
-          fee: '3.2% (min R2.00)'
-        },
-        {
-          name: 'Samsung Pay',
-          description: 'A mobile payment solution for online shoppers with Samsung Galaxy smartphones.',
-          fee: '3.2% (min R2.00)'
-        },
-        {
-          name: 'Masterpass',
-          description: 'A digital wallet that streamlines the checkout process.',
-          fee: '3.5% plus R2.00'
+          name: 'International Transactions',
+          description: 'Non-South African cards',
+          fee: '3.9% + R1.00'
         }
       ]
     },
     {
-      type: 'Shape Pay',
-      description: 'Buy Now, Pay Later',
-      logo: '/api/placeholder/120/40',
-      methods: [
+      type: 'Cash Options',
+      description: 'Secure cash payment methods',
+      icon: <Banknote className="h-12 w-12 text-red-500" />,
+      logos: [
         {
-          name: 'MoreTyme',
-          description: 'A buy now, pay later option with TymeBank.',
-          fee: '5.5% plus R2.00'
+          name: 'Bank Transfer',
+          src: '/images/bank.jpg',
+          alt: 'Bank transfer icon'
+        }
+      ],
+      provider: {
+        name: 'Mukuru Pay',
+        logo: '/images/mukuru.jpg',
+      },
+      rates: [
+        {
+          name: 'Cash Deposit',
+          description: 'Pay at any major retailer',
+          fee: '3.9% + R6'
+        },
+        {
+          name: '',
+          description: '',
+          fee: ''
+        }
+      ]
+    },
+    {
+      type: 'Instant Payments',
+      description: 'Quick digital transfers',
+      icon: <Wallet className="h-12 w-12 text-red-500" />,
+      logos: [
+        {
+          name: 'PayShap',
+          src: '/images/payshap.jpg',
+          alt: 'PayShap logo'
+        },
+        {
+          name: 'Instant EFT',
+          src: '/images/eft.jpg',
+          alt: 'EFT icon'
+        }
+      ],
+      provider: {
+        name: 'PayFast',
+        logo: '/images/payfastlogo.jpg',
+      },
+      rates: [
+        {
+          name: 'PayShap',
+          description: 'Instant mobile payments',
+          fee: 'R7.50'
+        },
+        {
+          name: 'Instant EFT',
+          description: 'Direct bank transfer',
+          fee: '2.0%(min R2)'
         }
       ]
     }
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 py-16">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h1>
-        <p className="text-lg text-gray-600 mb-2">Our fee is always 0.85%</p>
-        <p className="text-gray-500">Plus payment processing fees</p>
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+      {/* Promotional Banner */}
+      <div className="bg-gradient-to-r from-red-600 to-red-800 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-center gap-4">
+            <div className="flex items-center">
+              <span className="text-2xl font-bold line-through opacity-75">2%</span>
+              <ArrowRight className="mx-2 h-5 w-5" />
+              <span className="text-3xl font-bold">0.85%</span>
+            </div>
+            <div className="h-8 w-px bg-red-400/30" />
+            <p className="text-sm font-medium">
+              South Africa's Most Competitive Payment Rates
+            </p>
+          </div>
+        </div>
       </div>
 
-      <div className="space-y-6 mb-12">
-        {paymentMethods.map((provider, index) => (
-          <Card key={index} className="bg-white shadow-lg overflow-hidden">
-            <div 
-              className="cursor-pointer"
-              onClick={() => setExpandedMethod(expandedMethod === index ? null : index)}
+      <div className="max-w-5xl mx-auto px-4 py-12">
+        {/* Header Section */}
+        <div className="text-center mb-12">
+          <span className="text-red-600 font-semibold text-sm tracking-wider uppercase mb-4 block">
+            Payment Solutions
+          </span>
+          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
+            Payment Methods
+          </h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Choose from our range of secure payment options tailored for your needs
+          </p>
+        </div>
+
+        {/* Payment Options Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {paymentOptions.map((option, index) => (
+            <Card 
+              key={index} 
+              className="bg-white/80 backdrop-blur-sm border-0 hover:shadow-xl transition-all duration-300 overflow-hidden"
             >
-              <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <div className="flex items-center space-x-4">
-                  <img 
-                    src={provider.logo} 
-                    alt={`${provider.type} logo`}
-                    className="h-10"
-                  />
-                  <div>
-                    <CardTitle className="text-xl font-bold">{provider.type}</CardTitle>
-                    <p className="text-sm text-gray-500">{provider.description}</p>
+              <CardContent className="p-6">
+                {/* Provider Logo Section */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="bg-red-50 p-4 rounded-2xl">
+                    {option.icon}
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-xl">
+                    <img 
+                      src={option.provider.logo} 
+                      alt={`${option.provider.name} logo`}
+                      className="h-8 w-auto object-contain"
+                    />
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className="font-semibold text-blue-600">Our fee: 0.85%</span>
-                  {expandedMethod === index ? <ChevronUp /> : <ChevronDown />}
-                </div>
-              </CardHeader>
-            </div>
-            
-            {expandedMethod === index && (
-              <CardContent className="border-t">
-                <div className="space-y-4 pt-4">
-                  {provider.methods.map((method, methodIndex) => (
-                    <div key={methodIndex} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg">
-                      <div className="space-y-1">
-                        <h4 className="font-semibold">{method.name}</h4>
-                        <p className="text-sm text-gray-600">{method.description}</p>
+                
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800 mb-1">
+                      {option.type}
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      {option.description}
+                    </p>
+                  </div>
+
+                  {/* Payment Method Logos */}
+                  <div className="flex items-center gap-4">
+                    {option.logos.map((logo, logoIndex) => (
+                      <div key={logoIndex} className="bg-white p-2 rounded-lg shadow-sm">
+                        <img 
+                          src={logo.src} 
+                          alt={logo.alt}
+                          className="h-6 w-auto object-contain"
+                        />
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{method.fee}</p>
-                        <p className="text-sm text-gray-500">+ 0.85% our fee</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                  
+                  {/* Rates Section */}
+                  <div className="space-y-3">
+                    {option.rates.map((rate, rateIndex) => (
+                      rate.name && (
+                        <div 
+                          key={rateIndex}
+                          className="pt-3 border-t border-red-100"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-semibold text-sm text-gray-800 mb-1">
+                                {rate.name}
+                              </h4>
+                              <p className="text-xs text-gray-600">
+                                {rate.description}
+                              </p>
+                            </div>
+                            <span className="font-bold text-sm text-red-600">
+                              {rate.fee}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    ))}
+                  </div>
+
+                  {/* Sponsored Section */}
+                  <div className="pt-4 border-t border-red-100">
+                    <p className="text-xs text-gray-500 text-center">
+                      Powered by <span className="font-semibold text-red-600">{option.provider.name}</span>
+                    </p>
+                  </div>
                 </div>
               </CardContent>
-            )}
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
 
-      <Card className="bg-white shadow-lg">
-        <CardContent className="py-8">
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-lg font-bold mb-4">What's Included</h3>
-              <ul className="space-y-3">
-                {[
-                  'No monthly fees',
-                  'No setup fees',
-                  'No hidden charges',
-                  'Instant settlement',
-                  'South African payment methods',
-                  '24/7 support'
-                ].map((feature, index) => (
-                  <li key={index} className="flex items-center">
-                    <Check className="h-5 w-5 text-green-500 mr-3" />
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold mb-4">Our Promise</h3>
-              <p className="text-gray-600">
-                We keep things simple and transparent. Our fee is consistently 0.85% across all payment methods. 
-                The processing fees go directly to our payment partners to handle the 
-                secure processing of your transactions.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Calculator Component */}
+        <PaymentCalculator />
 
-      <div className="mt-8 text-center text-sm text-gray-500">
-        <p>Contact us for volume pricing on transactions over R100,000 monthly.</p>
+        {/* Bottom Section */}
+        <Card className="mt-12 bg-white/80 backdrop-blur-sm border-0">
+          <CardContent className="p-6">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Secure Payments</h3>
+                <p className="text-gray-600">
+                  All transactions are processed through our verified partners,
+                  ensuring the highest level of security for your payments.
+                </p>
+              </div>
+              <div className="border-l border-red-100 pl-8">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">24/7 Support</h3>
+                <p className="text-gray-600">
+                  Our dedicated support team is available around the clock
+                  to assist you with any payment-related queries.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

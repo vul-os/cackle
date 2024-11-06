@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useCart } from '@/context/use-cart';
-import { Plus, Minus, Ticket } from 'lucide-react';
+import { Plus, Minus, Ticket, ChevronDown } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,14 +9,83 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
-const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
+const TICKET_TYPES = {
+  GENERAL: 'general',
+  VIP: 'vip',
+  EARLY_BIRD: 'early-bird',
+  GROUP: 'group',
+  STUDENT: 'student'
+};
+
+const TicketSelection = ({ event }) => {
   const { addItem } = useCart();
   const [open, setOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState("all");
+  
+  // Sample ticket types with type field included
+  const ticketTypes = [
+    {
+      id: "1",
+      name: "General Admission",
+      type: TICKET_TYPES.GENERAL,
+      price: 99.99,
+      quantity_total: 1000,
+      description: "Standard event access"
+    },
+    {
+      id: "2",
+      name: "VIP Pass",
+      type: TICKET_TYPES.VIP,
+      price: 299.99,
+      quantity_total: 100,
+      description: "Premium access with exclusive perks"
+    },
+    {
+      id: "3",
+      name: "Early Bird Special",
+      type: TICKET_TYPES.EARLY_BIRD,
+      price: 79.99,
+      quantity_total: 200,
+      description: "Limited time discount pricing"
+    },
+    {
+      id: "4",
+      name: "Group Package (5+ people)",
+      type: TICKET_TYPES.GROUP,
+      price: 89.99,
+      quantity_total: 50,
+      description: "Discounted rate for groups"
+    },
+    {
+      id: "5",
+      name: "Student Ticket",
+      type: TICKET_TYPES.STUDENT,
+      price: 49.99,
+      quantity_total: 300,
+      description: "Valid student ID required"
+    }
+  ];
+
   const [quantities, setQuantities] = useState(
     ticketTypes.reduce((acc, ticket) => ({ ...acc, [ticket.id]: 0 }), {})
   );
+
+  // Get unique ticket types
+  const uniqueTypes = ["all", ...new Set(ticketTypes.map(ticket => ticket.type))];
+
+  // Filter tickets based on selected type
+  const filteredTickets = selectedType === "all" 
+    ? ticketTypes 
+    : ticketTypes.filter(ticket => ticket.type === selectedType);
 
   const updateQuantity = (ticketId, delta) => {
     setQuantities(prev => ({
@@ -29,20 +98,23 @@ const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
     sum + (ticket.price * quantities[ticket.id]), 0
   );
 
+  const formatTicketType = (type) => {
+    if (type === 'all') return 'All Tickets';
+    return type.split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   const handleAddToCart = () => {
     Object.entries(quantities).forEach(([ticketId, quantity]) => {
       if (quantity > 0) {
         const ticketType = ticketTypes.find(tt => tt.id === ticketId);
         if (ticketType) {
-          // Pass both ticketType and event to addItem
           addItem(ticketType, event, quantity);
         }
       }
     });
-    
-    // Reset quantities
     setQuantities(ticketTypes.reduce((acc, ticket) => ({ ...acc, [ticket.id]: 0 }), {}));
-    // Close the dialog
     setOpen(false);
   };
 
@@ -59,13 +131,34 @@ const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
         <DialogHeader>
           <DialogTitle>Select Tickets</DialogTitle>
         </DialogHeader>
+
+        <div className="mb-4">
+          <Select value={selectedType} onValueChange={setSelectedType}>
+            <SelectTrigger className="w-full bg-gray-800 border-white/10 text-white">
+              <SelectValue placeholder="Select ticket type">
+                {formatTicketType(selectedType)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-white/10 text-white">
+              {uniqueTypes.map(type => (
+                <SelectItem 
+                  key={type} 
+                  value={type}
+                  className="hover:bg-gray-700 focus:bg-gray-700 cursor-pointer"
+                >
+                  {formatTicketType(type)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         
-        <div className="space-y-4">
-          {ticketTypes.map(ticket => (
+        <div className="space-y-4 max-h-[400px] overflow-y-auto">
+          {filteredTickets.map(ticket => (
             <div key={ticket.id} className="flex items-center justify-between p-4 border border-white/10 rounded-lg bg-white/5">
               <div>
                 <h3 className="font-medium text-white">{ticket.name}</h3>
-                <p className="text-sm text-gray-300">${ticket.price.toFixed(2)}</p>
+                <p className="text-sm text-gray-300">R{ticket.price.toFixed(2)}</p>
                 {ticket.description && (
                   <p className="text-sm text-gray-400">{ticket.description}</p>
                 )}
@@ -98,7 +191,7 @@ const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
         <div className="mt-4 pt-4 border-t border-white/10">
           <div className="flex justify-between font-medium text-white">
             <span>Total:</span>
-            <span>${total.toFixed(2)}</span>
+            <span>R{total.toFixed(2)}</span>
           </div>
         </div>
 
@@ -108,7 +201,7 @@ const TicketSelection = ({ ticketTypes, event }) => {  // Add event prop
             disabled={total === 0}
             className="w-full bg-gradient-to-r from-[#880424] to-[#660318] hover:from-[#990525] hover:to-[#770419]"
           >
-            Add to Cart (${total.toFixed(2)})
+            Add to Cart (R{total.toFixed(2)})
           </Button>
         </DialogFooter>
       </DialogContent>

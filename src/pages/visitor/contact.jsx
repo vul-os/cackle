@@ -19,7 +19,7 @@ const ContactIconBlock = ({ icon, title, description, address, link, linkText })
       )}
       {link && (
         <a
-          className="group mt-2 inline-flex items-center gap-x-2 rounded-lg text-sm font-medium text-purple-600 outline-none ring-purple-500 transition duration-300 hover:text-purple-700 focus-visible:ring"
+          className="group mt-2 inline-flex items-center gap-x-2 rounded-lg text-sm font-medium text-red-800 outline-none ring-red-500 transition duration-300 hover:text-red-900 focus-visible:ring"
           href={link}
         >
           {linkText}
@@ -69,7 +69,7 @@ const ContactPage = () => {
   const icons = {
     knowledgeBase: (
       <svg
-        className="mt-1.5 h-6 w-6 flex-shrink-0 text-purple-500"
+        className="mt-1.5 h-6 w-6 flex-shrink-0 text-red-800"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -82,7 +82,7 @@ const ContactPage = () => {
     ),
     faq: (
       <svg
-        className="mt-1.5 h-6 w-6 flex-shrink-0 text-purple-500"
+        className="mt-1.5 h-6 w-6 flex-shrink-0 text-red-800"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -95,7 +95,7 @@ const ContactPage = () => {
     ),
     location: (
       <svg
-        className="mt-1.5 h-6 w-6 flex-shrink-0 text-purple-500"
+        className="mt-1.5 h-6 w-6 flex-shrink-0 text-red-800"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -109,7 +109,7 @@ const ContactPage = () => {
     ),
     email: (
       <svg
-        className="mt-1.5 h-6 w-6 flex-shrink-0 text-purple-500"
+        className="mt-1.5 h-6 w-6 flex-shrink-0 text-red-800"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -123,19 +123,20 @@ const ContactPage = () => {
   };
 
   return (
-    <section className="mx-auto max-w-[85rem] px-4 py-10 sm:px-6 lg:px-8 lg:py-14 bg-white">
-      <div className="mx-auto max-w-2xl lg:max-w-5xl">
-        <div className="text-center">
-          <h1 className="text-balance text-2xl font-bold tracking-tight md:text-4xl md:leading-tight bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50">
+      <section className="mx-auto max-w-5xl px-4 py-12">
+        <div className="text-center mb-12">
+          <span className="text-red-600 font-semibold text-sm tracking-wider uppercase mb-4 block">Get in Touch</span>
+          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-red-600 to-red-800 bg-clip-text text-transparent">
             Contact Us
           </h1>
-          <p className="mt-1 text-pretty text-gray-600">
+          <p className="text-gray-600 max-w-2xl mx-auto">
             Turn every occasion into an experience. From vibrant virtual gatherings to sunset festivals and laid-back social meetups, there's an adventure waiting for everyone.
           </p>
         </div>
 
-        <div className="mt-12 grid items-center gap-6 lg:grid-cols-2 lg:gap-16">
-          <Card className="flex flex-col rounded-xl p-4 sm:p-6 lg:p-8 bg-white shadow-lg border-purple-100">
+        <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-16">
+          <Card className="flex flex-col rounded-xl p-4 sm:p-6 lg:p-8 bg-white/80 backdrop-blur-sm border-0 hover:shadow-xl transition-all duration-300">
             <CardHeader className="px-0">
               <CardTitle className="text-xl font-bold text-gray-800">
                 Fill in the form below
@@ -151,7 +152,7 @@ const ContactPage = () => {
                       name="firstName"
                       value={formData.firstName}
                       onChange={handleChange}
-                      className="block w-full border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full border-gray-200 focus:border-red-500 focus:ring-red-500"
                       placeholder="First Name"
                     />
                   </div>
@@ -162,7 +163,7 @@ const ContactPage = () => {
                       name="lastName"
                       value={formData.lastName}
                       onChange={handleChange}
-                      className="block w-full border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full border-gray-200 focus:border-red-500 focus:ring-red-500"
                       placeholder="Last Name"
                     />
                   </div>
@@ -175,7 +176,7 @@ const ContactPage = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className="block w-full border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="block w-full border-gray-200 focus:border-red-500 focus:ring-red-500"
                     placeholder="Email"
                   />
                 </div>
@@ -187,7 +188,7 @@ const ContactPage = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="block w-full border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="block w-full border-gray-200 focus:border-red-500 focus:ring-red-500"
                     placeholder="Phone Number"
                   />
                 </div>
@@ -199,7 +200,7 @@ const ContactPage = () => {
                     value={formData.details}
                     onChange={handleChange}
                     rows={4}
-                    className="block w-full border-gray-200 focus:border-purple-500 focus:ring-purple-500"
+                    className="block w-full border-gray-200 focus:border-red-500 focus:ring-red-500"
                     placeholder="Details"
                   />
                 </div>
@@ -207,7 +208,7 @@ const ContactPage = () => {
                 <div className="mt-4">
                   <Button
                     type="submit"
-                    className="inline-flex w-full items-center justify-center gap-x-2 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 px-4 py-3 text-sm font-bold text-white hover:from-purple-700 hover:to-pink-700 focus:ring-2 focus:ring-purple-500"
+                    className="inline-flex w-full items-center justify-center gap-x-2 rounded-lg bg-gradient-to-r from-red-900 to-red-700 px-4 py-3 text-sm font-bold text-white hover:from-red-950 hover:to-red-800 focus:ring-2 focus:ring-red-500"
                   >
                     Send Message
                   </Button>
@@ -231,29 +232,23 @@ const ContactPage = () => {
               linkText="Visit guides & tutorials"
             />
             <ContactIconBlock
-              icon={icons.faq}
-              title="FAQ"
-              description="Explore our FAQ for quick, clear answers to common queries."
-              link="#"
-              linkText="Visit FAQ"
-            />
-            <ContactIconBlock
-              icon={icons.location}
-              title="Visit our office"
-              description="UK ScrewFast"
-              address="72 Union Terrace, E10 4PE London"
-            />
+             icon={icons.phone}
+              title="Contact Us"
+                description="Have questions? Reach out to our support team directly."
+                 link="tel:+1234567890"
+                 linkText="0674358901"
+         />
             <ContactIconBlock
               icon={icons.email}
               title="Contact us by email"
               description="Prefer the written word? Drop us an email at"
               link="#"
-              linkText="support@screwfast.uk"
+              linkText="cackleza@gmail.com"
             />
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 };
 

@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Loader2 } from "lucide-react"
 
 import { useAuthRedirect } from './auth-redirect';
+import backgroundImage from '/images/celebback.jpg'; // Adjust path as needed
 
 const SignUp = () => {
   const { signUp, signInWithGoogle } = useContext(AuthContext);
@@ -53,12 +54,22 @@ const SignUp = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#980F2E] via-[#CD1B41] to-[#FF476F]"
+      style={{
+        backgroundImage: `url(${backgroundImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        opacity: 0.9,
+      }}>
+      <div className="absolute inset-0 bg-[url('/api/placeholder/1920/1080')] opacity-5 mix-blend-overlay" />
+      <Card className="w-full max-w-md backdrop-blur-sm bg-white/90 shadow-2xl border-0 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#980F2E]/10 to-transparent pointer-events-none" />
+        <CardHeader className="space-y-1 relative">
+          <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-[#980F2E] to-[#CD1B41] bg-clip-text text-transparent">
+            Create an account
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6 relative">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -66,7 +77,7 @@ const SignUp = () => {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">Email</label>
+              <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
               <Input
                 id="email"
                 type="email"
@@ -75,10 +86,11 @@ const SignUp = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}
                 required
+                className="border-gray-200 focus:border-[#980F2E] focus:ring-[#980F2E] transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">Password</label>
+              <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
               <Input
                 id="password"
                 type="password"
@@ -87,10 +99,11 @@ const SignUp = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
                 required
+                className="border-gray-200 focus:border-[#980F2E] focus:ring-[#980F2E] transition-colors"
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">Confirm Password</label>
               <Input
                 id="confirmPassword"
                 type="password"
@@ -99,9 +112,14 @@ const SignUp = () => {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 disabled={isLoading}
                 required
+                className="border-gray-200 focus:border-[#980F2E] focus:ring-[#980F2E] transition-colors"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-[#980F2E] to-[#CD1B41] hover:from-[#CD1B41] hover:to-[#980F2E] text-white transition-all duration-300 shadow-lg hover:shadow-xl" 
+              disabled={isLoading}
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -114,17 +132,17 @@ const SignUp = () => {
           </form>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <Separator />
+              <Separator className="bg-gray-300" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
+              <span className="bg-white/90 px-2 text-gray-500">
                 Or continue with
               </span>
             </div>
           </div>
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full border-2 hover:bg-gray-50 transition-colors duration-300"
             onClick={handleGoogleSignUp}
             disabled={isLoading}
           >
@@ -137,7 +155,7 @@ const SignUp = () => {
         <CardFooter>
           <Button 
             variant="link" 
-            className="w-full text-sm text-muted-foreground" 
+            className="w-full text-sm text-[#980F2E] hover:text-[#CD1B41] transition-colors" 
             onClick={() => navigate('/login')}
             disabled={isLoading}
           >
