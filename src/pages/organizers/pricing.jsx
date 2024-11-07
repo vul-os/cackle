@@ -50,8 +50,8 @@ const PricingPage = () => {
         }
       ],
       provider: {
-        name: 'Mukuru Pay',
-        logo: '/images/mukuru.jpg',
+        name: 'PayFast',
+        logo: '/images/payfastlogo.jpg',
       },
       rates: [
         {
@@ -83,8 +83,8 @@ const PricingPage = () => {
         }
       ],
       provider: {
-        name: 'PayFast',
-        logo: '/images/payfastlogo.jpg',
+        name: 'Mukuru',
+        logo: '/images/mukuru.jpg',
       },
       rates: [
         {

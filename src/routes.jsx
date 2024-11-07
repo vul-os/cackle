@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
+
 // Layouts
 import BlankLayout from './components/layout/blank-layout';
 import MainLayout from './components/layout/main-layout';
@@ -35,7 +36,7 @@ import CheckoutPage from './pages/visitor/checkout';
 import OrderPage from './pages/visitor/orders/order';
 import OrdersPage from './pages/visitor/orders';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
-import TicketPage from './pages/visitor/ticket';
+import TicketPage from './pages/visitor/tickets';
 
 const AppRoutes = () => {
   return (
@@ -64,7 +65,7 @@ const AppRoutes = () => {
         <Route path="/order/:id" element={<ProtectedRoute><OrderPage /></ProtectedRoute>} />
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/payment/verify" element={<ProtectedRoute><PaymentConfirmationPage /></ProtectedRoute>} />
-        <Route path="/ticket/:id" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
+        <Route path="/tickets/:eventId" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
 
       </Route>
 
