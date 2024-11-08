@@ -36,7 +36,8 @@ import CheckoutPage from './pages/visitor/checkout';
 import OrderPage from './pages/visitor/orders/order';
 import OrdersPage from './pages/visitor/orders';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
-import TicketPage from './pages/visitor/tickets';
+import TicketPage from './pages/visitor/tickets/ticket';
+import TicketsPage from './pages/visitor/tickets';
 
 const AppRoutes = () => {
   return (
@@ -66,7 +67,7 @@ const AppRoutes = () => {
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/payment/verify" element={<ProtectedRoute><PaymentConfirmationPage /></ProtectedRoute>} />
         <Route path="/ticket/:id" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
-
+        <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
       </Route>
 
       {/* Protected routes */}

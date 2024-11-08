@@ -44,7 +44,9 @@ import {
   Filter,
   SortDesc,
   ChevronDown,
-  BarChart3
+  BarChart3,
+  TicketIcon,
+  Layout
 } from 'lucide-react';
 
 const formatCurrency = (amount) => {
@@ -206,7 +208,7 @@ const ValidTicketCard = ({ event, ticketTypes, orders }) => {
               }`} />
             </button>
             <Link 
-              to={`/event/${event.id}`}
+              to={`/events/${event.id}`}
               className="hover:opacity-70 transition-opacity"
             >
               <ArrowUpRight className="h-5 w-5" />
@@ -447,14 +449,14 @@ export default function OrdersPage() {
         [background-image:radial-gradient(at_top_left,rgba(255,0,0,0.1)_0%,transparent_50%),radial-gradient(at_bottom_right,rgba(220,38,38,0.1)_0%,transparent_50%)]">
           {/* Back Button */}
           <div className="flex items-center">
-          <button
-          onClick={() => navigate('/')}
-          className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Back
-        </button>
-      </div>
+            <button
+              onClick={() => navigate('/')}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back
+            </button>
+          </div>
   
           {/* Valid Tickets Section */}
           <section>
@@ -463,6 +465,16 @@ export default function OrdersPage() {
                 <h2 className="text-2xl font-bold">Valid Tickets</h2>
                 <p className="text-gray-500 mt-1">Access your current valid tickets</p>
               </div>
+              <Button 
+      variant="outline" 
+      size="lg" 
+      className="gap-2"
+      onClick={() => navigate(`/tickets`)}
+    >
+      <Layout className="h-5 w-5" />
+      See All Tickets
+      <ChevronRight className="h-4 w-4" />
+    </Button>
             </div>
             <div className="grid gap-6">
               {validTickets.map(({ event, ticketTypes }) => (
