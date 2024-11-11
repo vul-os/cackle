@@ -180,7 +180,10 @@ export const useImageUploader = (eventId, organizationId, onImagesChange) => {
     try {
       const updates = items.map((item, index) => ({
         id: item.id,
-        sort_order: index
+        organization_id: organizationId, // Add this
+        sort_order: index,
+        image_url: item.image_url,
+        event_id: eventId  // Add this too for completeness
       }));
 
       const { error } = await supabase
