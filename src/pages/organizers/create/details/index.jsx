@@ -69,7 +69,7 @@ const OrganizationDetailsForm = ({ orgId }) => {
       const { error } = await supabase
         .from('organization_details')
         .insert({
-          org_id: orgId,
+          organization_id: orgId,
           ...form,
           identity_document_path,
           registration_document_path,

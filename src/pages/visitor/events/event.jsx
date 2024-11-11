@@ -35,17 +35,30 @@ const EventPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentImage, setCurrentImage] = useState(0);
+  const [eventImages, setEventImages] = useState([]);
+  const [signedUrls, setSignedUrls] = useState({});
 
-  const images = [
-    '/images/racing.jpeg',
-    '/images/weezy.jpg',
-    '/images/nicki.jpg'
-  ];
+  // Function to get signed URLs for images
+  const getSignedUrls = async (imageFiles) => {
+    const urls = {};
+    for (const image of imageFiles) {
+      const { data: { signedUrl }, error } = await supabase
+        .storage
+        .from('event_documents')
+        .createSignedUrl(image.image_url, 3600); // 1 hour expiry
 
+      if (!error) {
+        urls[image.image_url] = signedUrl;
+      }
+    }
+    return urls;
+  };
+
+  // Fetch event data, tickets, and images
   useEffect(() => {
-    const fetchEventAndTickets = async () => {
+    const fetchEventData = async () => {
       try {
-        const [eventResult, ticketsResult] = await Promise.all([
+        const [eventResult, ticketsResult, imagesResult] = await Promise.all([
           supabase
             .from('events')
             .select('*')
@@ -54,12 +67,19 @@ const EventPage = () => {
           supabase
             .from('ticket_types')
             .select('*')
+            .eq('event_id', id),
+          supabase
+            .from('event_images')
+            .select('*')
             .eq('event_id', id)
+            .order('sort_order')
         ]);
-
+        console.log(imagesResult)
         if (eventResult.error) throw eventResult.error;
         if (ticketsResult.error) throw ticketsResult.error;
+        if (imagesResult.error) throw imagesResult.error;
         
+        // Parse policy info if it's a string
         if (typeof eventResult.data.policy_info === 'string') {
           try {
             eventResult.data.policy_info = JSON.parse(eventResult.data.policy_info);
@@ -70,6 +90,11 @@ const EventPage = () => {
         
         setEvent(eventResult.data);
         setTicketTypes(ticketsResult.data);
+        setEventImages(imagesResult.data);
+
+        // Get signed URLs for all images
+        const urls = await getSignedUrls(imagesResult.data);
+        setSignedUrls(urls);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -78,16 +103,32 @@ const EventPage = () => {
     };
 
     if (id) {
-      fetchEventAndTickets();
+      fetchEventData();
     }
   }, [id]);
 
+  // Refresh signed URLs periodically
   useEffect(() => {
+    const refreshUrls = async () => {
+      const urls = await getSignedUrls(eventImages);
+      setSignedUrls(urls);
+    };
+
+    // Refresh every 45 minutes (since URLs expire after 1 hour)
+    const interval = setInterval(refreshUrls, 45 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [eventImages]);
+
+  // Auto-advance image slider
+  useEffect(() => {
+    if (eventImages.length === 0) return;
+    
     const timer = setInterval(() => {
-      setCurrentImage((prevImage) => (prevImage + 1) % images.length);
+      setCurrentImage((prevImage) => (prevImage + 1) % eventImages.length);
     }, 5000);
+    
     return () => clearInterval(timer);
-  }, [images.length]);
+  }, [eventImages.length]);
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 flex items-center justify-center">
@@ -107,12 +148,20 @@ const EventPage = () => {
     </div>
   );
 
+  // Transform event images into the format expected by ImageSlider
+  const sliderImages = eventImages.length > 0
+    ? eventImages.map(img => signedUrls[img.image_url])
+    : ['/images/racing.jpeg']; // Provide a default image
+
   return (
     <>
       <Header className="fixed top-0 left-0 right-0 z-50" />
-      <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 pt-16"> {/* Added pt-16 for header space */}
+      <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 pt-16">
         <div className="relative group h-[60vh]">
-          <ImageSlider images={images} currentImage={currentImage} />
+          <ImageSlider 
+            images={sliderImages} 
+            currentImage={currentImage} 
+          />
           <EventHeader 
             category={event.category || 'Event'} 
             title={event.title || 'Event Title'} 

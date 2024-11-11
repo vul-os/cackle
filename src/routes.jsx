@@ -39,6 +39,8 @@ import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
 // Ticket Pages
 import TicketPage from './pages/visitor/ticket';
 import TicketsListPage from './pages/visitor/tickets';
+import BankListPage from './pages/organizers/bank-list';
+import PayoutsPage from './pages/organizers/events/event/payouts';
 
 const AppRoutes = () => {
   return (
@@ -76,10 +78,13 @@ const AppRoutes = () => {
 
         <Route path="/admin/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/admin/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
-        <Route path="/admin/events/:id/tickets" element={<EventTicketsLayout />}>
-          <Route index element={<TicketsView />} />
+        <Route path="/admin/events/:id/payouts" element={<PayoutsPage />} />
+
+        <Route path="/admin/events/:id/tickets" element={<ProtectedRoute><EventTicketsLayout /></ProtectedRoute>}>
+        <Route index element={<TicketsView />} />
           <Route path="types" element={<TicketTypesView />} />
         </Route>
+        <Route path="/admin/bank-list" element={<ProtectedRoute><BankListPage /></ProtectedRoute>} />
 
         <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />

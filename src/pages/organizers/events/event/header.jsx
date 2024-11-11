@@ -1,8 +1,7 @@
-// src/pages/EventPage/header.jsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Trash2, Ticket } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Ticket, DollarSign } from 'lucide-react';
 
 export const EventPageHeader = ({
   editForm,
@@ -41,6 +40,14 @@ export const EventPageHeader = ({
           >
             <Ticket className="h-4 w-4 mr-2" />
             Manage Tickets
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/admin/events/${editForm.id}/payouts`)}
+            className="bg-white hover:bg-gray-50 transition-colors"
+          >
+            <DollarSign className="h-4 w-4 mr-2" />
+            Payouts
           </Button>
           {hasChanges && (
             <Button

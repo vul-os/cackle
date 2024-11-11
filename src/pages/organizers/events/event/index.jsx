@@ -176,6 +176,7 @@ const EventPage = () => {
           handleInputChange={handleInputChange}
           initialData={event}
           isSubmitting={isSubmitting}
+          organizationId={activeOrganization?.id}
           categories={categories}
           availableSubcategories={availableSubcategories}
           dateRange={dateRange}
