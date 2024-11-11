@@ -1,7 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
-
 // Layouts
 import BlankLayout from './components/layout/blank-layout';
 import MainLayout from './components/layout/main-layout';
@@ -13,10 +12,10 @@ import ForgotPassword from './pages/auth/forgot-password';
 import UpdatePassword from './pages/auth/update-password';
 import AcceptInvite from './pages/auth/accept-invite';
 
-
 // Components
 import ProtectedRoute from './components/auth/protected-route';
 
+// Pages
 import NotFound from './pages/not-found';
 import LandingPage from './pages/visitor/landing';
 import DocsPage from './pages/visitor/docs';
@@ -36,8 +35,10 @@ import CheckoutPage from './pages/visitor/checkout';
 import OrderPage from './pages/visitor/orders/order';
 import OrdersPage from './pages/visitor/orders';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
-import TicketPage from './pages/visitor/tickets/ticket';
-import TicketsPage from './pages/visitor/tickets';
+
+// Ticket Pages
+import TicketPage from './pages/visitor/ticket/ticket';
+import TicketsListPage from './pages/visitor/tickets';
 
 const AppRoutes = () => {
   return (
@@ -46,13 +47,11 @@ const AppRoutes = () => {
         {/* Public routes */}
         <Route exact path="/" element={<LandingPage />} />
         <Route exact path="/docs" element={<DocsPage />} />
-        {/* <Route exact path="/events/" element={<VisitorEventPage />} /> */}
         <Route path="/events/:id" element={<VisitorEventPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route exact path="/pricing" element={<PricingPage />} />
 
-        
         <Route path="/login" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/password-reset" element={<ForgotPassword />} />
@@ -67,7 +66,7 @@ const AppRoutes = () => {
         <Route path="/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
         <Route path="/payment/verify" element={<ProtectedRoute><PaymentConfirmationPage /></ProtectedRoute>} />
         <Route path="/ticket/:id" element={<ProtectedRoute><TicketPage /></ProtectedRoute>} />
-        <Route path="/tickets" element={<ProtectedRoute><TicketsPage /></ProtectedRoute>} />
+        <Route path="/tickets" element={<ProtectedRoute><TicketsListPage /></ProtectedRoute>} />
       </Route>
 
       {/* Protected routes */}
@@ -77,7 +76,6 @@ const AppRoutes = () => {
 
         <Route path="/admin/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/admin/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
-        {/* <Route path="/admin/events/:id/tickets" element={<ProtectedRoute><EventTicketTypes /></ProtectedRoute>} /> */}
         <Route path="/admin/events/:id/tickets" element={<EventTicketsLayout />}>
           <Route index element={<TicketsView />} />
           <Route path="types" element={<TicketTypesView />} />
@@ -86,7 +84,6 @@ const AppRoutes = () => {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>
-
     </Routes>
   );
 };

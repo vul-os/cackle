@@ -160,54 +160,76 @@ export default function TicketPage() {
           <CardContent>
             {/* Printable Ticket Section */}
             <div 
-              id="printable-ticket" 
-              className="bg-white p-6 rounded-lg border-2 border-dashed print:border-solid print:rounded-none print:p-4"
-            >
-              <div className="flex print:h-[2.75in]">
-                {/* Main Ticket Content */}
-                <div className="flex-[3] pr-6 print:pr-4 print:border-r-2 print:border-dashed">
-                  <div className="space-y-4">
-                    <h2 className="text-2xl font-bold">{event.title}</h2>
-                    <div className="flex items-center text-gray-600">
-                      <Tag className="h-4 w-4 mr-2" />
-                      <span className="text-sm">{ticketType.name}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      <span className="text-sm">{formatDate(event.start_time)}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Clock className="h-4 w-4 mr-2" />
-                      <span className="text-sm">{formatTime(event.start_time)}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      <span className="text-sm">
-                        {event.venue_name} - {event.venue_address}
-                      </span>
-                    </div>
-                    <div className="text-xs font-mono mt-4">
-                      Ticket ID: {ticket.ticket_code}
-                    </div>
-                  </div>
-                </div>
+  id={`printable-ticket-${ticket.id}`}
+  className="printable-ticket"
+>
+  <div className="flex p-6">
+    {/* Left section */}
+    <div className="flex-[3] pr-8 border-r border-dashed border-gray-300">
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h2 className="text-2xl font-bold mb-1">
+            {event.title}
+          </h2>
+          <p className="text-sm font-medium">
+            {type.name}
+          </p>
+        </div>
+        <div className="text-sm font-mono">
+          #{ticket.ticket_code}
+        </div>
+      </div>
 
-                {/* QR Code Section */}
-                <div className="flex-1 flex flex-col items-center justify-center">
-                  <div className="print:p-0 p-4">
-                    <QRCodeSVG 
-                      value={`https://cackle.co.za/tickets/code/${ticket.ticket_code}`}
-                      size={100}
-                      level="H"
-                      includeMargin={true}
-                    />
-                  </div>
-                  <div className="text-sm font-mono mt-2 text-center">
-                    {ticket.ticket_code}
-                  </div>
-                </div>
-              </div>
+      {/* Event details */}
+      <div className="space-y-4 mb-6">
+        <div className="flex items-center space-x-3">
+          <Calendar className="h-5 w-5" />
+          <div>
+            <div className="text-sm font-medium">
+              {formatDate(event.start_time)}
             </div>
+            <div className="text-sm">
+              {formatTime(event.start_time)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-start space-x-3">
+          <MapPin className="h-5 w-5 mt-0.5" />
+          <div>
+            <div className="text-sm font-medium">
+              {event.venue_name}
+            </div>
+            <div className="text-sm">
+              {event.venue_address}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-dashed">
+        <p className="text-xs">
+          Please present this ticket at the entrance. Valid for one-time entry only.
+        </p>
+      </div>
+    </div>
+
+    {/* Right section - QR Code */}
+    <div className="flex-1 pl-8 flex flex-col items-center justify-center">
+      <div className="bg-white p-3 rounded-xl">
+      <QRCodeSVG 
+  value={`https://cackle.co.za/tickets/code/${ticket.ticket_code}`}
+  size={120}s
+  includeMargin={false}
+  className="qr-code"
+/>
+      </div>
+      <div className="mt-4 text-sm font-mono text-center">
+        {ticket.ticket_code}
+      </div>
+    </div>
+  </div>
+</div>
           </CardContent>
         </Card>
 

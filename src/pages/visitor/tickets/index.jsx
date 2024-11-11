@@ -1,52 +1,14 @@
+// tickets/pages/TicketsListPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/services/supabaseClient';
-import { QRCodeSVG } from 'qrcode.react';
-import { format } from 'date-fns';
 import Header from '@/pages/visitor/header';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  Calendar,
-  Clock,
-  MapPin,
-  Tag,
-  AlertCircle,
-  Printer,
-  Eye,
-  PrinterIcon,
-  Filter,
-} from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A';
-  try {
-    return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
-  } catch (error) {
-    return 'N/A';
-  }
-}
-
-function formatTime(dateString) {
-  if (!dateString) return 'N/A';
-  try {
-    return format(new Date(dateString), 'h:mm a');
-  } catch (error) {
-    return 'N/A';
-  }
-}
+import { AlertCircle, Printer, Eye, PrinterIcon } from 'lucide-react';
+import TicketFilters from './ticket-filters';
+import PrintableTicket from './printable-tickets';
+import EventInformation from './event-infomation';
 
 export default function TicketsListPage() {
   const [tickets, setTickets] = useState([]);
@@ -77,7 +39,6 @@ export default function TicketsListPage() {
 
         setTickets(data);
 
-        // Extract unique events and ticket types
         const uniqueEvents = [...new Set(data.map(ticket => ticket.ticket_type.event.id))];
         const uniqueTicketTypes = [...new Set(data.map(ticket => ticket.ticket_type.id))];
 
@@ -133,6 +94,13 @@ export default function TicketsListPage() {
         .printable-ticket svg {
           background-color: white !important;
         }
+        .cut-line {
+          border: none !important;
+          border-top: 1px dashed #000 !important;
+        }
+        .scissors-icon {
+          display: block !important;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -142,44 +110,68 @@ export default function TicketsListPage() {
   const handlePrint = (ticketId) => {
     if (isPrinting) return;
     setIsPrinting(true);
-
+    
     const ticketElement = document.getElementById(`printable-ticket-${ticketId}`);
     
     if (ticketElement) {
-      const printWindow = window.open('', '', 'width=800,height=600');
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
       printWindow.document.write(`
+        <!DOCTYPE html>
         <html>
           <head>
             <title>Print Ticket</title>
             <style>
-              @page {
-                size: A4;
-                margin: 20mm;
-              }
-              
-              body {
-                margin: 0;
-                padding: 0;
-                width: 210mm;
-                height: 297mm;
-              }
-              
-              .printable-ticket {
-                width: 100%;
-                height: auto;
-                padding: 10mm;
-                box-sizing: border-box;
-              }
-              
               @media print {
+                @page {
+                  size: 8.5in 2.75in landscape;
+                  margin: 0;
+                }
+                
                 html, body {
-                  width: 210mm;
-                  height: 297mm;
+                  margin: 0;
+                  padding: 0;
+                  width: 8.5in;
+                  height: 2.75in;
+                  background: white;
                 }
                 
                 .printable-ticket {
-                  page-break-inside: avoid;
-                  break-inside: avoid;
+                  width: 8.5in !important;
+                  height: 2.75in !important;
+                  padding: 20px !important;
+                  margin: 0 !important;
+                  box-sizing: border-box !important;
+                  background: white !important;
+                  display: flex !important;
+                  page-break-after: always !important;
+                  position: relative !important;
+                }
+  
+                .printable-ticket * {
+                  visibility: visible !important;
+                  color: black !important;
+                  background-color: white !important;
+                }
+  
+                .printable-ticket > div {
+                  display: flex !important;
+                }
+  
+                .printable-ticket > div > div:first-child {
+                  flex: 3 !important;
+                  border-right: 2px dashed #000 !important;
+                  padding-right: 20px !important;
+                }
+  
+                .printable-ticket > div > div:last-child {
+                  flex: 1 !important;
+                  padding-left: 20px !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+                }
+  
+                body > *:not(.printable-ticket) {
+                  display: none !important;
                 }
               }
             </style>
@@ -191,15 +183,15 @@ export default function TicketsListPage() {
       `);
       
       printWindow.document.close();
-      printWindow.focus();
-      
+    
       setTimeout(() => {
+        printWindow.focus();
         printWindow.print();
         setTimeout(() => {
           printWindow.close();
           setIsPrinting(false);
         }, 500);
-      }, 250);
+      }, 500);
     } else {
       setIsPrinting(false);
     }
@@ -221,34 +213,37 @@ export default function TicketsListPage() {
           <title>Print All Tickets</title>
           <style>
             @page {
-              size: A4;
-              margin: 20mm;
+              size: 8.5in 2.75in;
+              margin: 0;
             }
             
             body {
               margin: 0;
               padding: 0;
-              width: 210mm;
-              height: 297mm;
             }
             
             .printable-ticket {
-              width: 100%;
-              height: auto;
-              padding: 10mm;
+              width: 8.5in;
+              height: 2.75in;
+              padding: 0;
               box-sizing: border-box;
               page-break-after: always;
+              position: relative;
+            }
+            
+            .cut-line {
+              border-top: 1px dashed #000;
+            }
+            
+            .scissors-icon {
+              position: absolute;
+              width: 16px;
+              height: 16px;
             }
             
             @media print {
-              html, body {
-                width: 210mm;
-                height: 297mm;
-              }
-              
-              .printable-ticket {
-                page-break-inside: avoid;
-                break-inside: avoid;
+              .cut-line {
+                border-top: 1px dashed #000 !important;
               }
             }
           </style>
@@ -311,7 +306,6 @@ export default function TicketsListPage() {
 
   const filteredTickets = getFilteredTickets();
 
-  // Group tickets by event and then by ticket type
   const groupedTickets = filteredTickets.reduce((acc, ticket) => {
     const eventId = ticket.ticket_type.event.id;
     const ticketTypeId = ticket.ticket_type.id;
@@ -355,44 +349,14 @@ export default function TicketsListPage() {
             )}
           </div>
 
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1">
-              <Select
-                value={selectedEvent}
-                onValueChange={setSelectedEvent}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by Event" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Events</SelectItem>
-                  {events.map(event => (
-                    <SelectItem key={event.id} value={event.id}>
-                      {event.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <Select
-                value={selectedTicketType}
-                onValueChange={setSelectedTicketType}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Filter by Ticket Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Ticket Types</SelectItem>
-                  {ticketTypes.map(type => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <TicketFilters
+            selectedEvent={selectedEvent}
+            setSelectedEvent={setSelectedEvent}
+            selectedTicketType={selectedTicketType}
+            setSelectedTicketType={setSelectedTicketType}
+            events={events}
+            ticketTypes={ticketTypes}
+          />
         </div>
         
         {Object.values(groupedTickets).map(({ event, ticketTypes }) => (
@@ -408,53 +372,11 @@ export default function TicketsListPage() {
                   {typeTickets.map((ticket) => (
                     <Card key={ticket.id} className="relative">
                       <CardContent className="p-6">
-                        <div 
-                          id={`printable-ticket-${ticket.id}`}
-                          className="printable-ticket bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed print:border-solid print:rounded-none dark:border-gray-600"
-                        >
-                          <div className="flex print:h-[2.75in]">
-                            <div className="flex-[3] pr-6 print:pr-4 print:border-r-2 print:border-dashed dark:print:border-gray-600">
-                              <div className="space-y-4">
-                                <h2 className="text-2xl font-bold dark:text-white">{event.title}</h2>
-                                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                  <Tag className="h-4 w-4 mr-2" />
-                                  <span className="text-sm">{type.name}</span>
-                                </div>
-                                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                  <Calendar className="h-4 w-4 mr-2" />
-                                  <span className="text-sm">{formatDate(event.start_time)}</span>
-                                </div>
-                                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                  <Clock className="h-4 w-4 mr-2" />
-                                  <span className="text-sm">{formatTime(event.start_time)}</span>
-                                </div>
-                                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                  <MapPin className="h-4 w-4 mr-2" />
-                                  <span className="text-sm">
-                                    {event.venue_name} - {event.venue_address}
-                                  </span>
-                                </div>
-                                <div className="text-xs font-mono mt-4 dark:text-gray-300">
-                                  Ticket ID: {ticket.ticket_code}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex-1 flex flex-col items-center justify-center">
-                              <div className="print:p-0 p-4"><QRCodeSVG 
-                                  value={`https://cackle.co.za/tickets/code/${ticket.ticket_code}`}
-                                  size={100}
-                                  level="H"
-                                  includeMargin={true}
-                                  className="dark:bg-white p-2 rounded"
-                                />
-                              </div>
-                              <div className="text-sm font-mono mt-2 text-center dark:text-gray-300">
-                                {ticket.ticket_code}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <PrintableTicket 
+                          ticket={ticket}
+                          event={event}
+                          type={type}
+                        />
 
                         <div className="mt-4 flex gap-2 print:hidden">
                           <Button
@@ -480,40 +402,7 @@ export default function TicketsListPage() {
               </div>
             ))}
 
-            {/* Event Information Section */}
-            {(event.description || event.information || event.policy_info) && (
-              <Card className="mt-4 print:hidden">
-                <CardHeader>
-                  <CardTitle className="dark:text-white">{event.title} - Event Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {event.description && (
-                    <div>
-                      <h3 className="font-semibold mb-2 dark:text-white">Description</h3>
-                      <p className="text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{event.description}</p>
-                    </div>
-                  )}
-
-                  {event.information && (
-                    <div>
-                      <h3 className="font-semibold mb-2 dark:text-white">Additional Information</h3>
-                      <div className="prose dark:prose-invert max-w-none">
-                        <div dangerouslySetInnerHTML={{ __html: event.information }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {event.policy_info && (
-                    <div>
-                      <h3 className="font-semibold mb-2 dark:text-white">Event Policies</h3>
-                      <div className="prose dark:prose-invert max-w-none">
-                        <div dangerouslySetInnerHTML={{ __html: event.policy_info }} />
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+            <EventInformation event={event} />
           </div>
         ))}
 
