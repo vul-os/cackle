@@ -50,7 +50,7 @@ const Header = () => {
               variant="ghost"
               size={isMobile ? "sm" : "default"}
               className="text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 hover:bg-gray-100 dark:hover:bg-slate-800"
-              onClick={() => handleNavigation('/home')}
+              onClick={() => handleNavigation('/admin')}
             >
               <ShieldCheck className="h-4 w-4 mr-2" />
               Admin

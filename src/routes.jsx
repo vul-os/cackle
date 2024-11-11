@@ -37,7 +37,7 @@ import OrdersPage from './pages/visitor/orders';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
 
 // Ticket Pages
-import TicketPage from './pages/visitor/ticket/ticket';
+import TicketPage from './pages/visitor/ticket';
 import TicketsListPage from './pages/visitor/tickets';
 
 const AppRoutes = () => {
@@ -71,8 +71,8 @@ const AppRoutes = () => {
 
       {/* Protected routes */}
       <Route element={<MainLayout />}>
-        <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
-        <Route path="/scanner" element={<ProtectedRoute><ScannerPage /></ProtectedRoute>} />
+        <Route path="/admin" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
+        <Route path="/admin/scanner" element={<ProtectedRoute><ScannerPage /></ProtectedRoute>} />
 
         <Route path="/admin/events" element={<ProtectedRoute><EventsPage /></ProtectedRoute>} />
         <Route path="/admin/events/:id" element={<ProtectedRoute><EventPage /></ProtectedRoute>} />
@@ -81,7 +81,7 @@ const AppRoutes = () => {
           <Route path="types" element={<TicketTypesView />} />
         </Route>
 
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>
     </Routes>

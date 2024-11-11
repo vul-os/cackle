@@ -22,8 +22,13 @@ export function AuthProvider({ children }) {
     
     try {
       const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
+      .from('organizations')
+      .select(`
+          *,
+          organization_verifications!left (
+              verified
+          )
+      `)
 
       if (error) throw error;
       console.log("data", data)

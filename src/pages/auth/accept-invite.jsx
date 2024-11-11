@@ -134,7 +134,7 @@ const AcceptInvite = () => {
           <Button 
             variant="outline" 
             className="w-full" 
-            onClick={() => navigate('/home')}
+            onClick={() => navigate('/admin')}
           >
             {error ? 'Return Home' : 'Cancel'}
           </Button>

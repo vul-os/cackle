@@ -1,24 +1,27 @@
-import React from 'react';
+import React, { useContext } from "react";
 import {
   Home,
   CalendarDays,
   Settings,
-  QrCode  // Add this import
-} from 'lucide-react';
-import { NavItem } from './nav-item';
+  QrCode
+} from "lucide-react";
+import { NavItem } from "./nav-item";
+import { AuthContext } from "@/context/use-auth";
 
 const navItems = [
-  { to: '/home', icon: Home, text: 'Home' },
-  { to: '/admin/events', icon: CalendarDays, text: 'Events' },
-  { to: '/scanner', icon: QrCode, text: 'Scanner' },  // Add this line
-  { to: '/settings', icon: Settings, text: 'Settings' }
+  { to: "/admin", icon: Home, text: "Home" },
+  { to: "/admin/events", icon: CalendarDays, text: "Events" },
+  { to: "/admin/scanner", icon: QrCode, text: "Scanner" },
+  { to: "/admin/settings", icon: Settings, text: "Settings" }
 ];
 
 const SideNav = ({ isExpanded, isMobile }) => {
+  const { activeOrganization } = useContext(AuthContext);
+
   return (
     <div
       className={`fixed top-16 left-0 h-[calc(100vh-4rem)] bg-gray-800 text-white shadow-md transition-all duration-300 ${
-        isExpanded ? 'w-60' : isMobile ? 'w-0' : 'w-16'
+        isExpanded ? "w-60" : isMobile ? "w-0" : "w-16"
       }`}
     >
       <div className="mt-9">
@@ -27,8 +30,8 @@ const SideNav = ({ isExpanded, isMobile }) => {
             <NavItem 
               key={item.to} 
               {...item} 
-              isExpanded={isExpanded} 
-              isMobile={isMobile}
+              isExpanded={isExpanded}
+              hasOrganizations={!!activeOrganization}
             />
           ))}
         </ul>
