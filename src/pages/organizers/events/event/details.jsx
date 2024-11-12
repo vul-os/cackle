@@ -3,10 +3,128 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { CategorySection } from './categories';
-import { Calendar, MapPin, Link2, Globe, Image } from 'lucide-react';
+import { Calendar, MapPin, Link2, Globe, Image, Info, Bold, Italic, List, ListOrdered, Quote, Link, Eye } from 'lucide-react';
 import DatePickerWithRange from '@/components/date-range-picker';
 import { supabase } from '@/services/supabaseClient';
 import { ImageUploader } from './image-uploader';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import ReactMarkdown from 'react-markdown';
+
+const MarkdownToolbar = ({ onAction }) => {
+  return (
+    <div className="flex items-center gap-1 p-1 bg-gray-50 border-b">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('**', '**')} 
+        className="h-8 w-8 p-0"
+      >
+        <Bold className="h-4 w-4" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('*', '*')} 
+        className="h-8 w-8 p-0"
+      >
+        <Italic className="h-4 w-4" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('\n- ', '')} 
+        className="h-8 w-8 p-0"
+      >
+        <List className="h-4 w-4" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('\n1. ', '')} 
+        className="h-8 w-8 p-0"
+      >
+        <ListOrdered className="h-4 w-4" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('\n> ', '')} 
+        className="h-8 w-8 p-0"
+      >
+        <Quote className="h-4 w-4" />
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onAction('[', '](url)')} 
+        className="h-8 w-8 p-0"
+      >
+        <Link className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
+
+const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = "200px", disabled }) => {
+  const [activeTab, setActiveTab] = React.useState("write");
+  const inputClasses = "border-gray-200 hover:border-gray-300 transition-colors bg-white";
+
+  const handleMarkdownAction = (prefix, suffix) => {
+    const textarea = document.querySelector(`textarea[name="${name}"]`);
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const before = text.substring(0, start);
+    const selection = text.substring(start, end);
+    const after = text.substring(end);
+
+    const newText = before + prefix + selection + suffix + after;
+    onChange(newText);
+
+    // Reset cursor position
+    textarea.focus();
+    const newCursor = start + prefix.length + selection.length + suffix.length;
+    textarea.setSelectionRange(newCursor, newCursor);
+  };
+
+  return (
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <TabsList className="grid w-full grid-cols-2 mb-2">
+        <TabsTrigger value="write" className="flex items-center gap-2">
+          <Link2 className="h-4 w-4" />
+          Write
+        </TabsTrigger>
+        <TabsTrigger value="preview" className="flex items-center gap-2">
+          <Eye className="h-4 w-4" />
+          Preview
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="write" className="mt-0">
+        <div className="border rounded-md">
+          <MarkdownToolbar onAction={handleMarkdownAction} />
+          <Textarea
+            name={name}
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={`${inputClasses} min-h-[${minHeight}] resize-none border-0 rounded-none rounded-b-md`}
+            disabled={disabled}
+          />
+        </div>
+      </TabsContent>
+      <TabsContent value="preview" className="mt-0">
+        <div className="border rounded-md p-4" style={{ minHeight }}>
+          <div className="prose prose-sm max-w-none">
+            <ReactMarkdown>{value || '*No content yet*'}</ReactMarkdown>
+          </div>
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+};
 
 export const EventDetailsCard = ({
   editForm,
@@ -176,15 +294,67 @@ export const EventDetailsCard = ({
         <div className="space-y-4 border-t pt-6">
           <div className="flex items-center gap-2 text-gray-500">
             <Link2 className="h-4 w-4" />
-            <h2 className="text-sm font-medium">Description</h2>
+            <h2 className="text-sm font-medium">Event Details</h2>
           </div>
-          <Textarea
-            placeholder="Write a compelling description of your event..."
+          <MarkdownEditor
+            name="description"
             value={editForm.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            className={`${inputClasses} min-h-[200px] resize-none`}
+            onChange={(value) => handleInputChange('description', value)}
+            placeholder="Write a compelling description of your event using Markdown..."
             disabled={isSubmitting}
           />
+        </div>
+
+        {/* Information Section */}
+        <div className="space-y-4 border-t pt-6">
+          <div className="flex items-center gap-2 text-gray-500">
+            <Info className="h-4 w-4" />
+            <h2 className="text-sm font-medium">Additional Information</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Event Capacity</label>
+              <Input
+                type="number"
+                placeholder="Enter maximum number of attendees"
+                value={editForm.capacity}
+                onChange={(e) => handleInputChange('capacity', e.target.value)}
+                className={inputClasses}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Age Restrictions</label>
+              <Input
+                placeholder="e.g., 18+, All Ages, etc."
+                value={editForm.age_restriction}
+                onChange={(e) => handleInputChange('age_restriction', e.target.value)}
+                className={inputClasses}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Special Requirements</label>
+              <MarkdownEditor
+                name="special_requirements"
+                value={editForm.special_requirements}
+                onChange={(value) => handleInputChange('special_requirements', value)}
+                placeholder="Enter any special requirements or important information for attendees..."
+                minHeight="100px"
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Contact Information</label>
+              <Input
+                placeholder="Enter contact details for inquiries"
+                value={editForm.contact_info}
+                onChange={(e) => handleInputChange('contact_info', e.target.value)}
+                className={inputClasses}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
