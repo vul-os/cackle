@@ -1,24 +1,25 @@
 // tickets/pages/TicketsListPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { supabase } from '@/services/supabaseClient';
 import Header from '@/pages/visitor/header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, Printer, Eye, PrinterIcon } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import TicketFilters from './ticket-filters';
-import PrintableTicket from './printable-tickets';
+import PrintableTicket from './printing/layout';
 import EventInformation from './event-infomation';
+import { usePrintTicket } from './printing/use-print-ticket';
+import { PrintTicketButtons, PrintAllButton } from './printing/print-buttons';
 
 export default function TicketsListPage() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isPrinting, setIsPrinting] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState('all');
   const [selectedTicketType, setSelectedTicketType] = useState('all');
   const [events, setEvents] = useState([]);
   const [ticketTypes, setTicketTypes] = useState([]);
+
+  const { isPrinting, printSingleTicket, printAllTickets } = usePrintTicket();
 
   useEffect(() => {
     const fetchTickets = async () => {
@@ -39,9 +40,7 @@ export default function TicketsListPage() {
 
         setTickets(data);
 
-        const uniqueEvents = [...new Set(data.map(ticket => ticket.ticket_type.event.id))];
-        const uniqueTicketTypes = [...new Set(data.map(ticket => ticket.ticket_type.id))];
-
+        // Extract unique events and ticket types
         setEvents(data.reduce((acc, ticket) => {
           if (!acc.find(e => e.id === ticket.ticket_type.event.id)) {
             acc.push(ticket.ticket_type.event);
@@ -65,206 +64,6 @@ export default function TicketsListPage() {
 
     fetchTickets();
   }, []);
-
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @media print {
-        @page {
-          size: 8.5in 2.75in;
-          margin: 0;
-        }
-        body * {
-          visibility: hidden;
-        }
-        .printable-ticket, .printable-ticket * {
-          visibility: visible;
-        }
-        .printable-ticket {
-          position: relative;
-          page-break-after: always;
-          width: 8.5in;
-          height: 2.75in;
-          background-color: white !important;
-          color: black !important;
-        }
-        .printable-ticket * {
-          color: black !important;
-        }
-        .printable-ticket svg {
-          background-color: white !important;
-        }
-        .cut-line {
-          border: none !important;
-          border-top: 1px dashed #000 !important;
-        }
-        .scissors-icon {
-          display: block !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => document.head.removeChild(style);
-  }, []);
-
-  const handlePrint = (ticketId) => {
-    if (isPrinting) return;
-    setIsPrinting(true);
-    
-    const ticketElement = document.getElementById(`printable-ticket-${ticketId}`);
-    
-    if (ticketElement) {
-      const printWindow = window.open('', '_blank', 'width=800,height=600');
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Print Ticket</title>
-            <style>
-              @media print {
-                @page {
-                  size: 8.5in 2.75in landscape;
-                  margin: 0;
-                }
-                
-                html, body {
-                  margin: 0;
-                  padding: 0;
-                  width: 8.5in;
-                  height: 2.75in;
-                  background: white;
-                }
-                
-                .printable-ticket {
-                  width: 8.5in !important;
-                  height: 2.75in !important;
-                  padding: 20px !important;
-                  margin: 0 !important;
-                  box-sizing: border-box !important;
-                  background: white !important;
-                  display: flex !important;
-                  page-break-after: always !important;
-                  position: relative !important;
-                }
-  
-                .printable-ticket * {
-                  visibility: visible !important;
-                  color: black !important;
-                  background-color: white !important;
-                }
-  
-                .printable-ticket > div {
-                  display: flex !important;
-                }
-  
-                .printable-ticket > div > div:first-child {
-                  flex: 3 !important;
-                  border-right: 2px dashed #000 !important;
-                  padding-right: 20px !important;
-                }
-  
-                .printable-ticket > div > div:last-child {
-                  flex: 1 !important;
-                  padding-left: 20px !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                }
-  
-                body > *:not(.printable-ticket) {
-                  display: none !important;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            ${ticketElement.outerHTML}
-          </body>
-        </html>
-      `);
-      
-      printWindow.document.close();
-    
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        setTimeout(() => {
-          printWindow.close();
-          setIsPrinting(false);
-        }, 500);
-      }, 500);
-    } else {
-      setIsPrinting(false);
-    }
-  };
-
-  const handlePrintAll = () => {
-    if (isPrinting) return;
-    setIsPrinting(true);
-
-    const filteredTickets = getFilteredTickets();
-    const printWindow = window.open('', '', 'width=800,height=600');
-    const allTickets = filteredTickets.map(ticket => 
-      document.getElementById(`printable-ticket-${ticket.id}`).outerHTML
-    ).join('');
-
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Print All Tickets</title>
-          <style>
-            @page {
-              size: 8.5in 2.75in;
-              margin: 0;
-            }
-            
-            body {
-              margin: 0;
-              padding: 0;
-            }
-            
-            .printable-ticket {
-              width: 8.5in;
-              height: 2.75in;
-              padding: 0;
-              box-sizing: border-box;
-              page-break-after: always;
-              position: relative;
-            }
-            
-            .cut-line {
-              border-top: 1px dashed #000;
-            }
-            
-            .scissors-icon {
-              position: absolute;
-              width: 16px;
-              height: 16px;
-            }
-            
-            @media print {
-              .cut-line {
-                border-top: 1px dashed #000 !important;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          ${allTickets}
-        </body>
-      </html>
-    `);
-    
-    printWindow.document.close();
-    printWindow.focus();
-    
-    setTimeout(() => {
-      printWindow.print();
-      setTimeout(() => {
-        printWindow.close();
-        setIsPrinting(false);
-      }, 500);
-    }, 250);
-  };
 
   const getFilteredTickets = () => {
     return tickets.filter(ticket => {
@@ -335,18 +134,11 @@ export default function TicketsListPage() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold dark:text-white">My Tickets</h1>
-            {filteredTickets.length > 0 && (
-              <Button
-                onClick={handlePrintAll}
-                variant="outline"
-                size="sm"
-                className="print:hidden"
-                disabled={isPrinting}
-              >
-                <PrinterIcon className="h-4 w-4 mr-2" />
-                {isPrinting ? 'Printing...' : 'Print All Tickets'}
-              </Button>
-            )}
+            <PrintAllButton 
+              onPrintAll={() => printAllTickets(filteredTickets)}
+              isPrinting={isPrinting}
+              ticketsCount={filteredTickets.length}
+            />
           </div>
 
           <TicketFilters
@@ -378,23 +170,11 @@ export default function TicketsListPage() {
                           type={type}
                         />
 
-                        <div className="mt-4 flex gap-2 print:hidden">
-                          <Button
-                            onClick={() => handlePrint(ticket.id)}
-                            variant="outline"
-                            size="sm"
-                            disabled={isPrinting}
-                          >
-                            <Printer className="h-4 w-4 mr-2" />
-                            {isPrinting ? 'Printing...' : 'Print Ticket'}
-                          </Button>
-                          <Link to={`/tickets/${ticket.id}`}>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </Button>
-                          </Link>
-                        </div>
+                        <PrintTicketButtons 
+                          ticketId={ticket.id}
+                          onPrint={() => printSingleTicket(ticket.id)}
+                          isPrinting={isPrinting}
+                        />
                       </CardContent>
                     </Card>
                   ))}
