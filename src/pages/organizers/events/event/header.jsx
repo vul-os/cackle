@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save, Trash2, Ticket, DollarSign } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Ticket, DollarSign, Users } from 'lucide-react';
 
 export const EventPageHeader = ({
   editForm,
@@ -11,6 +11,11 @@ export const EventPageHeader = ({
   setShowDeleteDialog,
   navigate
 }) => {
+  const handleAttendeeClick = () => {
+    console.log('Current event ID:', editForm.id); // Debug log
+    console.log('Navigation path:', `/admin/events/${editForm.id}/attendees`); // Debug log
+    navigate(`/admin/events/${editForm.id}/attendees`);
+  };
 
   return (
     <div className="mb-8">
@@ -35,6 +40,14 @@ export const EventPageHeader = ({
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={handleAttendeeClick}
+            className="bg-white hover:bg-gray-50 transition-colors"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Orders
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => navigate(`/admin/events/${editForm.id}/tickets`)}
             className="bg-white hover:bg-gray-50 transition-colors"
           >
@@ -48,24 +61,6 @@ export const EventPageHeader = ({
           >
             <DollarSign className="h-4 w-4 mr-2" />
             Payouts
-          </Button>
-          {hasChanges && (
-            <Button
-              variant="default"
-              onClick={handleSave}
-              className="bg-green-600 hover:bg-green-700 transition-colors"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Changes
-            </Button>
-          )}
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteDialog(true)}
-            className="hover:bg-red-700 transition-colors"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
           </Button>
         </div>
       </div>

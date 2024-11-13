@@ -20,7 +20,7 @@ const EventDetailsSection = ({ description }) => (
   <Card className="border-none bg-white/5 backdrop-blur-lg hover:bg-white/10 transition-colors duration-300">
     <CardContent className="p-8">
       <h2 className="text-3xl font-bold text-white mb-6 flex items-center gap-3">
-        <Star className="h-6 w-6 text-[#880424]" />
+        <Star className="h-6 w-6 text-[#ff0437]" />
         Event Details
       </h2>
       <ProcessedText content={description} />
@@ -131,19 +131,19 @@ const EventPage = () => {
   }, [eventImages.length]);
 
   if (loading) return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 flex items-center justify-center">
+    <div className="min-h-screen bg-[#ff0437] flex items-center justify-center">
       <div className="text-white text-xl">Loading amazing events...</div>
     </div>
   );
 
   if (error) return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 flex items-center justify-center">
+    <div className="min-h-screen bg-[#ff0437] flex items-center justify-center">
       <div className="text-red-500 text-xl">Error: {error}</div>
     </div>
   );
 
   if (!event) return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 flex items-center justify-center">
+    <div className="min-h-screen bg-[#ff0437] flex items-center justify-center">
       <div className="text-white text-xl">Event not found</div>
     </div>
   );
@@ -156,7 +156,7 @@ const EventPage = () => {
   return (
     <>
       <Header className="fixed top-0 left-0 right-0 z-50" />
-      <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-[#880424] to-gray-900 pt-16">
+      <div className="flex flex-col min-h-screen bg-[#ff0437] pt-16">
         <div className="relative group h-[60vh]">
           <ImageSlider 
             images={sliderImages} 

@@ -35,6 +35,9 @@ import CheckoutPage from './pages/visitor/checkout';
 import OrderPage from './pages/visitor/orders/order';
 import OrdersPage from './pages/visitor/orders';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
+import AttendeesPage from './pages/organizers/events/event/attendees';
+
+
 
 // Ticket Pages
 import TicketPage from './pages/visitor/ticket';
@@ -85,7 +88,7 @@ const AppRoutes = () => {
           <Route path="types" element={<TicketTypesView />} />
         </Route>
         <Route path="/admin/bank-list" element={<ProtectedRoute><BankListPage /></ProtectedRoute>} />
-
+        <Route path="/admin/events/:id/attendees" element={<ProtectedRoute><AttendeesPage /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
       </Route>
