@@ -152,6 +152,77 @@ const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = "200px
     textarea.setSelectionRange(newCursor, newCursor);
   };
 
+  const components = {
+    h1: ({ children }) => (
+      <h1 className="text-3xl font-bold mb-4 text-gray-900 border-b pb-2">{children}</h1>
+    ),
+    h2: ({ children }) => (
+      <h2 className="text-2xl font-bold mb-3 text-gray-800 mt-6">{children}</h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-xl font-bold mb-2 text-gray-700 mt-4">{children}</h3>
+    ),
+    p: ({ children }) => (
+      <p className="mb-4 text-gray-600 leading-relaxed">{children}</p>
+    ),
+    ul: ({ children }) => (
+      <ul className="mb-4 ml-6 list-disc space-y-2 text-gray-600">{children}</ul>
+    ),
+    ol: ({ children }) => (
+      <ol className="mb-4 ml-6 list-decimal space-y-2 text-gray-600">{children}</ol>
+    ),
+    li: ({ children }) => (
+      <li className="leading-relaxed">{children}</li>
+    ),
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-blue-200 pl-4 my-4 italic text-gray-600">{children}</blockquote>
+    ),
+    code: ({ inline, children }) => (
+      inline ? 
+        <code className="bg-gray-100 rounded px-1 py-0.5 text-sm font-mono text-blue-600">{children}</code> :
+        <pre className="bg-gray-100 rounded-lg p-4 mb-4 overflow-x-auto">
+          <code className="text-sm font-mono text-blue-600">{children}</code>
+        </pre>
+    ),
+    a: ({ href, children }) => (
+      <a href={href} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    ),
+    table: ({ children }) => (
+      <div className="overflow-x-auto mb-4">
+        <table className="min-w-full divide-y divide-gray-200 border">
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ children }) => (
+      <thead className="bg-gray-50">
+        {children}
+      </thead>
+    ),
+    tbody: ({ children }) => (
+      <tbody className="divide-y divide-gray-200 bg-white">
+        {children}
+      </tbody>
+    ),
+    tr: ({ children }) => (
+      <tr className="hover:bg-gray-50">
+        {children}
+      </tr>
+    ),
+    th: ({ children }) => (
+      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {children}
+      </td>
+    ),
+  };
+
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-2 mb-2 bg-gradient-to-r from-blue-100 to-red-100">
@@ -178,9 +249,11 @@ const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = "200px
         </div>
       </TabsContent>
       <TabsContent value="preview" className="mt-0">
-        <div className="border rounded-md p-4 border-blue-200 bg-white" style={{ minHeight }}>
+        <div className="border rounded-md p-6 border-blue-200 bg-white" style={{ minHeight }}>
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown>{value || '*No content yet*'}</ReactMarkdown>
+            <ReactMarkdown components={components}>
+              {value || '*No content yet*'}
+            </ReactMarkdown>
           </div>
         </div>
       </TabsContent>
@@ -198,7 +271,6 @@ export const EventDetailsCard = ({
   organizationId,
   handleSave = async (formData) => {
     try {
-      // If no handleSave function is provided, save to Supabase directly
       if (!editForm?.id) {
         const { data, error } = await supabase
           .from('events')
@@ -329,7 +401,7 @@ export const EventDetailsCard = ({
 
   return (
     <>
-       <Card className="shadow-lg border-blue-200/80 bg-gradient-to-br from-white to-blue-50 relative">
+      <Card className="shadow-lg border-blue-200/80 bg-gradient-to-br from-white to-blue-50 relative">
         <div className="absolute top-4 right-4 flex gap-2">
           <Button
             variant="ghost"
@@ -337,7 +409,7 @@ export const EventDetailsCard = ({
             disabled={isSubmitting || !localHasChanges || isSaving}
             className={`h-8 w-8 p-0 transition-colors ${
               localHasChanges && !isSubmitting && !isSaving
-                ? 'text-blck-600 hover:text-black-700 hover:bg-black-50'
+                ? 'text-black-600 hover:text-black-700 hover:bg-black-50'
                 : 'text-gray-400'
             }`}
             title={isSaving ? 'Saving...' : 'Save Changes'}
@@ -367,7 +439,8 @@ export const EventDetailsCard = ({
             <div className="flex items-center justify-between">
               <div className={headerClasses}>
                 <Image className={iconClasses} />
-                <h2 className={labelClasses}>Event Images</h2></div>
+                <h2 className={labelClasses}>Event Images</h2>
+              </div>
             </div>
             <ImageUploader
               eventId={editForm?.id}
