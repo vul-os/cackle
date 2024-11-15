@@ -14,18 +14,18 @@ import LocationSection from './location';
 
 const LoadingView = () => (
   <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] flex items-center justify-center">
-    <div className="text-[#1A1D24] dark:text-white text-xl font-semibold animate-pulse">Creating unforgettable moments...</div>
+    <div className="text-black dark:text-white text-xl font-semibold animate-pulse">Creating unforgettable moments...</div>
   </div>
 );
 
 const ErrorView = ({ message }) => (
   <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] flex items-center justify-center">
-    <div className="text-[#1A1D24] dark:text-white text-xl font-semibold">Error: {message}</div>
+    <div className="text-black dark:text-white text-xl font-semibold">Error: {message}</div>
   </div>
 );
 
 const GradientText = ({ children, className = "" }) => (
-  <span className={`text-[#1A1D24] dark:text-white font-semibold ${className}`}>
+  <span className={`text-black dark:text-white font-semibold ${className}`}>
     {children}
   </span>
 );
@@ -35,9 +35,9 @@ const EventDetailsSection = ({ description }) => (
     <CardContent className="p-8">
       <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
         <GradientText>Event Details</GradientText>
-        <Star className="h-6 w-6 text-[#1A1D24] dark:text-white" />
+        <Star className="h-6 w-6 text-black dark:text-white" />
       </h2>
-      <div className="text-[#1A1D24] dark:text-[#E5E7EB]">
+      <div className="text-black dark:text-[#E5E7EB]">
         <ProcessedText content={description} />
       </div>
     </CardContent>
@@ -122,7 +122,7 @@ const EventPage = () => {
     : ['/images/racing.jpeg'];
 
   return (
-    <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] text-[#1A1D24] dark:text-white">
+    <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] text-black dark:text-white">
       <Header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-[#0A0C10]/80 backdrop-blur-xl border-b border-gray-100 dark:border-[#2A2E36]" />
       
       <div className="flex flex-col min-h-screen pt-16">
@@ -145,7 +145,7 @@ const EventPage = () => {
             <EventQuickInfo 
               event={event}
               ticketTypes={ticketTypes}
-              className="bg-[#FFF8F8] dark:bg-[#1A1D24] rounded-xl p-6 text-[#1A1D24] dark:text-white"
+              className="bg-[#FFF8F8] dark:bg-[#1A1D24] rounded-xl p-6 text-black dark:text-white"
             />
           </div>
         </div>
@@ -157,7 +157,7 @@ const EventPage = () => {
               location={event.venue_address}
               latitude={event.venue_latitude}
               longitude={event.venue_longitude}
-              className="bg-white dark:bg-[#0A0C10] border border-gray-100 dark:border-[#2A2E36] rounded-xl shadow-lg dark:shadow-none text-[#1A1D24] dark:text-white"
+              className="bg-white dark:bg-[#0A0C10] border border-gray-100 dark:border-[#2A2E36] rounded-xl shadow-lg dark:shadow-none text-black dark:text-white"
             />
           </div>
           
@@ -170,7 +170,7 @@ const EventPage = () => {
                 <InformationSection 
                   information={event.information}
                   policyInfo={event.policy_info}
-                  className="text-[#1A1D24] dark:text-[#E5E7EB]"
+                  className="text-black dark:text-[#E5E7EB]"
                 />
               </CardContent>
             </Card>
