@@ -9,15 +9,12 @@ const ImageSlider = ({ images, currentImage }) => (
           index === currentImage ? 'scale-100 opacity-100' : 'scale-110 opacity-0'
         }`}
       >
-        <img 
-          src={image} 
+        <img
+          src={image}
           alt={`Slide ${index + 1}`}
           className="w-full h-full object-cover md:object-contain"
         />
-        <div 
-          className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/80" 
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
       </div>
     ))}
   </div>

@@ -4,6 +4,7 @@ import { supabase } from '@/services/supabaseClient';
 import { Card, CardContent } from "@/components/ui/card";
 import { Star, Calendar, MapPin, Info } from 'lucide-react';
 import Header from '@/pages/visitor/header';
+import Footer from '@/pages/visitor/landing/footer.jsx';
 
 import EventHeader from './header';
 import EventQuickInfo from './quick-info';
@@ -13,28 +14,22 @@ import InformationSection from './information';
 import LocationSection from './location';
 
 const LoadingView = () => (
-  <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] flex items-center justify-center">
+  <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] flex items-center justify-center">
     <div className="text-black dark:text-white text-xl font-semibold animate-pulse">Creating unforgettable moments...</div>
   </div>
 );
 
 const ErrorView = ({ message }) => (
-  <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] flex items-center justify-center">
+  <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] flex items-center justify-center">
     <div className="text-black dark:text-white text-xl font-semibold">Error: {message}</div>
   </div>
-);
-
-const GradientText = ({ children, className = "" }) => (
-  <span className={`text-black dark:text-white font-semibold ${className}`}>
-    {children}
-  </span>
 );
 
 const EventDetailsSection = ({ description }) => (
   <Card className="border-none bg-white dark:bg-[#0A0C10] shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2A2E36] rounded-xl overflow-hidden">
     <CardContent className="p-8">
       <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
-        <GradientText>Event Details</GradientText>
+        Event Details
         <Star className="h-6 w-6 text-black dark:text-white" />
       </h2>
       <div className="text-black dark:text-[#E5E7EB]">
@@ -122,7 +117,7 @@ const EventPage = () => {
     : ['/images/racing.jpeg'];
 
   return (
-    <div className="min-h-screen bg-[#FFF8F8] dark:bg-[#1A1D24] text-black dark:text-white">
+    <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] text-black dark:text-white">
       <Header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-[#0A0C10]/80 backdrop-blur-xl border-b border-gray-100 dark:border-[#2A2E36]" />
       
       <div className="flex flex-col min-h-screen pt-16">
@@ -132,12 +127,12 @@ const EventPage = () => {
             currentImage={currentImage}
             className="rounded-b-xl overflow-hidden"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#FFF8F8]/80 dark:from-[#1A1D24]/80 to-transparent" />
-          <EventHeader 
-            category={event.category} 
-            title={event.title}
-            className="absolute bottom-0 left-0 right-0 p-8"
-          />
+          <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black via-transparent to-transparent">
+            <EventHeader 
+              category={event.category} 
+              title={event.title}
+            />
+          </div>
         </div>
 
         <div className="bg-white dark:bg-[#0A0C10] border-t border-gray-100 dark:border-[#2A2E36] shadow-lg dark:shadow-none transform -translate-y-4">
@@ -145,7 +140,7 @@ const EventPage = () => {
             <EventQuickInfo 
               event={event}
               ticketTypes={ticketTypes}
-              className="bg-[#FFF8F8] dark:bg-[#1A1D24] rounded-xl p-6 text-black dark:text-white"
+              className="bg-[#F2F2F2] dark:bg-[#1A1D24] rounded-xl p-6 text-black dark:text-white"
             />
           </div>
         </div>
@@ -165,7 +160,7 @@ const EventPage = () => {
             <Card className="border-none bg-white dark:bg-[#0A0C10] shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2A2E36] rounded-xl">
               <CardContent className="p-8">
                 <h2 className="text-2xl font-bold mb-6">
-                  <GradientText>Additional Information</GradientText>
+                  Additional Information
                 </h2>
                 <InformationSection 
                   information={event.information}
@@ -176,6 +171,8 @@ const EventPage = () => {
             </Card>
           </div>
         </div>
+
+        <Footer />
       </div>
     </div>
   );
