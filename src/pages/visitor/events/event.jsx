@@ -14,25 +14,29 @@ import InformationSection from './information';
 import LocationSection from './location';
 
 const LoadingView = () => (
-  <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] flex items-center justify-center">
-    <div className="text-black dark:text-white text-xl font-semibold animate-pulse">Creating unforgettable moments...</div>
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+    <div className="text-gray-900 dark:text-gray-100 text-xl font-semibold animate-pulse">
+      Creating unforgettable moments...
+    </div>
   </div>
 );
 
 const ErrorView = ({ message }) => (
-  <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] flex items-center justify-center">
-    <div className="text-black dark:text-white text-xl font-semibold">Error: {message}</div>
+  <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+    <div className="text-gray-900 dark:text-gray-100 text-xl font-semibold">
+      Error: {message}
+    </div>
   </div>
 );
 
 const EventDetailsSection = ({ description }) => (
-  <Card className="border-none bg-white dark:bg-[#0A0C10] shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2A2E36] rounded-xl overflow-hidden">
+  <Card className="border-none bg-white dark:bg-gray-800 shadow-lg dark:shadow-none border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
     <CardContent className="p-8">
-      <h2 className="text-3xl font-bold mb-6 flex items-center gap-3">
+      <h2 className="text-3xl font-bold mb-6 flex items-center gap-3 text-gray-900 dark:text-gray-100">
         Event Details
-        <Star className="h-6 w-6 text-black dark:text-white" />
+        <Star className="h-6 w-6 text-gray-900 dark:text-gray-100" />
       </h2>
-      <div className="text-black dark:text-[#E5E7EB]">
+      <div className="text-gray-700 dark:text-gray-200">
         <ProcessedText content={description} />
       </div>
     </CardContent>
@@ -117,8 +121,8 @@ const EventPage = () => {
     : ['/images/racing.jpeg'];
 
   return (
-    <div className="min-h-screen bg-[#F2F2F2] dark:bg-[#1A1D24] text-black dark:text-white">
-      <Header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-[#0A0C10]/80 backdrop-blur-xl border-b border-gray-100 dark:border-[#2A2E36]" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+      <Header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-700" />
       
       <div className="flex flex-col min-h-screen pt-16">
         <div className="relative group h-[70vh]">
@@ -135,12 +139,12 @@ const EventPage = () => {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-[#0A0C10] border-t border-gray-100 dark:border-[#2A2E36] shadow-lg dark:shadow-none transform -translate-y-4">
+        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-lg dark:shadow-none transform -translate-y-4">
           <div className="max-w-6xl mx-auto p-8">
             <EventQuickInfo 
               event={event}
               ticketTypes={ticketTypes}
-              className="bg-[#F2F2F2] dark:bg-[#1A1D24] rounded-xl p-6 text-black dark:text-white"
+              className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6"
             />
           </div>
         </div>
@@ -152,20 +156,19 @@ const EventPage = () => {
               location={event.venue_address}
               latitude={event.venue_latitude}
               longitude={event.venue_longitude}
-              className="bg-white dark:bg-[#0A0C10] border border-gray-100 dark:border-[#2A2E36] rounded-xl shadow-lg dark:shadow-none text-black dark:text-white"
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg dark:shadow-none"
             />
           </div>
           
           <div className="col-span-1">
-            <Card className="border-none bg-white dark:bg-[#0A0C10] shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2A2E36] rounded-xl">
+            <Card className="border-none bg-white dark:bg-gray-800 shadow-lg dark:shadow-none border border-gray-200 dark:border-gray-700 rounded-xl">
               <CardContent className="p-8">
-                <h2 className="text-2xl font-bold mb-6">
+                <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
                   Additional Information
                 </h2>
                 <InformationSection 
                   information={event.information}
                   policyInfo={event.policy_info}
-                  className="text-black dark:text-[#E5E7EB]"
                 />
               </CardContent>
             </Card>

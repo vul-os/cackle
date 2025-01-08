@@ -31,7 +31,6 @@ const TicketSelection = ({ event }) => {
   const [open, setOpen] = useState(false);
   const [selectedType, setSelectedType] = useState("all");
   
-  // Sample ticket types with type field included
   const ticketTypes = [
     {
       id: "1",
@@ -79,10 +78,8 @@ const TicketSelection = ({ event }) => {
     ticketTypes.reduce((acc, ticket) => ({ ...acc, [ticket.id]: 0 }), {})
   );
 
-  // Get unique ticket types
   const uniqueTypes = ["all", ...new Set(ticketTypes.map(ticket => ticket.type))];
 
-  // Filter tickets based on selected type
   const filteredTickets = selectedType === "all" 
     ? ticketTypes 
     : ticketTypes.filter(ticket => ticket.type === selectedType);
@@ -127,24 +124,24 @@ const TicketSelection = ({ event }) => {
         </Button>
       </DialogTrigger>
       
-      <DialogContent className="sm:max-w-md bg-gray-900 text-white">
+      <DialogContent className="sm:max-w-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
         <DialogHeader>
           <DialogTitle>Select Tickets</DialogTitle>
         </DialogHeader>
 
         <div className="mb-4">
           <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full bg-gray-800 border-white/10 text-white">
+            <SelectTrigger className="w-full bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-white/10">
               <SelectValue placeholder="Select ticket type">
                 {formatTicketType(selectedType)}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-white/10 text-white">
+            <SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-white/10">
               {uniqueTypes.map(type => (
                 <SelectItem 
                   key={type} 
                   value={type}
-                  className="hover:bg-gray-700 focus:bg-gray-700 cursor-pointer"
+                  className="hover:bg-gray-100 dark:hover:bg-gray-700 focus:bg-gray-100 dark:focus:bg-gray-700 cursor-pointer"
                 >
                   {formatTicketType(type)}
                 </SelectItem>
@@ -155,12 +152,21 @@ const TicketSelection = ({ event }) => {
         
         <div className="space-y-4 max-h-[400px] overflow-y-auto">
           {filteredTickets.map(ticket => (
-            <div key={ticket.id} className="flex items-center justify-between p-4 border border-white/10 rounded-lg bg-white/5">
+            <div 
+              key={ticket.id} 
+              className="flex items-center justify-between p-4 border border-gray-200 dark:border-white/10 rounded-lg bg-gray-50 dark:bg-white/5"
+            >
               <div>
-                <h3 className="font-medium text-white">{ticket.name}</h3>
-                <p className="text-sm text-gray-300">R{ticket.price.toFixed(2)}</p>
+                <h3 className="font-medium text-gray-900 dark:text-white">
+                  {ticket.name}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  R{ticket.price.toFixed(2)}
+                </p>
                 {ticket.description && (
-                  <p className="text-sm text-gray-400">{ticket.description}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {ticket.description}
+                  </p>
                 )}
               </div>
               <div className="flex items-center space-x-2">
@@ -169,17 +175,19 @@ const TicketSelection = ({ event }) => {
                   variant="outline"
                   onClick={() => updateQuantity(ticket.id, -1)}
                   disabled={quantities[ticket.id] === 0}
-                  className="text-white border-white/20"
+                  className="border-gray-300 dark:border-white/20"
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
-                <span className="w-8 text-center text-white">{quantities[ticket.id]}</span>
+                <span className="w-8 text-center">
+                  {quantities[ticket.id]}
+                </span>
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => updateQuantity(ticket.id, 1)}
                   disabled={quantities[ticket.id] >= ticket.quantity_total}
-                  className="text-white border-white/20"
+                  className="border-gray-300 dark:border-white/20"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -188,8 +196,8 @@ const TicketSelection = ({ event }) => {
           ))}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <div className="flex justify-between font-medium text-white">
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
+          <div className="flex justify-between font-medium">
             <span>Total:</span>
             <span>R{total.toFixed(2)}</span>
           </div>
@@ -199,7 +207,7 @@ const TicketSelection = ({ event }) => {
           <Button
             onClick={handleAddToCart}
             disabled={total === 0}
-            className="w-full bg-gradient-to-r from-[#880424] to-[#660318] hover:from-[#990525] hover:to-[#770419]"
+            className="w-full bg-gradient-to-r from-[#880424] to-[#660318] hover:from-[#990525] hover:to-[#770419] text-white"
           >
             Add to Cart (R{total.toFixed(2)})
           </Button>
