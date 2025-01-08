@@ -88,13 +88,13 @@ export default function TicketsListPage() {
     return (
       <>
         <Header />
-        <Card className="max-w-2xl mx-auto mt-8">
+        <Card className="max-w-2xl mx-auto mt-8 bg-white dark:bg-gray-800">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center space-y-4 text-center">
-              <AlertCircle className="h-12 w-12 text-red-500" />
+              <AlertCircle className="h-12 w-12 text-red-500 dark:text-red-400" />
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold dark:text-white">Error Loading Tickets</h2>
-                <p className="text-gray-500 dark:text-gray-400">{error || 'No tickets found'}</p>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Error Loading Tickets</h2>
+                <p className="text-gray-700 dark:text-white">{error || 'No tickets found'}</p>
               </div>
             </div>
           </CardContent>
@@ -130,10 +130,10 @@ export default function TicketsListPage() {
   return (
     <>
       <Header />
-      <main className="max-w-6xl mx-auto p-4 pt-20">
+      <main className="max-w-6xl mx-auto p-4 pt-20 bg-white dark:bg-gray-900">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold dark:text-white">My Tickets</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Tickets</h1>
             <PrintAllButton 
               onPrintAll={() => printAllTickets(filteredTickets)}
               isPrinting={isPrinting}
@@ -153,16 +153,18 @@ export default function TicketsListPage() {
         
         {Object.values(groupedTickets).map(({ event, ticketTypes }) => (
           <div key={event.id} className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4 dark:text-white">{event.title}</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-white">
+              {event.title}
+            </h2>
             
             {Object.values(ticketTypes).map(({ type, tickets: typeTickets }) => (
               <div key={type.id} className="mb-6">
-                <h3 className="text-xl font-medium mb-3 dark:text-white pl-4 border-l-4 border-primary">
+                <h3 className="text-xl font-medium mb-3 text-gray-800 dark:text-white pl-4 border-l-4 border-primary">
                   {type.name} ({typeTickets.length})
                 </h3>
                 <div className="grid gap-6 md:grid-cols-1">
                   {typeTickets.map((ticket) => (
-                    <Card key={ticket.id} className="relative">
+                    <Card key={ticket.id} className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
                       <CardContent className="p-6">
                         <PrintableTicket 
                           ticket={ticket}
@@ -187,13 +189,13 @@ export default function TicketsListPage() {
         ))}
 
         {filteredTickets.length === 0 && (
-          <Card className="mt-4">
+          <Card className="mt-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center space-y-4 text-center">
-                <AlertCircle className="h-12 w-12 text-yellow-500" />
+                <AlertCircle className="h-12 w-12 text-yellow-500 dark:text-yellow-400" />
                 <div className="space-y-2">
-                  <h2 className="text-xl font-semibold dark:text-white">No Tickets Found</h2>
-                  <p className="text-gray-500 dark:text-gray-400">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">No Tickets Found</h2>
+                  <p className="text-gray-700 dark:text-white">
                     No tickets match your current filter settings. Try adjusting your filters.
                   </p>
                 </div>

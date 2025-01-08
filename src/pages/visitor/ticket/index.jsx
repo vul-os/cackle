@@ -76,7 +76,6 @@ export default function TicketPage() {
     }
   }, [id]);
 
-  // Add print-specific styles
   useEffect(() => {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -87,6 +86,8 @@ export default function TicketPage() {
         }
         body * {
           visibility: hidden;
+          background-color: white !important;
+          color: black !important;
         }
         #printable-ticket, #printable-ticket * {
           visibility: visible;
@@ -109,7 +110,7 @@ export default function TicketPage() {
       <>
         <Header />
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100" />
         </div>
       </>
     );
@@ -119,13 +120,13 @@ export default function TicketPage() {
     return (
       <>
         <Header />
-        <Card className="max-w-2xl mx-auto mt-8">
+        <Card className="max-w-2xl mx-auto mt-8 bg-white dark:bg-gray-800">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center space-y-4 text-center">
-              <AlertCircle className="h-12 w-12 text-red-500" />
+              <AlertCircle className="h-12 w-12 text-red-500 dark:text-red-400" />
               <div className="space-y-2">
-                <h2 className="text-2xl font-semibold">Error Loading Ticket</h2>
-                <p className="text-gray-500">{error || 'Ticket not found'}</p>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Error Loading Ticket</h2>
+                <p className="text-gray-700 dark:text-gray-200">{error || 'Ticket not found'}</p>
               </div>
             </div>
           </CardContent>
@@ -144,10 +145,10 @@ export default function TicketPage() {
   return (
     <>
       <Header />
-      <main className="max-w-4xl mx-auto p-4 pt-20">
-        <Card className="mb-6">
+      <main className="max-w-4xl mx-auto p-4 pt-20 bg-white dark:bg-gray-900">
+        <Card className="mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Ticket Details</CardTitle>
+            <CardTitle className="text-gray-900 dark:text-white">Ticket Details</CardTitle>
             <Button 
               onClick={handlePrint}
               className="print:hidden"
@@ -158,101 +159,96 @@ export default function TicketPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {/* Printable Ticket Section */}
             <div 
-  id={`printable-ticket-${ticket.id}`}
-  className="printable-ticket"
->
-  <div className="flex p-6">
-    {/* Left section */}
-    <div className="flex-[3] pr-8 border-r border-dashed border-gray-300">
-      <div className="flex justify-between items-start mb-6">
-        <div>
-          <h2 className="text-2xl font-bold mb-1">
-            {event.title}
-          </h2>
-          <p className="text-sm font-medium">
-            {type.name}
-          </p>
-        </div>
-        <div className="text-sm font-mono">
-          #{ticket.ticket_code}
-        </div>
-      </div>
+              id={`printable-ticket-${ticket.id}`}
+              className="printable-ticket bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+            >
+              <div className="flex p-6">
+                <div className="flex-[3] pr-8 border-r border-dashed border-gray-300 dark:border-gray-600">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-1 text-gray-900 dark:text-white">
+                        {event.title}
+                      </h2>
+                      <p className="text-base font-medium text-gray-800 dark:text-gray-50">
+                        {ticketType.name}
+                      </p>
+                    </div>
+                    <div className="text-sm font-mono font-medium text-gray-800 dark:text-gray-50">
+                      #{ticket.ticket_code}
+                    </div>
+                  </div>
 
-      {/* Event details */}
-      <div className="space-y-4 mb-6">
-        <div className="flex items-center space-x-3">
-          <Calendar className="h-5 w-5" />
-          <div>
-            <div className="text-sm font-medium">
-              {formatDate(event.start_time)}
-            </div>
-            <div className="text-sm">
-              {formatTime(event.start_time)}
-            </div>
-          </div>
-        </div>
+                  <div className="space-y-4 mb-6">
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="h-5 w-5 text-gray-700 dark:text-gray-200" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-50">
+                          {formatDate(event.start_time)}
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-gray-200">
+                          {formatTime(event.start_time)}
+                        </div>
+                      </div>
+                    </div>
 
-        <div className="flex items-start space-x-3">
-          <MapPin className="h-5 w-5 mt-0.5" />
-          <div>
-            <div className="text-sm font-medium">
-              {event.venue_name}
-            </div>
-            <div className="text-sm">
-              {event.venue_address}
-            </div>
-          </div>
-        </div>
-      </div>
+                    <div className="flex items-start space-x-3">
+                      <MapPin className="h-5 w-5 mt-0.5 text-gray-700 dark:text-gray-200" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-800 dark:text-gray-50">
+                          {event.venue_name}
+                        </div>
+                        <div className="text-sm text-gray-700 dark:text-gray-200">
+                          {event.venue_address}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-      <div className="pt-4 border-t border-dashed">
-        <p className="text-xs">
-          Please present this ticket at the entrance. Valid for one-time entry only.
-        </p>
-      </div>
-    </div>
+                  <div className="pt-4 border-t border-dashed border-gray-300 dark:border-gray-600">
+                    <p className="text-sm text-gray-700 dark:text-gray-200">
+                      Please present this ticket at the entrance. Valid for one-time entry only.
+                    </p>
+                  </div>
+                </div>
 
-    {/* Right section - QR Code */}
-    <div className="flex-1 pl-8 flex flex-col items-center justify-center">
-      <div className="bg-white p-3 rounded-xl">
-      <QRCodeSVG 
-  value={`https://cackle.co.za/tickets/code/${ticket.ticket_code}`}
-  size={120}s
-  includeMargin={false}
-  className="qr-code"
-/>
-      </div>
-      <div className="mt-4 text-sm font-mono text-center">
-        {ticket.ticket_code}
-      </div>
-    </div>
-  </div>
-</div>
+                <div className="flex-1 pl-8 flex flex-col items-center justify-center">
+                  <div className="bg-white p-3 rounded-xl shadow-sm">
+                    <QRCodeSVG 
+                      value={`https://cackle.co.za/tickets/code/${ticket.ticket_code}`}
+                      size={120}
+                      includeMargin={false}
+                      className="qr-code"
+                    />
+                  </div>
+                  <div className="mt-4 text-sm font-mono font-medium text-gray-800 dark:text-gray-50 text-center">
+                    {ticket.ticket_code}
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Additional Event Information - Hidden during print */}
         <div className="print:hidden">
           {event.description && (
-            <Card className="mb-6">
+            <Card className="mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <CardTitle>Event Description</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-white">Event Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600 whitespace-pre-wrap">{event.description}</p>
+                <p className="text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{event.description}</p>
               </CardContent>
             </Card>
           )}
 
           {event.information && (
-            <Card className="mb-6">
+            <Card className="mb-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <CardTitle>Event Information</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-white">Event Information</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
+                <div className="prose dark:prose-invert prose-gray dark:prose-gray max-w-none">
                   <div dangerouslySetInnerHTML={{ __html: event.information }} />
                 </div>
               </CardContent>
@@ -260,12 +256,12 @@ export default function TicketPage() {
           )}
 
           {event.policy_info && (
-            <Card>
+            <Card className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <CardTitle>Event Policies</CardTitle>
+                <CardTitle className="text-gray-900 dark:text-white">Event Policies</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose max-w-none">
+                <div className="prose dark:prose-invert prose-gray dark:prose-gray max-w-none">
                   <div dangerouslySetInnerHTML={{ __html: event.policy_info }} />
                 </div>
               </CardContent>
