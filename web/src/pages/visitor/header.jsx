@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Moon, Sun, LogOut, ShieldCheck, Package } from 'lucide-react';
+import { Menu, X, Moon, Sun, LogOut, ShieldCheck, Package, Ticket } from 'lucide-react';
 import { useTheme } from '@/components/theme-provider';
 import CartDropdown from '@/pages/visitor/cart/dropdown';
 import { useAuth } from '@/context/use-auth';
@@ -67,6 +67,12 @@ const Header = ({ className = '' }) => {
                     </a>
 
                     <div className="hidden items-center gap-2 md:flex">
+                        <Button variant="ghost" asChild>
+                            <Link to="/events">
+                                <Ticket className="mr-2 h-4 w-4" />
+                                Browse Events
+                            </Link>
+                        </Button>
                         <CartDropdown />
                         <AuthButtons />
                         <Button
@@ -91,6 +97,10 @@ const Header = ({ className = '' }) => {
             {isMobileMenuOpen && (
                 <div className="border-t border-border bg-background md:hidden">
                     <div className="flex flex-col gap-2 p-4">
+                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => handleNavigation('/events')}>
+                            <Ticket className="mr-2 h-4 w-4" />
+                            Browse Events
+                        </Button>
                         <AuthButtons isMobile />
                         <Button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

@@ -88,8 +88,9 @@ sequenceDiagram
     loop every attendee
         Gate->>Tickets: Verify(capability, pinned_pubkey, now)
         Tickets-->>Gate: payload or error — pure, no DB, no network
+        Gate->>Gate: check ticket_index (reject if absent from a non-empty index)
         Gate->>Gate: check local admissions table (dedupe)
-        Gate->>Gate: append admission row (admitted/duplicate/invalid)
+        Gate->>Gate: append admission row (admitted/duplicate/invalid/wrong_event)
     end
 
     Note over Gate,API: LATER, once back online
@@ -117,11 +118,17 @@ sequenceDiagram
   integer-cents totals.
 - **`internal/payments`** — the `Provider` interface (`Begin` / `Verify` /
   `Webhook`) plus concrete adapters. See [PAYMENTS.md](PAYMENTS.md).
-- **`internal/scan`** — gate admission: looks up a ticket, dedupes against
-  the local `admissions` table (unique on `ticket_id`, first scan wins,
-  every subsequent scan recorded as its own `duplicate` row rather than
-  overwritten), and the offline `allocations` bookkeeping a device
-  used while running unplugged.
+- **`internal/scan`** — gate admission: verifies a capability purely
+  (`tickets.VerifyWithRing`, no I/O), checks it against the bundle's
+  `ticket_index` when present (`DecideWithBundle` — this is what catches a
+  ticket voided/refunded after issuance, since a signature alone can't;
+  see [OFFLINE-GATES.md](OFFLINE-GATES.md)), dedupes against the local
+  `admissions` table (unique on `ticket_id`, first scan wins, every
+  subsequent scan recorded as its own `duplicate` row rather than
+  overwritten), and the offline `allocations` bookkeeping a device used
+  while running unplugged. `Decide` (no bundle, signature+dedupe only) and
+  `DecideWithBundle` (adds the index check) share one signature-stable
+  entry point each — see the package's doc comments before changing either.
 - **`internal/httpapi`** — chi router, middleware (auth, CSRF, rate
   limiting, security headers), and handlers that compose the packages
   above. This is the only package that knows about HTTP.
@@ -161,6 +168,12 @@ Notes that matter more than the diagram:
   `result='duplicate'`, not an overwrite. This is what makes the offline
   sync endpoint idempotent and auditable — you can always reconstruct what
   happened at every gate, in order.
+- **`tickets.status`** (`valid` / `void` / `refunded`) is what a scan
+  bundle's `ticket_index` is built from (`store.ListValidTicketIDsForEvent`
+  — only `status='valid'` rows). `VoidTicket` flips a row to `void`;
+  `tickets.Verify` itself knows nothing of this column by design (purity),
+  so revocation is enforced entirely by `internal/scan` consulting the
+  index, never inside the signature check.
 - **`allocations`** exists so a scanner can be handed a bounded, signed claim
   ("this device may admit up to N more of ticket-type X") for scenarios
   where even the scan-bundle's ticket index isn't precise enough — the seam

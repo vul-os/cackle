@@ -176,6 +176,146 @@ func TestDecide_WithSQLiteSeenSet(t *testing.T) {
 	}
 }
 
+// issueTestBundle wraps issueTestTicket into a full Bundle ready for
+// DecideWithBundle, with a caller-supplied ticket_index.
+func issueTestBundle(t testing.TB, eventID, ticketID string, nbf, exp int64, ticketIndex []string) (Bundle, string) {
+	t.Helper()
+	ring, token := issueTestTicket(t, eventID, ticketID, nbf, exp)
+	b := Bundle{
+		Event:       EventMeta{EventID: eventID},
+		IssuerKeys:  ring,
+		TicketIndex: ticketIndex,
+		IssuedAt:    time.Unix(nbf, 0),
+	}
+	return b, token
+}
+
+func TestDecideWithBundle_Admitted_TicketInIndex(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1", "ticket-2"})
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Admitted {
+		t.Fatalf("expected Admitted, got %s (%s)", res.Status, res.Reason)
+	}
+	if res.Payload == nil || res.Payload.TID != "ticket-1" {
+		t.Fatalf("expected payload with tid ticket-1, got %+v", res.Payload)
+	}
+}
+
+func TestDecideWithBundle_Invalid_TicketAbsentFromIndex(t *testing.T) {
+	// Perfectly signed, current, right event — but not in the index, e.g.
+	// because it was refunded after issuance. This is the whole gap this
+	// feature closes.
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-2", "ticket-3"})
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Invalid {
+		t.Fatalf("expected Invalid for ticket absent from index, got %s (%s)", res.Status, res.Reason)
+	}
+	if res.Payload != nil {
+		t.Fatalf("invalid result must not carry a payload, got %+v", res.Payload)
+	}
+	if res.Reason == "" {
+		t.Fatalf("expected a non-empty, human-readable reason")
+	}
+}
+
+func TestDecideWithBundle_Invalid_RevokedTicket_SignatureOtherwisePerfect(t *testing.T) {
+	// Same as above, spelled out explicitly per the spec's required case:
+	// a revoked ticket that is otherwise perfectly signed must be rejected.
+	b, token := issueTestBundle(t, "event-1", "ticket-refunded", 1000, 2000, []string{"ticket-other"})
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Invalid {
+		t.Fatalf("expected revoked ticket to be Invalid, got %s (%s)", res.Status, res.Reason)
+	}
+
+	// And it must not have consumed the dedupe slot — a revoked scan was
+	// never admitted, so a legitimate first scan of some OTHER ticket must
+	// still be possible afterwards (sanity check that we didn't call
+	// seen.MarkSeen for the rejected ticket).
+	seenAlready, err := seen.Seen(context.Background(), "ticket-refunded")
+	if err != nil {
+		t.Fatalf("Seen: %v", err)
+	}
+	if seenAlready {
+		t.Fatalf("a rejected/revoked ticket must not be recorded in the dedupe set")
+	}
+}
+
+func TestDecideWithBundle_FallsBackToSignatureOnly_WhenIndexEmpty(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, nil)
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Admitted {
+		t.Fatalf("expected Admitted (signature-only fallback) with empty index, got %s (%s)", res.Status, res.Reason)
+	}
+}
+
+func TestDecideWithBundle_FallsBackToSignatureOnly_WhenIndexAbsent(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{})
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Admitted {
+		t.Fatalf("expected Admitted (signature-only fallback) with absent index, got %s (%s)", res.Status, res.Reason)
+	}
+}
+
+func TestDecideWithBundle_Invalid_BadSignature_EvenWithIndexPresent(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1"})
+	tampered := token[:len(token)-2] + "xx"
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), tampered, b, seen, now)
+	if res.Status != Invalid {
+		t.Fatalf("expected Invalid for tampered token even with a matching index, got %s", res.Status)
+	}
+	if res.Payload != nil {
+		t.Fatalf("expected nil payload for invalid signature")
+	}
+}
+
+func TestDecideWithBundle_Duplicate_IndexedTicketScannedTwice(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1"})
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	first := DecideWithBundle(context.Background(), token, b, seen, now)
+	if first.Status != Admitted {
+		t.Fatalf("first scan: expected Admitted, got %s (%s)", first.Status, first.Reason)
+	}
+	second := DecideWithBundle(context.Background(), token, b, seen, now.Add(time.Minute))
+	if second.Status != Duplicate {
+		t.Fatalf("second scan: expected Duplicate, got %s (%s)", second.Status, second.Reason)
+	}
+	if second.Payload == nil || second.Payload.TID != "ticket-1" {
+		t.Fatalf("duplicate result should still carry the payload, got %+v", second.Payload)
+	}
+}
+
+func TestDecideWithBundle_WrongEvent_NotShadowedByIndex(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1"})
+	b.Event.EventID = "event-OTHER" // gate scanning for a different event than the one the bundle/ring belong to
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != WrongEvent {
+		t.Fatalf("expected WrongEvent, got %s (%s)", res.Status, res.Reason)
+	}
+}
+
 // TestDecide_ConcurrentScans_ExactlyOneAdmitted hammers Decide with the
 // same ticket from many goroutines at once and asserts exactly one call
 // observes Admitted — this is the property that makes "first scan wins"

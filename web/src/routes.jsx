@@ -11,6 +11,7 @@ import LandingPage from './pages/visitor/landing';
 import DocsPage from './pages/visitor/docs';
 import ContactPage from './pages/visitor/contact';
 import VisitorEventPage from './pages/visitor/events/event';
+import BrowsePage from './pages/visitor/browse';
 import CartPage from './pages/visitor/cart';
 import CheckoutPage from './pages/visitor/checkout';
 import PaymentConfirmationPage from './pages/visitor/payment/confirmation';
@@ -31,6 +32,7 @@ import HomePage from './pages/organizers/home';
 import EventsPage from './pages/organizers/events';
 import EventPage from './pages/organizers/events/event';
 import EventStatsPage from './pages/organizers/events/event/stats';
+import EventAttendeesPage from './pages/organizers/events/event/attendees';
 import EventTicketTypesPage from './pages/organizers/events/event/tickets';
 import ScannerPage from './pages/organizers/scanner';
 import SettingsPage from './pages/organizers/settings';
@@ -43,6 +45,7 @@ const AppRoutes = () => {
             <Route element={<BlankLayout />}>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/docs" element={<DocsPage />} />
+                <Route path="/events" element={<BrowsePage />} />
                 <Route path="/events/:slug" element={<VisitorEventPage />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/contact" element={<ContactPage />} />
@@ -145,6 +148,14 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <EventStatsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/events/:id/attendees"
+                    element={
+                        <ProtectedRoute>
+                            <EventAttendeesPage />
                         </ProtectedRoute>
                     }
                 />

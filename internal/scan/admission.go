@@ -73,16 +73,84 @@ type SeenSet interface {
 // first-scan-wins dedupe. The only I/O in this whole call is whatever
 // seen.MarkSeen does (typically a local SQLite write) — there is still no
 // network access anywhere in this path, which is the whole point.
+//
+// Decide has no notion of ticket revocation — it only ever proves a
+// capability was validly issued, never that it wasn't later voided or
+// refunded. Callers with a Bundle (i.e. anything that went through
+// scan-bundle) should prefer DecideWithBundle, which layers exactly that
+// check on top without altering this signature — kept stable because a JS
+// port (web/src/lib/capability.js, consumed by
+// web/src/pages/organizers/scanner/use-scan-engine.js) and internal/httpapi
+// both depend on this exact shape.
 func Decide(ctx context.Context, cap string, ring tickets.KeyRing, eventID string, seen SeenSet, now time.Time) Result {
+	payload, terminal, ok := verifyForEvent(cap, ring, eventID, now)
+	if !ok {
+		return terminal
+	}
+	return admitOrDuplicate(ctx, payload, seen, now)
+}
+
+// DecideWithBundle is Decide plus one additional, purely-local check: when
+// b.TicketIndex is present and non-empty, a ticket whose id is absent from
+// it is rejected as Invalid even though its signature verifies cleanly.
+// That is the whole point of TicketIndex (see bundle.go) — a signature only
+// proves a capability was validly issued, never that it wasn't later voided
+// or refunded, and this is what closes that gap.
+//
+// Compatibility fallback, stated plainly: when TicketIndex is empty (an
+// older bundle downloaded before this field existed, or an event with no
+// issued tickets at bundle time) DecideWithBundle does NOT reject every
+// scan — it falls back to signature-only behaviour identical to Decide.
+// Refusing to admit anyone just because the index is missing would trade
+// one failure mode (admitting a revoked ticket) for a worse one (admitting
+// nobody). This is a deliberate compatibility choice, not an oversight.
+//
+// Point-in-time limitation, also stated plainly: TicketIndex is a snapshot
+// as of the bundle's IssuedAt. A ticket refunded after a gate downloaded
+// its bundle is still admittable at that gate until it re-pulls a fresh
+// one — DecideWithBundle cannot see a revocation it was never told about.
+// The mitigation is operational (re-sync bundles periodically, e.g. between
+// shifts or at a venue's re-entry point), not a code fix; see
+// docs/OFFLINE-GATES.md.
+//
+// Like Decide, DecideWithBundle is pure aside from seen.MarkSeen: the index
+// is just more pinned data handed in by the caller, exactly like the key
+// ring — no network, no DB lookup inside this function.
+func DecideWithBundle(ctx context.Context, cap string, b Bundle, seen SeenSet, now time.Time) Result {
+	payload, terminal, ok := verifyForEvent(cap, b.IssuerKeys, b.Event.EventID, now)
+	if !ok {
+		return terminal
+	}
+
+	if len(b.TicketIndex) > 0 && !ticketIndexContains(b.TicketIndex, payload.TID) {
+		return Result{Status: Invalid, Reason: "ticket revoked or not issued for this event"}
+	}
+
+	return admitOrDuplicate(ctx, payload, seen, now)
+}
+
+// verifyForEvent runs the two checks Decide and DecideWithBundle share
+// before either of them consult SeenSet: signature verification against the
+// pinned ring, then the event-id match. On success it returns the decoded
+// payload and ok=true, meaning the caller should proceed. On failure it
+// returns a terminal Result (Invalid or WrongEvent) and ok=false, meaning
+// the caller should return that Result immediately without touching seen.
+func verifyForEvent(cap string, ring tickets.KeyRing, eventID string, now time.Time) (payload *tickets.Payload, terminal Result, ok bool) {
 	payload, err := tickets.VerifyWithRing(cap, ring, now)
 	if err != nil {
-		return Result{Status: Invalid, Reason: err.Error()}
+		return nil, Result{Status: Invalid, Reason: err.Error()}, false
 	}
-
 	if payload.EID != eventID {
-		return Result{Status: WrongEvent, Payload: payload, Reason: "capability is for a different event"}
+		return nil, Result{Status: WrongEvent, Payload: payload, Reason: "capability is for a different event"}, false
 	}
+	return payload, Result{}, true
+}
 
+// admitOrDuplicate is the local first-scan-wins dedupe shared by Decide and
+// DecideWithBundle, run only once a capability has already verified and
+// passed every other check (event id, and — for DecideWithBundle — the
+// ticket index).
+func admitOrDuplicate(ctx context.Context, payload *tickets.Payload, seen SeenSet, now time.Time) Result {
 	firstSeen, err := seen.MarkSeen(ctx, payload.TID, now)
 	if err != nil {
 		// The dedupe store itself failed (e.g. disk I/O error). We fail
@@ -95,4 +163,18 @@ func Decide(ctx context.Context, cap string, ring tickets.KeyRing, eventID strin
 	}
 
 	return Result{Status: Admitted, Payload: payload, Reason: "ok"}
+}
+
+// ticketIndexContains reports whether ticketID appears in index. Linear
+// scan is fine here: index sizes track an event's ticket count, this runs
+// once per scan on a gate device, and it keeps Bundle's wire shape a plain
+// JSON array rather than forcing every caller (including the JS port) to
+// maintain a parallel set.
+func ticketIndexContains(index []string, ticketID string) bool {
+	for _, id := range index {
+		if id == ticketID {
+			return true
+		}
+	}
+	return false
 }

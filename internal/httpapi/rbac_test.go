@@ -46,6 +46,7 @@ func TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers(t *testing.T) {
 		{"update ticket type", http.MethodPatch, "/api/ticket-types/" + fx.ticketTypeID, map[string]any{"name": "hijacked"}},
 		{"delete ticket type", http.MethodDelete, "/api/ticket-types/" + fx.ticketTypeID, nil},
 		{"scan bundle", http.MethodGet, "/api/events/" + fx.eventID + "/scan-bundle", nil},
+		{"list attendees", http.MethodGet, "/api/events/" + fx.eventID + "/attendees", nil},
 		{"online scan", http.MethodPost, "/api/scan", scanRequest{
 			EventID: fx.eventID, Capability: "cackle.bogus.bogus", DeviceID: "dev-1", GateID: "gate-1", ScannedAt: time.Now(),
 		}},
@@ -98,6 +99,11 @@ func TestRBAC_ScannerRoleSufficesButDoesNotElevate(t *testing.T) {
 	rec = h.do(http.MethodGet, "/api/events/"+fx.eventID+"/stats", scannerToken, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("scanner stats: expected 200, got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	rec = h.do(http.MethodGet, "/api/events/"+fx.eventID+"/attendees", scannerToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("scanner attendees: expected 200, got %d body %s", rec.Code, rec.Body.String())
 	}
 
 	rec = h.do(http.MethodPatch, "/api/events/"+fx.eventID, scannerToken, map[string]any{"title": "should be forbidden"})

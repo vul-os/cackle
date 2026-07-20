@@ -1,6 +1,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Calendar, MapPin, Tag, Scissors } from 'lucide-react';
+import { Calendar, MapPin, Tag, User, Scissors } from 'lucide-react';
 import { formatDate, formatTime } from '../date-utils';
 
 export default function TicketLayout({ ticket, event, type }) {
@@ -39,8 +39,8 @@ export default function TicketLayout({ ticket, event, type }) {
                                 <div className="flex items-start space-x-3">
                                     <MapPin className="mt-0.5 h-5 w-5 text-primary print:text-gray-700" />
                                     <div>
-                                        <div className="text-sm font-medium print:text-black">{event.venue_name}</div>
-                                        <div className="text-sm text-muted-foreground print:text-gray-600">{event.address}</div>
+                                        <div className="text-sm font-medium print:text-black">{event.venue_name || 'Venue TBA'}</div>
+                                        {event.address && <div className="text-sm text-muted-foreground print:text-gray-600">{event.address}</div>}
                                     </div>
                                 </div>
                             </div>
@@ -49,6 +49,12 @@ export default function TicketLayout({ ticket, event, type }) {
                                     <Tag className="h-5 w-5 text-primary print:text-gray-700" />
                                     <div className="text-sm font-medium print:text-black">{type.name}</div>
                                 </div>
+                                {ticket.holder_name && (
+                                    <div className="flex items-center space-x-3">
+                                        <User className="h-5 w-5 text-primary print:text-gray-700" />
+                                        <div className="text-sm font-medium print:text-black">{ticket.holder_name}</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 

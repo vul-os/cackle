@@ -64,6 +64,19 @@
     --ring: 355 85% 54%;
 
     --radius: 0.75rem;
+
+    /* The organiser console chrome (top bar + side nav) is intentionally a
+       persistent dark shell in both themes — a deliberate brand choice, not
+       an unstyled corner. Tokenised here rather than hardcoded so contrast
+       stays auditable and consistent between light/dark mode. */
+    --sidebar-background: 240 12% 6%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-muted-foreground: 0 0% 100% / 0.6;
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-accent: 0 0% 100% / 0.1;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-primary: 355 85% 54% / 0.2;
+    --sidebar-primary-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -103,6 +116,9 @@
     --ring: 355 90% 61%;
 
     --radius: 0.75rem;
+
+    /* --sidebar-* tokens are deliberately NOT redefined here: the console
+       chrome stays visually identical in light and dark mode (see :root). */
   }
 }
 
@@ -120,6 +136,22 @@
   }
   ::selection {
     @apply bg-primary/25;
+  }
+}
+
+/* Respect the user's motion preference everywhere — radix data-state
+   animations (accordion/dialog/dropdown/toast/etc.), the pulse-ring scanner
+   animation, and any framer-motion transitions all key off this. Scoped to
+   durations/transforms rather than "display: none"-ing animations outright,
+   so state changes (open/closed) still apply, they just don't move. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

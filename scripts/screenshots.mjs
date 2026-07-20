@@ -43,7 +43,8 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, existsSync, copyFileSync, rmSync, cpSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync, rmSync, cpSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawn, execSync } from 'node:child_process';
@@ -75,7 +76,6 @@ const SURFACES = [
   {
     name: 'event-browse',
     path: '/events',
-    fallback: ['/'],
     description: 'Browse published events',
   },
   {
@@ -87,7 +87,9 @@ const SURFACES = [
   {
     name: 'checkout',
     path: '/checkout',
+    auth: true,
     description: 'Checkout',
+    discover: async (ctx) => (ctx.eventId ? `/checkout/${ctx.eventId}` : null),
   },
   {
     name: 'my-tickets',
@@ -117,10 +119,10 @@ const SURFACES = [
   },
   {
     name: 'ticket-types',
-    path: '/admin/events/demo/tickets/types',
+    path: '/admin/events/demo/tickets',
     auth: true,
     description: 'Ticket types for an event',
-    discover: async (ctx) => (ctx.eventId ? `/admin/events/${ctx.eventId}/tickets/types` : null),
+    discover: async (ctx) => (ctx.eventId ? `/admin/events/${ctx.eventId}/tickets` : null),
   },
   {
     name: 'attendees',
@@ -139,10 +141,10 @@ const SURFACES = [
   },
   {
     name: 'stats',
-    path: '/admin/events/demo',
+    path: '/admin/events/demo/stats',
     auth: true,
     description: 'Event stats (sold / revenue / admitted)',
-    discover: async (ctx) => (ctx.eventId ? `/admin/events/${ctx.eventId}` : null),
+    discover: async (ctx) => (ctx.eventId ? `/admin/events/${ctx.eventId}/stats` : null),
   },
   {
     name: 'settings',
@@ -457,6 +459,27 @@ async function main() {
   const failed = results.filter((r) => r.status === 'failed');
   const skipped = results.filter((r) => r.status === 'skipped');
   console.log(`\nDone — ${ok.length} captured, ${failed.length} failed, ${skipped.length} skipped`);
+
+  // Identical-capture guard. "N captured, 0 failed" once meant 13 byte-identical
+  // copies of the sign-in page, because a silent auth failure sent every
+  // auth-gated route to the same redirect. A count is not evidence the shots
+  // differ, so check, and say so loudly when they don't.
+  const byDigest = new Map();
+  for (const r of ok) {
+    const file = path.join(OUT, `${r.name}-${r.theme}.png`);
+    if (!existsSync(file)) continue;
+    const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
+    if (!byDigest.has(digest)) byDigest.set(digest, []);
+    byDigest.get(digest).push(`${r.name}-${r.theme}`);
+  }
+  const collisions = [...byDigest.values()].filter((names) => names.length > 1);
+  if (collisions.length) {
+    console.warn('\n  WARNING: identical screenshots detected — these surfaces rendered the same page:');
+    for (const names of collisions) console.warn(`    ${names.join('  ==  ')}`);
+    console.warn('  Usually a route that does not exist, or an auth-gated route silently redirecting.');
+  } else if (ok.length) {
+    console.log('  all captures are distinct');
+  }
 
   // Hero: the single most representative shot, copied to the gallery top.
   const heroSrc = path.join(OUT, `${HERO_SURFACE}-${HERO_THEME}.png`);

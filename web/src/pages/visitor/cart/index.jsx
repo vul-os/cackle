@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Minus, Plus, Trash2, ArrowLeft, Clock, MapPin, ShoppingCart } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import { format } from 'date-fns';
+import { REDIRECT_STORAGE_KEY } from '@/pages/auth/auth-redirect';
 
 function formatMoney(cents, currency = 'ZAR') {
     try {
@@ -24,7 +25,17 @@ const CartPage = () => {
 
     const handleCheckout = (eventId) => {
         if (!user) {
-            navigate('/login', { state: { returnTo: `/checkout/${eventId}` } });
+            // ProtectedRoute (and the auth pages' post-login redirect) both
+            // key off this localStorage entry, not router state — set it
+            // here too so signing in from this prompt returns the buyer to
+            // checkout instead of dropping them on the homepage.
+            try {
+                localStorage.setItem(REDIRECT_STORAGE_KEY, `/checkout/${eventId}`);
+            } catch {
+                // localStorage unavailable — worst case the buyer lands on
+                // the homepage after signing in and re-opens their cart.
+            }
+            navigate('/login');
             return;
         }
         navigate(`/checkout/${eventId}`);

@@ -22,7 +22,7 @@ const CheckoutPage = () => {
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [redirectUrl, setRedirectUrl] = useState(null);
-    const [billingDetails, setBillingDetails] = useState({ name: '', email: user?.email || '' });
+    const [billingDetails, setBillingDetails] = useState({ name: user?.name || '', email: user?.email || '' });
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;

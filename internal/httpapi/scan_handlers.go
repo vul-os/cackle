@@ -232,11 +232,18 @@ func (s *server) handleScanBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ticketIDs, err := s.deps.Store.ListValidTicketIDsForEvent(ctx, eventID)
+	if err != nil {
+		internalError(w, s.log(), "scan-bundle ticket index", err)
+		return
+	}
+
 	bundle := scan.Bundle{
-		Event:      eventToMeta(ev),
-		IssuerKeys: ring,
-		Allocation: nil, // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
-		IssuedAt:   time.Now(),
+		Event:       eventToMeta(ev),
+		IssuerKeys:  ring,
+		TicketIndex: ticketIDs,
+		Allocation:  nil, // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
+		IssuedAt:    time.Now(),
 	}
 	if err := bundle.Validate(); err != nil {
 		internalError(w, s.log(), "scan-bundle validate", err)
@@ -276,13 +283,30 @@ func (s *server) handleScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The online path honours the same ticket_index check an offline gate
+	// gets from its cached bundle (see scan.DecideWithBundle) — there is no
+	// reason an online scanner should be laxer about a refunded ticket than
+	// an offline one. We build a Bundle for exactly this call rather than
+	// serving a stale cached one; Event only needs EventID populated,
+	// DecideWithBundle never looks at the rest.
+	ticketIDs, err := s.deps.Store.ListValidTicketIDsForEvent(ctx, req.EventID)
+	if err != nil {
+		internalError(w, s.log(), "scan ticket index", err)
+		return
+	}
+
 	scannedAt := req.ScannedAt
 	if scannedAt.IsZero() {
 		scannedAt = time.Now()
 	}
 
 	seen := &dbSeenSet{db: s.deps.Store.DB(), eventID: req.EventID, gateID: req.GateID, deviceID: req.DeviceID, scannedBy: user.ID}
-	result := scan.Decide(ctx, req.Capability, ring, req.EventID, seen, scannedAt)
+	bundle := scan.Bundle{
+		Event:       scan.EventMeta{EventID: req.EventID},
+		IssuerKeys:  ring,
+		TicketIndex: ticketIDs,
+	}
+	result := scan.DecideWithBundle(ctx, req.Capability, bundle, seen, scannedAt)
 
 	// Admitted was already written by seen.MarkSeen above (the atomic
 	// claim IS the row). Every other outcome that got far enough to know

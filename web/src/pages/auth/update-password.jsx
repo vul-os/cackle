@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, KeyRound } from 'lucide-react';
+
+import nightBackground from '/images/night.jpg';
 
 const UpdatePassword = () => {
     const { updatePassword } = useAuth();
@@ -38,12 +41,19 @@ const UpdatePassword = () => {
     };
 
     return (
-        <div className="container mx-auto mt-10 max-w-md">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-2xl">Update password</CardTitle>
-                </CardHeader>
-                <CardContent>
+        <div
+            className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat p-4"
+            style={{ backgroundImage: `linear-gradient(rgba(10,8,10,0.75), rgba(10,8,10,0.85)), url(${nightBackground})` }}
+        >
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="relative z-10 w-full max-w-md">
+                <Card className="border-white/10 bg-card/95 shadow-2xl backdrop-blur">
+                    <CardHeader className="space-y-1 pb-6 text-center">
+                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                            <KeyRound className="h-6 w-6" />
+                        </div>
+                        <CardTitle className="font-display text-2xl font-bold">Update password</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                     {!token && (
                         <Alert variant="destructive" className="mb-4">
                             <AlertDescription>This link is missing its reset token. Request a new one from the sign-in page.</AlertDescription>
@@ -88,8 +98,9 @@ const UpdatePassword = () => {
                             Back to sign in
                         </Button>
                     </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+            </motion.div>
         </div>
     );
 };

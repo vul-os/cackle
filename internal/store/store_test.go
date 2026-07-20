@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 	"time"
@@ -163,6 +165,88 @@ func TestOrgMembershipRoleConstraint(t *testing.T) {
 	}
 	if len(orgs) != 1 || orgs[0].Role != "owner" || orgs[0].Slug != "acme" {
 		t.Fatalf("unexpected orgs for user: %+v", orgs)
+	}
+}
+
+func TestListValidTicketIDsForEvent(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	org := &Org{Name: "Acme", Slug: "acme-tix"}
+	if err := st.CreateOrg(ctx, org); err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	ev := &Event{
+		OrgID: org.ID, Slug: "fest", Title: "Fest", Status: "published",
+		StartsAt: time.Now(), EndsAt: time.Now().Add(time.Hour),
+	}
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	if err := st.CreateEventWithKey(ctx, ev, &EventKey{PublicKey: pub, PrivateKey: priv}); err != nil {
+		t.Fatalf("create event: %v", err)
+	}
+	tt := &TicketType{EventID: ev.ID, Name: "General", QuantityTotal: 10}
+	if err := st.CreateTicketType(ctx, tt); err != nil {
+		t.Fatalf("create ticket type: %v", err)
+	}
+
+	// A fresh event with no orders yet: the index must be empty, not an
+	// error — this is the "no tickets issued for this event" fallback
+	// case internal/scan.DecideWithBundle relies on.
+	ids, err := st.ListValidTicketIDsForEvent(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("ListValidTicketIDsForEvent (empty): %v", err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("expected no valid ticket ids yet, got %v", ids)
+	}
+
+	order := &Order{EventID: ev.ID, BuyerEmail: "buyer@example.com"}
+	if _, err := st.CreateOrderWithItems(ctx, order, []OrderLine{{TicketTypeID: tt.ID, Quantity: 3, UnitPriceCents: 1000}}); err != nil {
+		t.Fatalf("create order: %v", err)
+	}
+	tickets := []Ticket{
+		{ID: "tik-1", OrderID: order.ID, EventID: ev.ID, TicketTypeID: tt.ID, Serial: "S1", Capability: "cap-1", IssuedAt: time.Now()},
+		{ID: "tik-2", OrderID: order.ID, EventID: ev.ID, TicketTypeID: tt.ID, Serial: "S2", Capability: "cap-2", IssuedAt: time.Now()},
+		{ID: "tik-3", OrderID: order.ID, EventID: ev.ID, TicketTypeID: tt.ID, Serial: "S3", Capability: "cap-3", IssuedAt: time.Now()},
+	}
+	if settled, err := st.SettleOrder(ctx, order.ID, time.Now(), tickets); err != nil || !settled {
+		t.Fatalf("settle order: settled=%v err=%v", settled, err)
+	}
+
+	ids, err = st.ListValidTicketIDsForEvent(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("ListValidTicketIDsForEvent: %v", err)
+	}
+	assertSameIDs(t, ids, []string{"tik-1", "tik-2", "tik-3"})
+
+	// Void one ticket (e.g. a refund) — it must drop out of the index
+	// immediately, which is the entire point of this method existing.
+	if err := st.VoidTicket(ctx, "tik-2", time.Now()); err != nil {
+		t.Fatalf("void ticket: %v", err)
+	}
+	ids, err = st.ListValidTicketIDsForEvent(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("ListValidTicketIDsForEvent (after void): %v", err)
+	}
+	assertSameIDs(t, ids, []string{"tik-1", "tik-3"})
+}
+
+func assertSameIDs(t *testing.T, got []string, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("id count = %d, want %d (got %v, want %v)", len(got), len(want), got, want)
+	}
+	seen := make(map[string]bool, len(got))
+	for _, id := range got {
+		seen[id] = true
+	}
+	for _, id := range want {
+		if !seen[id] {
+			t.Fatalf("expected id %q in result, got %v", id, got)
+		}
 	}
 }
 

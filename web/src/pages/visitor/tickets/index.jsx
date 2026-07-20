@@ -36,26 +36,39 @@ export default function TicketsListPage() {
 
     const { tickets, loading, error } = state;
 
+    // GET /api/tickets returns a flat, best-effort-decorated ticket: no
+    // nested `event`/`ticket_type` objects, just event_id/event_title/
+    // event_venue_name/event_starts_at and ticket_type_id/ticket_type_name
+    // alongside the ticket's own fields. Build the small view-model objects
+    // the printable-ticket components expect from those flat fields.
+    const eventOf = (t) => ({
+        id: t.event_id,
+        title: t.event_title || 'Untitled event',
+        venue_name: t.event_venue_name,
+        starts_at: t.event_starts_at,
+    });
+    const typeOf = (t) => ({ id: t.ticket_type_id, name: t.ticket_type_name || 'Ticket' });
+
     const events = tickets.reduce((acc, t) => {
-        if (t.event && !acc.find((e) => e.id === t.event.id)) acc.push(t.event);
+        if (t.event_id && !acc.find((e) => e.id === t.event_id)) acc.push(eventOf(t));
         return acc;
     }, []);
     const ticketTypes = tickets.reduce((acc, t) => {
-        if (t.ticket_type && !acc.find((tt) => tt.id === t.ticket_type.id)) acc.push(t.ticket_type);
+        if (t.ticket_type_id && !acc.find((tt) => tt.id === t.ticket_type_id)) acc.push(typeOf(t));
         return acc;
     }, []);
 
     const filteredTickets = tickets.filter((t) => {
-        const eventMatch = selectedEvent === 'all' || t.event?.id === selectedEvent;
-        const typeMatch = selectedTicketType === 'all' || t.ticket_type?.id === selectedTicketType;
+        const eventMatch = selectedEvent === 'all' || t.event_id === selectedEvent;
+        const typeMatch = selectedTicketType === 'all' || t.ticket_type_id === selectedTicketType;
         return eventMatch && typeMatch;
     });
 
     const groupedTickets = filteredTickets.reduce((acc, ticket) => {
-        const eventId = ticket.event?.id ?? 'unknown';
-        const typeId = ticket.ticket_type?.id ?? 'unknown';
-        acc[eventId] ||= { event: ticket.event ?? { id: eventId, title: 'Untitled event' }, ticketTypes: {} };
-        acc[eventId].ticketTypes[typeId] ||= { type: ticket.ticket_type ?? { id: typeId, name: 'Ticket' }, tickets: [] };
+        const eventId = ticket.event_id ?? 'unknown';
+        const typeId = ticket.ticket_type_id ?? 'unknown';
+        acc[eventId] ||= { event: eventOf(ticket), ticketTypes: {} };
+        acc[eventId].ticketTypes[typeId] ||= { type: typeOf(ticket), tickets: [] };
         acc[eventId].ticketTypes[typeId].tickets.push(ticket);
         return acc;
     }, {});

@@ -4,7 +4,7 @@ import Header from '@/pages/visitor/header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout } from 'lucide-react';
-import { orders as ordersApi } from '@/lib/api';
+import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 
 const STATUS_STYLE = {
     pending: { className: 'bg-warning/15 text-warning-foreground', icon: Clock },
@@ -42,6 +42,10 @@ const LoadingSkeleton = () => (
 export default function OrdersPage() {
     const navigate = useNavigate();
     const [state, setState] = useState({ orders: [], loading: true, error: null });
+    // GET /api/orders returns bare orders (event_id, no nested event) — the
+    // event title/date shown per row is resolved client-side against the
+    // public event-detail endpoint, best-effort, keyed by event_id.
+    const [eventsById, setEventsById] = useState({});
 
     useEffect(() => {
         let cancelled = false;
@@ -49,7 +53,8 @@ export default function OrdersPage() {
             .list()
             .then((data) => {
                 if (cancelled) return;
-                setState({ orders: Array.isArray(data) ? data : (data?.orders ?? []), loading: false, error: null });
+                const list = Array.isArray(data) ? data : (data?.orders ?? []);
+                setState({ orders: list, loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
@@ -59,6 +64,27 @@ export default function OrdersPage() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => {
+        const ids = [...new Set(state.orders.map((o) => o.event_id).filter(Boolean))];
+        const missing = ids.filter((id) => !(id in eventsById));
+        if (missing.length === 0) return;
+        let cancelled = false;
+        Promise.allSettled(missing.map((id) => eventsApi.get(id))).then((results) => {
+            if (cancelled) return;
+            setEventsById((prev) => {
+                const next = { ...prev };
+                results.forEach((res, i) => {
+                    next[missing[i]] = res.status === 'fulfilled' ? (res.value?.event ?? res.value) : null;
+                });
+                return next;
+            });
+        });
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.orders]);
 
     return (
         <div className="min-h-screen bg-background">
@@ -106,6 +132,8 @@ export default function OrdersPage() {
                         {state.orders.map((order) => {
                             const style = STATUS_STYLE[order.status] ?? STATUS_STYLE.pending;
                             const StatusIcon = style.icon;
+                            const event = eventsById[order.event_id];
+                            const title = event?.title ?? `Order ${order.id.slice(0, 8)}`;
                             return (
                                 <Card
                                     key={order.id}
@@ -114,8 +142,11 @@ export default function OrdersPage() {
                                 >
                                     <CardContent className="flex items-center justify-between p-5">
                                         <div className="min-w-0">
-                                            <p className="truncate font-medium">{order.event?.title ?? `Order ${order.id.slice(0, 8)}`}</p>
-                                            <p className="text-sm text-muted-foreground">{formatDate(order.created_at)}</p>
+                                            <p className="truncate font-medium">{title}</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {event?.venue_name ? `${event.venue_name} · ` : ''}
+                                                {formatDate(order.created_at)}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${style.className}`}>

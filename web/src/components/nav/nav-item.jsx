@@ -10,8 +10,8 @@ export const NavItem = ({ to, icon: Icon, text, isExpanded, end = false }) => {
                 end={end}
                 className={({ isActive }) =>
                     cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white',
-                        isActive && 'bg-primary/20 text-white',
+                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background',
+                        isActive && 'bg-sidebar-primary text-sidebar-primary-foreground',
                     )
                 }
             >

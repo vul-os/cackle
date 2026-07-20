@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Calendar, MapPin, ShieldCheck, QrCode, Wifi, WifiOff, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, ShieldCheck, QrCode, Wifi, WifiOff, AlertCircle, ArrowRight } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Header from '@/pages/visitor/header';
@@ -102,8 +102,7 @@ const HOW_IT_WORKS = [
 ];
 
 const LandingPage = () => {
-    const [searchParams, setSearchParams] = useSearchParams();
-    const query = searchParams.get('q') || '';
+    const navigate = useNavigate();
 
     const [state, setState] = useState({ events: [], loading: true, error: null });
 
@@ -111,7 +110,7 @@ const LandingPage = () => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
-            .list({ q: query || undefined, limit: 24 })
+            .list({ limit: 8 })
             .then((data) => {
                 if (cancelled) return;
                 setState({ events: Array.isArray(data) ? data : (data?.events ?? []), loading: false, error: null });
@@ -123,28 +122,35 @@ const LandingPage = () => {
         return () => {
             cancelled = true;
         };
-    }, [query]);
+    }, []);
 
+    // The homepage shows a preview only — searching sends the visitor to the
+    // full browse/search/filter surface at /events rather than duplicating
+    // that surface here.
     const handleSearch = (value) => {
-        const params = {};
-        if (value) params.q = value;
-        setSearchParams(params);
+        const params = new URLSearchParams();
+        if (value) params.set('q', value);
+        navigate(`/events${params.toString() ? `?${params}` : ''}`);
     };
 
     return (
         <div className="min-h-screen bg-background">
             <Header />
             <main>
-                <Hero query={query} onSearch={handleSearch} />
+                <Hero query="" onSearch={handleSearch} />
 
                 <section className="container mx-auto px-4 py-16">
-                    <div className="mb-8 flex items-end justify-between">
+                    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                         <div>
-                            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                                {query ? `Results for "${query}"` : 'Upcoming events'}
-                            </h2>
+                            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Upcoming events</h2>
                             <p className="mt-1 text-muted-foreground">Find something happening near you.</p>
                         </div>
+                        <Button variant="outline" asChild>
+                            <Link to="/events">
+                                Browse all events
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
                     </div>
 
                     {state.error && (
@@ -167,9 +173,7 @@ const LandingPage = () => {
                         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
                             <Wifi className="h-8 w-8 text-muted-foreground" />
                             <p className="font-medium">No events found</p>
-                            <p className="max-w-sm text-sm text-muted-foreground">
-                                {query ? 'Try a different search.' : 'Check back soon — new events are added all the time.'}
-                            </p>
+                            <p className="max-w-sm text-sm text-muted-foreground">Check back soon — new events are added all the time.</p>
                         </div>
                     )}
 

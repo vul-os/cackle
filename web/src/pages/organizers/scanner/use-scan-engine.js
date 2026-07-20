@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { verifyWithRing } from '@/lib/capability';
 import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced } from '@/lib/scan-store';
 import { scan as scanApi } from '@/lib/api';
@@ -40,9 +40,30 @@ function describeError(err) {
  * pinned key ring, dedupe locally, persist the append-only scan record, and
  * keep a live tally. Nothing here requires the network — sync is a
  * best-effort background step layered on top.
+ *
+ * `ticketIndex` mirrors the Go side's DecideWithBundle (internal/scan/
+ * admission.go): it is the scan bundle's `ticket_index` — the set of
+ * ticket IDs currently valid (issued, not void, not refunded) for this
+ * event as of when the bundle was downloaded. A ticket whose signature
+ * verifies but whose id is ABSENT from a non-empty ticketIndex is treated
+ * as invalid — this is what catches a ticket that was refunded after
+ * issuance, which a signature alone can never reveal. When ticketIndex is
+ * missing or empty (an older cached bundle, or an event with no tickets
+ * issued yet) this deliberately falls back to signature-only checking
+ * rather than refusing every scan — see docs/OFFLINE-GATES.md.
+ *
+ * Like the rest of this hook, this check is purely local: ticketIndex is
+ * whatever was cached in IndexedDB alongside the rest of the bundle, so a
+ * ticket refunded after the bundle was downloaded is still admitted here
+ * until the gate re-pulls a fresh bundle — an inherent limitation of
+ * offline operation, not a bug.
  */
-export function useScanEngine({ eventId, keyRing, gateId }) {
+export function useScanEngine({ eventId, keyRing, ticketIndex, gateId }) {
     const online = useOnline();
+    const ticketIndexSet = useMemo(
+        () => (Array.isArray(ticketIndex) && ticketIndex.length > 0 ? new Set(ticketIndex) : null),
+        [ticketIndex],
+    );
     const [tally, setTally] = useState({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
     const [pendingCount, setPendingCount] = useState(0);
     const [lastResult, setLastResult] = useState(null);
@@ -119,6 +140,14 @@ export function useScanEngine({ eventId, keyRing, gateId }) {
                     note = 'Ticket belongs to a different event';
                     ticketId = payload.tid;
                     holderName = payload.nm;
+                } else if (ticketIndexSet && !ticketIndexSet.has(payload.tid)) {
+                    // Signature verifies, right event — but not in the
+                    // index the gate downloaded, e.g. because it was
+                    // refunded after issuance. Mirrors Go's
+                    // scan.DecideWithBundle: reject as invalid, and (like
+                    // any other Invalid result) never record a ticket id.
+                    result = 'invalid';
+                    note = 'Ticket revoked or not issued for this event';
                 } else {
                     ticketId = payload.tid;
                     holderName = payload.nm;
@@ -145,7 +174,7 @@ export function useScanEngine({ eventId, keyRing, gateId }) {
                 }, 400);
             }
         },
-        [eventId, keyRing, gateId, refreshCounts, syncNow],
+        [eventId, keyRing, ticketIndexSet, gateId, refreshCounts, syncNow],
     );
 
     return { online, tally, pendingCount, lastResult, isSyncing, syncNow, handleDecode, deviceId: deviceId.current };

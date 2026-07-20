@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket, BarChart3, Globe, Loader2 } from 'lucide-react';
+import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users } from 'lucide-react';
 
 export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmitting, onPublish, isPublishing }) => {
     return (
@@ -33,6 +33,10 @@ export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmi
                     <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/stats`)} disabled={!editForm.id}>
                         <BarChart3 className="mr-2 h-4 w-4" />
                         Stats
+                    </Button>
+                    <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/attendees`)} disabled={!editForm.id}>
+                        <Users className="mr-2 h-4 w-4" />
+                        Attendees
                     </Button>
                     <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/tickets`)} disabled={!editForm.id}>
                         <Ticket className="mr-2 h-4 w-4" />

@@ -32,6 +32,8 @@ POST   /api/events                 org auth
 PATCH  /api/events/{id}
 POST   /api/events/{id}/publish
 GET    /api/events/{id}/stats      → sold, revenue_cents, admitted, by_type[]
+GET    /api/events/{id}/attendees  ?q=&status=&limit=&offset=   scanner+ auth
+                                   → {attendees:[...], total, limit, offset}
 ```
 
 `GET /api/events` and `GET /api/events/{slug}` are the only two endpoints in
@@ -40,6 +42,20 @@ event page need to work for an anonymous visitor. Every other event route
 requires an authenticated session with a role on the event's org, checked
 server-side, every time — see the RBAC rule in
 [ARCHITECTURE.md](ARCHITECTURE.md#security-bar).
+
+`GET /api/events/{id}/attendees` is the organiser-facing ticket-holder
+roster — every issued ticket for the event, one row per ticket, with the
+holder's name, ticket type, serial, order id, issue time, and admission
+status/time. It requires scanner-or-above membership on the event's org
+(the same bar as `stats` and `scan-bundle`): the door team needs this list
+as much as the organiser does. `q` matches holder name (substring,
+case-insensitive); `status` is one of `valid`, `void`, `refunded` (ticket
+status) or `admitted`, `not_admitted` (gate status) — an unrecognised
+value returns zero rows rather than the unfiltered roster. `limit`
+defaults to 50 and is hard-capped at 200 regardless of what's requested,
+so a large event's roster can never be pulled as one unbounded response.
+The response never includes the buyer's email — see
+[ARCHITECTURE.md](ARCHITECTURE.md#security-bar) if that seam changes.
 
 ## Ticket types
 
@@ -98,10 +114,23 @@ POST   /api/scan/sync                {admissions:[...]} batch upload of offline 
 `POST /api/scan` is the **online** scan path — useful for a gate that does
 have connectivity and wants server-side admission recorded immediately
 rather than batched. It runs the exact same `internal/tickets.Verify` +
-`internal/scan` dedupe logic a fully offline gate runs locally; the only
-difference is where the admissions table lives. `scan-bundle` and
-`scan/sync` are the offline path, and are the reason this product exists —
-see [OFFLINE-GATES.md](OFFLINE-GATES.md) for the full operational guide.
+`internal/scan` dedupe logic a fully offline gate runs locally (including
+the `ticket_index` revocation check below); the only difference is where
+the admissions table lives. `scan-bundle` and `scan/sync` are the offline
+path, and are the reason this product exists — see
+[OFFLINE-GATES.md](OFFLINE-GATES.md) for the full operational guide.
+
+`ticket_index` is the set of ticket IDs currently valid (issued, not void,
+not refunded) for the event, as of `issued_at`. A capability whose
+signature verifies but whose `tid` is absent from a non-empty
+`ticket_index` is reported `result: "invalid"` — this is what stops a
+refunded ticket from being admitted purely on the strength of its
+signature. An empty/absent `ticket_index` (older bundle, or an event with
+no tickets issued yet) is a deliberate fallback to signature-only
+checking, not "reject everyone" — and even a fresh `ticket_index` is only
+a snapshot as of `issued_at`: a ticket refunded after a gate downloaded its
+bundle stays admittable at that gate until it re-syncs. See
+[OFFLINE-GATES.md](OFFLINE-GATES.md) for the full reasoning.
 
 ## Error codes
 

@@ -12,13 +12,15 @@ const navItems = [
 const SideNav = ({ isExpanded, isMobile }) => {
     return (
         <div
-            className={`flex h-full flex-col bg-zinc-950 transition-all duration-300 ${isExpanded ? 'w-60' : isMobile ? 'w-0' : 'w-16'}`}
+            className={`flex h-full w-full flex-col overflow-hidden bg-sidebar transition-all duration-300 ${isMobile && !isExpanded ? 'invisible opacity-0' : 'visible opacity-100'}`}
         >
-            <ul className="mt-4 space-y-1">
-                {navItems.map((item) => (
-                    <NavItem key={item.to} {...item} isExpanded={isExpanded} />
-                ))}
-            </ul>
+            <nav aria-label="Primary" className="mt-4">
+                <ul className="space-y-1">
+                    {navItems.map((item) => (
+                        <NavItem key={item.to} {...item} isExpanded={isExpanded} />
+                    ))}
+                </ul>
+            </nav>
         </div>
     );
 };

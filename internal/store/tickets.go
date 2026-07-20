@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -45,6 +46,146 @@ func (s *Store) ListTicketsForUser(ctx context.Context, userID string) ([]Ticket
 	return s.queryTickets(ctx, ticketSelectColumns+` FROM tickets WHERE holder_user_id = ? ORDER BY issued_at DESC`, userID)
 }
 
+// AttendeeRow is one ticket holder row for an event's organiser-facing
+// roster: a ticket joined with its ticket type's name and — when the
+// ticket has been scanned in — the single 'admitted' admission's
+// timestamp (the admissions schema guarantees at most one such row per
+// ticket, see migration 0001's idx_admissions_admitted_once).
+//
+// Deliberately absent: the buyer's email. See ListEventAttendees' doc for
+// why the roster stops at holder_name.
+type AttendeeRow struct {
+	TicketID       string
+	OrderID        string
+	Serial         string
+	HolderName     string
+	Status         string // valid, void, refunded (tickets.status)
+	TicketTypeID   string
+	TicketTypeName string
+	IssuedAt       time.Time
+	VoidedAt       *time.Time
+	AdmittedAt     *time.Time // nil until/unless the gate has admitted this ticket
+}
+
+// AttendeeFilter narrows ListEventAttendees. Query is matched as a
+// case-insensitive substring of holder_name. Status, if non-empty, must be
+// one of "valid", "void", "refunded" (ticket status) or "admitted" /
+// "not_admitted" (gate status) — anything else matches nothing, by design:
+// an unrecognised filter should return an empty page, not silently ignore
+// itself and return everyone.
+type AttendeeFilter struct {
+	Query  string
+	Status string
+	Limit  int
+	Offset int
+}
+
+// MaxAttendeeLimit is the hard ceiling ListEventAttendees clamps Limit to,
+// regardless of what the caller asks for — an event can have tens of
+// thousands of tickets, and a roster page must never be usable as an
+// accidental unbounded dump of the whole tickets table.
+const MaxAttendeeLimit = 200
+
+// DefaultAttendeeLimit is what ListEventAttendees uses when the caller
+// specifies no limit (Limit <= 0).
+const DefaultAttendeeLimit = 50
+
+var validAttendeeStatuses = map[string]bool{
+	"valid": true, "void": true, "refunded": true,
+	"admitted": true, "not_admitted": true,
+}
+
+// ListEventAttendees returns a page of ticket holders for eventID, most
+// recently issued first, plus the total row count matching filter (before
+// pagination) so a caller can render "showing N of Total". Limit is
+// clamped to [1, MaxAttendeeLimit]; Offset below 0 is treated as 0.
+func (s *Store) ListEventAttendees(ctx context.Context, eventID string, filter AttendeeFilter) ([]AttendeeRow, int, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = DefaultAttendeeLimit
+	}
+	if limit > MaxAttendeeLimit {
+		limit = MaxAttendeeLimit
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	where := `t.event_id = ?`
+	args := []any{eventID}
+
+	q := strings.TrimSpace(filter.Query)
+	if q != "" {
+		where += ` AND t.holder_name LIKE ? ESCAPE '\'`
+		args = append(args, "%"+likeEscape(q)+"%")
+	}
+
+	status := strings.TrimSpace(filter.Status)
+	if status != "" {
+		if !validAttendeeStatuses[status] {
+			// Unrecognised filter value: fail closed to an empty result
+			// rather than silently returning the unfiltered roster.
+			return nil, 0, nil
+		}
+		switch status {
+		case "admitted":
+			where += ` AND a.scanned_at IS NOT NULL`
+		case "not_admitted":
+			where += ` AND a.scanned_at IS NULL`
+		default: // valid, void, refunded
+			where += ` AND t.status = ?`
+			args = append(args, status)
+		}
+	}
+
+	const fromJoin = `
+		FROM tickets t
+		JOIN ticket_types tt ON tt.id = t.ticket_type_id
+		LEFT JOIN admissions a ON a.ticket_id = t.id AND a.result = 'admitted'
+	`
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) `+fromJoin+` WHERE `+where, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("store: count event attendees: %w", err)
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT t.id, t.order_id, t.serial, t.holder_name, t.status,
+			t.ticket_type_id, tt.name, t.issued_at, t.voided_at, a.scanned_at
+		`+fromJoin+`
+		WHERE `+where+`
+		ORDER BY t.issued_at DESC, t.id DESC
+		LIMIT ? OFFSET ?`,
+		append(append([]any{}, args...), limit, offset)...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("store: list event attendees: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]AttendeeRow, 0, limit)
+	for rows.Next() {
+		var a AttendeeRow
+		var issuedAt string
+		var voidedAt, admittedAt sql.NullString
+		if err := rows.Scan(&a.TicketID, &a.OrderID, &a.Serial, &a.HolderName, &a.Status,
+			&a.TicketTypeID, &a.TicketTypeName, &issuedAt, &voidedAt, &admittedAt); err != nil {
+			return nil, 0, fmt.Errorf("store: scan event attendee row: %w", err)
+		}
+		if a.IssuedAt, err = textToTime(issuedAt); err != nil {
+			return nil, 0, fmt.Errorf("store: parse attendee issued_at: %w", err)
+		}
+		if a.VoidedAt, err = textToNullTime(voidedAt); err != nil {
+			return nil, 0, fmt.Errorf("store: parse attendee voided_at: %w", err)
+		}
+		if a.AdmittedAt, err = textToNullTime(admittedAt); err != nil {
+			return nil, 0, fmt.Errorf("store: parse attendee admitted_at: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, total, rows.Err()
+}
+
 // VoidTicket marks a ticket void (e.g. refunded/cancelled after issuance).
 // Voiding has no effect on tickets.Verify (which knows nothing of status) —
 // it is enforced by internal/scan consulting this column, or by a future
@@ -57,6 +198,33 @@ func (s *Store) VoidTicket(ctx context.Context, id string, at time.Time) error {
 		return fmt.Errorf("store: void ticket: %w", err)
 	}
 	return rowsAffectedOrNotFound(res)
+}
+
+// ListValidTicketIDsForEvent returns the IDs of every ticket issued for
+// eventID whose status is currently 'valid' — i.e. not void, not refunded.
+// This is the set internal/scan.Bundle's TicketIndex is built from (see
+// internal/httpapi's handleScanBundle and handleScan): a signature alone
+// proves a capability was validly issued, never that it wasn't later
+// voided or refunded by VoidTicket, so a gate needs this list as a second,
+// independent signal to catch that. Like the rest of this file's queries,
+// this is a point-in-time read — a ticket voided a moment after this call
+// returns is simply not reflected until the next call.
+func (s *Store) ListValidTicketIDsForEvent(ctx context.Context, eventID string) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id FROM tickets WHERE event_id = ? AND status = 'valid'`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list valid ticket ids: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]string, 0)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("store: scan valid ticket id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *Store) scanTicket(row *sql.Row) (*Ticket, error) {

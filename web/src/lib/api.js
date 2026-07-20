@@ -188,6 +188,11 @@ export const events = {
     publish: (id) => post(`/events/${id}/publish`),
     stats: (id) => get(`/events/${id}/stats`),
     scanBundle: (id) => get(`/events/${id}/scan-bundle`),
+    /**
+     * Organizer/scanner-only attendee roster: { attendees, total, limit, offset }.
+     * params may include { q, status, limit, offset } — all optional.
+     */
+    attendees: (id, params) => get(`/events/${id}/attendees`, params),
 };
 
 // ---------------------------------------------------------------------------

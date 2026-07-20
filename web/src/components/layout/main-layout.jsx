@@ -6,6 +6,13 @@ import SideNav from '../nav/side-nav';
 import TopBar from '../nav/top-bar';
 
 const TOP_BAR_HEIGHT = '4rem';
+// Single source of truth for the expanded sidebar width. Both the desktop
+// rail and the mobile drawer render at this width so the outer container
+// and SideNav's own layout never disagree (a previous mismatch here — the
+// wrapper fixed at w-16 while SideNav always rendered its w-60 expanded
+// state on desktop — caused the main content pane to visually paint over
+// and clip the nav labels down to their first couple of characters).
+const SIDEBAR_WIDTH_CLASS = 'w-60';
 
 const MainLayout = () => {
     const isMobile = useMediaQuery({ maxWidth: 640 });
@@ -40,16 +47,22 @@ const MainLayout = () => {
 
     return (
         <div className="flex h-screen flex-col bg-background text-foreground">
+            <a
+                href="#main-content"
+                className="fixed left-2 top-2 z-[100] -translate-y-16 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-transform focus:translate-y-0"
+            >
+                Skip to content
+            </a>
             <TopBar onMenuClick={handleDrawerToggle} toggleButtonRef={toggleButtonRef} />
 
             <div className="flex flex-1 overflow-hidden" style={{ marginTop: TOP_BAR_HEIGHT }}>
                 {!isMobile && (
-                    <aside className="h-full w-16 shrink-0 overflow-y-auto shadow-lg">
+                    <aside className={cn('h-full shrink-0 overflow-y-auto overflow-x-hidden shadow-lg', SIDEBAR_WIDTH_CLASS)}>
                         <SideNav isExpanded={true} isMobile={false} />
                     </aside>
                 )}
 
-                <main className="relative flex-grow overflow-y-auto bg-muted/30 p-4 sm:p-6">
+                <main id="main-content" tabIndex={-1} className="relative flex-grow overflow-y-auto bg-muted/30 p-4 outline-none sm:p-6">
                     <Outlet />
                     {isMobile && isExpanded && (
                         <div className="fixed inset-0 z-10 bg-black/50" onClick={() => setIsExpanded(false)} />
@@ -60,8 +73,8 @@ const MainLayout = () => {
                     <aside
                         ref={sidenavRef}
                         className={cn(
-                            'fixed inset-y-0 left-0 z-20 h-full overflow-y-auto shadow-lg transition-all duration-300 ease-in-out',
-                            isExpanded ? 'w-60' : 'w-0',
+                            'fixed inset-y-0 left-0 z-20 h-full overflow-y-auto overflow-x-hidden shadow-lg transition-all duration-300 ease-in-out',
+                            isExpanded ? SIDEBAR_WIDTH_CLASS : 'w-0',
                         )}
                         style={{ top: TOP_BAR_HEIGHT }}
                     >

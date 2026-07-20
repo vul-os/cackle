@@ -2,6 +2,7 @@ package scan
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,26 @@ func TestBundle_Validate_KeyRingEventMismatch(t *testing.T) {
 	}
 }
 
+func TestBundle_Validate_EmptyTicketIndexOK(t *testing.T) {
+	b := validBundle(t)
+	b.TicketIndex = nil
+	if err := b.Validate(); err != nil {
+		t.Fatalf("expected nil/absent ticket_index to be valid (fallback case), got: %v", err)
+	}
+	b.TicketIndex = []string{}
+	if err := b.Validate(); err != nil {
+		t.Fatalf("expected empty ticket_index to be valid (fallback case), got: %v", err)
+	}
+}
+
+func TestBundle_Validate_TicketIndexWithEmptyIDRejected(t *testing.T) {
+	b := validBundle(t)
+	b.TicketIndex = []string{"ticket-1", ""}
+	if err := b.Validate(); err == nil {
+		t.Fatalf("expected error for ticket_index containing an empty ticket id")
+	}
+}
+
 func TestBundle_Validate_AllocationEventMismatch(t *testing.T) {
 	b := validBundle(t)
 	b.Allocation = &Allocation{EventID: "some-other-event"}
@@ -86,6 +107,7 @@ func TestBundle_Validate_ZeroIssuedAt(t *testing.T) {
 
 func TestBundle_JSONRoundTrip(t *testing.T) {
 	b := validBundle(t)
+	b.TicketIndex = []string{"ticket-1", "ticket-2", "ticket-3"}
 	b.Allocation = &Allocation{
 		ID: "alloc-1", EventID: "event-1", DeviceID: "gate-7",
 		TicketTypeID: "tt-1", Count: 5,
@@ -96,6 +118,9 @@ func TestBundle_JSONRoundTrip(t *testing.T) {
 	data, err := json.Marshal(b)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
+	}
+	if !bytesContain(data, `"ticket_index"`) {
+		t.Fatalf("expected ticket_index key in marshaled bundle, got: %s", data)
 	}
 
 	var decoded Bundle
@@ -112,12 +137,24 @@ func TestBundle_JSONRoundTrip(t *testing.T) {
 	if len(decoded.IssuerKeys.Keys) != len(b.IssuerKeys.Keys) {
 		t.Fatalf("issuer keys count mismatch after round trip")
 	}
+	if len(decoded.TicketIndex) != len(b.TicketIndex) {
+		t.Fatalf("ticket_index length mismatch after round trip: got %v want %v", decoded.TicketIndex, b.TicketIndex)
+	}
+	for i, tid := range b.TicketIndex {
+		if decoded.TicketIndex[i] != tid {
+			t.Fatalf("ticket_index[%d] mismatch after round trip: got %q want %q", i, decoded.TicketIndex[i], tid)
+		}
+	}
 	if decoded.Allocation == nil || decoded.Allocation.ID != b.Allocation.ID {
 		t.Fatalf("allocation mismatch after round trip")
 	}
 	if err := decoded.Validate(); err != nil {
 		t.Fatalf("round-tripped bundle should still validate: %v", err)
 	}
+}
+
+func bytesContain(data []byte, sub string) bool {
+	return strings.Contains(string(data), sub)
 }
 
 func TestBundle_JSONRoundTrip_NoAllocation(t *testing.T) {

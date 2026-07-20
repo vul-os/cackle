@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronLeft, AlertCircle } from 'lucide-react';
+import { Check, ChevronLeft, AlertCircle, Calendar, MapPin } from 'lucide-react';
 import Header from '@/pages/visitor/header';
-import { orders as ordersApi } from '@/lib/api';
+import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 
 function formatMoney(cents, currency = 'ZAR') {
     try {
@@ -31,6 +31,10 @@ export default function OrderPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [state, setState] = useState({ order: null, loading: true, error: null });
+    // GET /api/orders/{id} returns bare order_id/ticket_type_id foreign keys,
+    // no nested event/ticket-type — enrich client-side against the public
+    // event endpoint, which also carries ticket_types (id -> name).
+    const [event, setEvent] = useState(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -51,6 +55,30 @@ export default function OrderPage() {
 
     const { order, loading, error } = state;
     const items = order?.items ?? order?.order_items ?? [];
+
+    useEffect(() => {
+        if (!order?.event_id) return;
+        let cancelled = false;
+        eventsApi
+            .get(order.event_id)
+            .then((data) => {
+                if (cancelled) return;
+                // GET /api/events/{id} responds { event, ticket_types, issuer_keys }
+                // — flatten into one object with ticket_types attached so
+                // callers can read event.title and look up ticket type names
+                // from the same fetch.
+                const ev = data?.event ?? data;
+                setEvent(ev ? { ...ev, ticket_types: data?.ticket_types ?? [] } : null);
+            })
+            .catch(() => {
+                if (!cancelled) setEvent(null);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [order?.event_id]);
+
+    const ticketTypeName = (ticketTypeId) => event?.ticket_types?.find((t) => t.id === ticketTypeId)?.name ?? 'Ticket';
 
     return (
         <div className="min-h-screen bg-background">
@@ -94,13 +122,38 @@ export default function OrderPage() {
                             </CardHeader>
 
                             <CardContent className="space-y-6">
+                                {event && (
+                                    <div className="space-y-2 rounded-lg bg-muted/50 p-4">
+                                        <p className="font-display text-lg font-bold">{event.title}</p>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                            {event.starts_at && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Calendar className="h-4 w-4" />
+                                                    {new Date(event.starts_at).toLocaleDateString(undefined, {
+                                                        weekday: 'short',
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric',
+                                                    })}
+                                                </span>
+                                            )}
+                                            {event.venue_name && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <MapPin className="h-4 w-4" />
+                                                    {event.venue_name}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold">Order Summary</h3>
                                     <div className="divide-y divide-border">
                                         {items.map((item) => (
                                             <div key={item.id} className="flex justify-between py-4">
                                                 <div className="space-y-1">
-                                                    <p className="font-medium">{item.ticket_type?.name ?? 'Ticket'}</p>
+                                                    <p className="font-medium">{ticketTypeName(item.ticket_type_id)}</p>
                                                     <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                                                 </div>
                                                 <p className="font-medium">

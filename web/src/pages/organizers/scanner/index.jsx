@@ -126,7 +126,16 @@ const ScannerPage = () => {
             return;
         }
         const keyRing = buildKeyRing(bundle.issuer_keys);
-        setSession({ event: normaliseSessionEvent(bundle.event, event), keyRing });
+        // ticket_index (see docs/OFFLINE-GATES.md) is the set of ticket ids
+        // currently valid for this event as of when the bundle was
+        // downloaded — an older cached bundle predating this field simply
+        // won't have it, which is fine: useScanEngine falls back to
+        // signature-only checking when it's missing/empty.
+        setSession({
+            event: normaliseSessionEvent(bundle.event, event),
+            keyRing,
+            ticketIndex: Array.isArray(bundle.ticket_index) ? bundle.ticket_index : [],
+        });
     };
 
     const cachedAsFallback = useMemo(
@@ -135,7 +144,15 @@ const ScannerPage = () => {
     );
 
     if (session) {
-        return <ScanView event={session.event} keyRing={session.keyRing} gateId={gateId} onExit={() => setSession(null)} />;
+        return (
+            <ScanView
+                event={session.event}
+                keyRing={session.keyRing}
+                ticketIndex={session.ticketIndex}
+                gateId={gateId}
+                onExit={() => setSession(null)}
+            />
+        );
     }
 
     return (

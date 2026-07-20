@@ -107,6 +107,7 @@ func New(deps Deps) http.Handler {
 			r.Get("/{id}/ticket-types", s.requireUser(s.handleListTicketTypes))
 			r.Post("/{id}/ticket-types", s.requireUser(s.handleCreateTicketType))
 			r.Get("/{id}/scan-bundle", s.requireUser(s.handleScanBundle))
+			r.Get("/{id}/attendees", s.requireUser(s.handleListEventAttendees))
 		})
 
 		r.Route("/ticket-types", func(r chi.Router) {

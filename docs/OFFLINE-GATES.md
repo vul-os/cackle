@@ -44,12 +44,30 @@ unplugged:
   matching `kid` for each presented ticket. This is the only thing that
   makes signature verification possible offline — without it, the device
   has a ticket but nothing to check it against.
-- **`ticket_index`** — the set of ticket IDs that exist for this event.
-  Combined with the signature check, this lets a gate flag a
-  structurally-valid-looking ticket that was never actually issued (a
-  forged `tid` with an otherwise-plausible payload still fails the
-  signature check on its own, but the index gives a second, independent
-  signal a UI can surface).
+- **`ticket_index`** — the set of ticket IDs currently **valid** for this
+  event as of `issued_at` below: issued, and neither voided nor refunded. A
+  signature only proves a ticket was validly *issued* at some point — it
+  says nothing about whether it was later voided/refunded, and an offline
+  gate has no other way to find out. `ticket_index` closes that gap: a
+  scan whose signature verifies cleanly but whose `tid` is **absent** from
+  a non-empty `ticket_index` is rejected (`result=invalid`, reason "ticket
+  revoked or not issued for this event") — see `internal/scan.DecideWithBundle`.
+
+  Two things worth stating plainly rather than glossing over:
+  - **Compatibility fallback.** If `ticket_index` is empty or absent (an
+    older cached bundle from before this field existed, or an event with no
+    tickets issued yet), a gate falls back to signature-only checking
+    rather than refusing to admit anyone. An empty index is not the same
+    thing as "nobody is valid."
+  - **Point-in-time snapshot, not a live feed.** `ticket_index` reflects
+    ticket status *at the moment the bundle was generated*. A ticket
+    refunded five minutes after a gate downloaded its bundle is still
+    admittable at that gate until it re-pulls a fresh one — this is
+    inherent to running fully offline, not a bug. The mitigation is
+    operational: re-download the bundle periodically (e.g. at shift
+    changes, or opportunistically whenever a device briefly has signal),
+    the same way you'd periodically re-sync admissions in the other
+    direction.
 - **`allocation`** — a signed claim, scoped to this device, bounding how
   many admissions of a given ticket type it may grant before it's expected
   to reconcile. See [ROADMAP.md](../ROADMAP.md) for where this is headed
@@ -64,17 +82,23 @@ doesn't already know about won't be recognised until refreshed.
 
 ## Step 2 — scanning, with no network
 
-Every scan against a locally-held bundle does two things, both local:
+Every scan against a locally-held bundle does up to three things, all
+local (`internal/scan.DecideWithBundle`):
 
 1. **Verify the capability** — `internal/tickets.Verify(token, pinned_pubkey,
    now)`. `now` is the device's own clock; there is no server round-trip to
    get a canonical time, so keep gate devices' clocks correct (NTP-synced
    before doors, same as you'd want for any other reason).
-2. **Check the local `admissions` table** for this `ticket_id`. First scan
+2. **Check `ticket_index`**, if the bundle has one. A ticket whose id isn't
+   in it is rejected `result='invalid'` even though its signature is
+   perfectly valid — see the `ticket_index` bullet above for exactly what
+   this does and does not catch.
+3. **Check the local `admissions` table** for this `ticket_id`. First scan
    wins and is recorded `result='admitted'`. Every scan after that is
    recorded as its own row, `result='duplicate'` — **never** overwriting the
-   original. A scan that fails verification is recorded `result='invalid'`;
-   a scan for the wrong event's ticket is recorded `result='wrong_event'`.
+   original. A scan that fails verification (step 1) or fails the index
+   check (step 2) is recorded `result='invalid'`; a scan for the wrong
+   event's ticket is recorded `result='wrong_event'`.
 
 Nothing in this loop touches the network. A gate can run for the length of
 an entire festival on a device that's been in airplane mode the whole time,
