@@ -1,0 +1,165 @@
+# .github/workflows/release.yml — build and publish a GitHub Release + ghcr image.
+#
+# Triggers on: push of a tag matching v* (e.g. v1.0.0, v1.2.3-rc.1)
+#
+# Jobs:
+#   build-and-test  — full check (build/vet/test/lint), then cross-compile
+#                      linux+darwin × amd64+arm64 with the frontend embedded,
+#                      generate SHA-256 checksums, upload artifacts.
+#   github-release   — create a GitHub Release with the binaries + checksums.
+#   docker            — build and push ghcr.io/vul-os/cackle:<tag>,:latest.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # create GitHub Releases + upload assets
+  packages: write    # push to ghcr.io
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    outputs:
+      semver: ${{ steps.version.outputs.semver }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "semver=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Go vet
+        run: go vet ./cmd/... ./internal/...
+
+      - name: Go test
+        run: go test ./cmd/... ./internal/...
+
+      - name: Frontend install + lint + build
+        working-directory: web
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+      # Same embed contract as `make build` / ci.yml's boot job.
+      - name: Overlay built frontend into cmd/cackle/dist
+        run: |
+          rm -rf cmd/cackle/dist
+          cp -r web/dist cmd/cackle/dist
+
+      - name: Verify tag matches binary --version
+        run: |
+          VERSION="${{ steps.version.outputs.semver }}"
+          CGO_ENABLED=0 go build -tags embed_frontend \
+            -ldflags "-X main.version=${VERSION}" \
+            -o /tmp/cackle-check ./cmd/cackle
+          # main.go prints "cackle <version>" (see cmd/cackle/main.go) — take
+          # the last field so this survives that format changing slightly.
+          BIN_VER=$(/tmp/cackle-check --version 2>/dev/null | awk '{print $NF}')
+          if [ -z "$BIN_VER" ]; then
+            echo "WARNING: --version did not print anything — skipping strict match"
+          elif [ "$BIN_VER" != "$VERSION" ] && [ "$BIN_VER" != "v$VERSION" ]; then
+            echo "ERROR: binary reports version '${BIN_VER}' but tag is '${VERSION}'"
+            exit 1
+          fi
+
+      - name: Cross-compile
+        env:
+          VERSION: ${{ steps.version.outputs.semver }}
+        run: |
+          set -e
+          mkdir -p out
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            GOOS="${target%/*}"
+            GOARCH="${target#*/}"
+            OUT="out/cackle-${GOOS}-${GOARCH}"
+            echo "==> building ${OUT}"
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+              -trimpath -tags embed_frontend \
+              -ldflags "-s -w -X main.version=${VERSION}" \
+              -o "$OUT" ./cmd/cackle
+          done
+
+      - name: Clean up embed copy
+        if: always()
+        run: rm -rf cmd/cackle/dist
+
+      - name: Generate SHA-256 checksums
+        working-directory: out
+        run: |
+          sha256sum cackle-* > checksums.txt
+          cat checksums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cackle-binaries
+          path: out/
+          retention-days: 7
+
+  github-release:
+    name: Create GitHub Release
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cackle-binaries
+          path: out
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: out/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    name: Build & push ghcr image
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            VERSION=${{ needs.build-and-test.outputs.semver }}
+          tags: |
+            ghcr.io/vul-os/cackle:${{ github.ref_name }}
+            ghcr.io/vul-os/cackle:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

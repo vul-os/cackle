@@ -1,1 +1,0 @@
-System.register(["./index-legacy-CYUmkN_m.js"],(function(e,t){"use strict";var r;return{setters:[e=>{r=e.g}],execute:function(){const t=r((function(){throw new Error("ws does not work in the browser. Browser clients must use the native WebSocket object")})),o=Object.freeze(Object.defineProperty({__proto__:null,default:t},Symbol.toStringTag,{value:"Module"}));e("b",o)}}}));

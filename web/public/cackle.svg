@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Vertical ticket shape -->
+  <path d="M60 30
+           L140 30
+           Q150 30, 150 40
+           L150 160
+           Q150 170, 140 170
+           L60 170
+           Q50 170, 50 160
+           L50 40
+           Q50 30, 60 30"
+        fill="#FF4848"
+        stroke="none"/>
+  
+  <!-- Horizontal ticket line -->
+  <line x1="50" y1="60" x2="150" y2="60" 
+        stroke="#FFF" 
+        stroke-width="2"
+        stroke-dasharray="6,6"/>
+  
+  <!-- Horizontal smile -->
+  <path d="M70 120
+           Q100 150, 130 120"
+        fill="none"
+        stroke="#FFF"
+        stroke-width="8"
+        stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,26 @@
+.git
+.github
+
+# build output
+/cackle
+/dist
+web/dist
+web/node_modules
+node_modules
+docs/screenshots
+
+# local state / secrets
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.local
+*.log
+
+# test/dev artifacts
+test-results
+playwright-report
+blob-report
+.playwright
+e2e-results
+.DS_Store

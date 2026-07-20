@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cackle docs</title>
+<meta name="description" content="Cackle documentation">
+<link rel="icon" href="./assets/cackle-logo.svg">
+<link rel="stylesheet" href="./assets/style.css">
+<script src="./assets/vendor/marked.umd.js"></script>
+<script src="./assets/vendor/mermaid.min.js"></script>
+</head>
+<body>
+<header class="site-header"><div class="wrap nav">
+    <a class="brand" href="./index.html"><span class="tile"><img src="./assets/cackle-logo.svg" alt="Cackle logo"></span>Cackle</a>
+    <div class="nav-spacer"></div>
+    <nav class="nav-links">
+      <a href="./index.html#features">Features</a>
+      <a href="./docs.html">Docs</a>
+      <a href="https://github.com/vul-os/cackle" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <a class="vulos-badge" href="https://vulos.org" target="_blank" rel="noopener" title="Part of Vulos">
+      <img src="./assets/vulos-logo.png" alt="Vulos">Part of Vulos
+    </a>
+  </div></header>
+<div class="wrap docs-shell">
+  <aside class="docs-nav">
+    <div class="label">Cackle docs</div>
+        <a data-slug="overview" href="#overview">Overview</a>
+        <a data-slug="getting-started" href="#getting-started">Getting started</a>
+        <a data-slug="architecture" href="#architecture">Architecture</a>
+        <a data-slug="ticket-format" href="#ticket-format">Ticket format</a>
+        <a data-slug="offline-gates" href="#offline-gates">Offline gates</a>
+        <a data-slug="api" href="#api">API</a>
+        <a data-slug="payments" href="#payments">Payments</a>
+        <a data-slug="configuration" href="#configuration">Configuration</a>
+        <a data-slug="self-hosting" href="#self-hosting">Self-hosting</a>
+        <a data-slug="screenshots" href="#screenshots">Screenshots</a>
+        <a data-slug="roadmap" href="#roadmap">Roadmap</a>
+        <a data-slug="changelog" href="#changelog">Changelog</a>
+  </aside>
+  <main class="docs-main">
+    <div class="docs-title" id="crumb"></div>
+    <article class="markdown" id="content">Loading…</article>
+  </main>
+</div>
+<footer class="site-footer"><div class="wrap foot">
+    <div class="left"><img src="./assets/vulos-logo.png" alt="Vulos"> <span>Part of <a href="https://vulos.org" target="_blank" rel="noopener" style="color:var(--text)">Vulos</a> — the open, self-hostable web OS &amp; app suite.</span></div>
+    <div class="links">
+      <a href="./docs.html">Docs</a>
+      <a href="https://github.com/vul-os/cackle" target="_blank" rel="noopener">GitHub</a>
+      <a href="../LICENSE">License</a>
+      <a href="https://vulos.org" target="_blank" rel="noopener">vulos.org</a>
+    </div>
+  </div></footer>
+<script>
+const DOCS = [
+  {"slug":"overview","title":"Overview","path":"./docs/overview.md"},
+  {"slug":"getting-started","title":"Getting started","path":"./docs/getting-started.md"},
+  {"slug":"architecture","title":"Architecture","path":"./docs/architecture.md"},
+  {"slug":"ticket-format","title":"Ticket format","path":"./docs/ticket-format.md"},
+  {"slug":"offline-gates","title":"Offline gates","path":"./docs/offline-gates.md"},
+  {"slug":"api","title":"API","path":"./docs/api.md"},
+  {"slug":"payments","title":"Payments","path":"./docs/payments.md"},
+  {"slug":"configuration","title":"Configuration","path":"./docs/configuration.md"},
+  {"slug":"self-hosting","title":"Self-hosting","path":"./docs/self-hosting.md"},
+  {"slug":"screenshots","title":"Screenshots","path":"./docs/screenshots.md"},
+  {"slug":"roadmap","title":"Roadmap","path":"./docs/roadmap.md"},
+  {"slug":"changelog","title":"Changelog","path":"./docs/changelog.md"}
+];
+const bySlug = Object.fromEntries(DOCS.map(d=>[d.slug,d]));
+const content = document.getElementById('content');
+const crumb = document.getElementById('crumb');
+let mermaidReady = false;
+try { mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose', themeVariables:{ fontFamily:'var(--sans)' } }); mermaidReady = true; } catch(e){}
+
+if (window.marked && marked.setOptions) marked.setOptions({ gfm:true, breaks:false });
+
+function setActive(slug){
+  document.querySelectorAll('.docs-nav a').forEach(a=>a.classList.toggle('active', a.dataset.slug===slug));
+}
+
+async function renderMermaid(){
+  if(!mermaidReady) return;
+  const blocks = [...content.querySelectorAll('code.language-mermaid')];
+  blocks.forEach((code,i)=>{
+    const div = document.createElement('div');
+    div.className='mermaid';
+    div.textContent = code.textContent;
+    code.closest('pre').replaceWith(div);
+  });
+  const nodes = content.querySelectorAll('.mermaid');
+  if(nodes.length){ try { await mermaid.run({ nodes }); } catch(e){ console.warn('mermaid', e); } }
+}
+
+async function load(slug){
+  const doc = bySlug[slug] || DOCS[0];
+  setActive(doc.slug);
+  crumb.textContent = doc.title;
+  content.innerHTML = 'Loading…';
+  try {
+    const res = await fetch(doc.path, {cache:'no-cache'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const md = await res.text();
+    content.innerHTML = marked.parse(md);
+    content.querySelectorAll('img').forEach(img=>{
+      const s=img.getAttribute('src')||'';
+      if(/^https?:/i.test(s)) return;
+      const m=s.match(/(?:\.\.\/)*(?:docs\/)?screenshots\/(.+)$/);
+      if(m) img.setAttribute('src','screenshots/'+m[1]);
+    });
+    content.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener';});
+    await renderMermaid();
+    window.scrollTo({top:0});
+  } catch(err){
+    content.innerHTML = '<div class="docs-error">Could not load <code>'+doc.path+'</code> — '+err.message+'</div>';
+  }
+}
+
+function current(){ return (location.hash||'').replace('#','') || DOCS[0].slug; }
+window.addEventListener('hashchange', ()=>load(current()));
+load(current());
+</script>
+</body>
+</html>

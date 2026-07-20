@@ -1,1 +1,21 @@
+# build output
+/cackle
+/cackle-screenshots-bin
+/cmd/cackle/dist
+/out
+/dist
+web/dist
+web/node_modules
 node_modules
+
+# local state
+*.db
+*.db-shm
+*.db-wal
+.cackle_session_secret
+.env
+.env.local
+
+# screenshots are committed; scratch is not
+/tmp
+.DS_Store

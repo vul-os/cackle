@@ -1,0 +1,17 @@
+# .gitleaks.toml — secret-scan config for the security-scan.yml `secret-scan`
+# job (BLOCKING — this is the one class of finding this repo never ships
+# with). Extends gitleaks' built-in default ruleset; add real false positives
+# to the allowlist below rather than disabling rules.
+title = "cackle gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths that legitimately contain non-secret, high-entropy-looking strings"
+paths = [
+  '''(^|/)go\.sum$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)THIRD-PARTY-NOTICES\.txt$''',
+  '''(^|/)docs/screenshots/.*''',
+]

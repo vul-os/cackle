@@ -1,0 +1,134 @@
+# .github/workflows/ci.yml — build, test, vet, lint and boot-check Cackle.
+#
+# House rule: a green build proves nothing about whether the app RUNS.
+# Sibling repos (ofisi, wede) shipped blank screens behind green builds
+# because nothing ever loaded the bundle in a real browser. The `boot` job
+# below builds the REAL single-binary artifact (frontend embedded) and points
+# headless Chromium at it, failing on any uncaught exception or empty #root.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Go backend ────────────────────────────────────────────────────────────
+  go:
+    name: Go build / vet / test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Scoped patterns — NEVER bare `./...`: web/node_modules can (and does)
+      # ship stray *.go files from npm packages (e.g. `flatted`'s golang/
+      # port), which a bare `./...` would try to build/vet/test.
+      - name: Build
+        run: go build ./cmd/... ./internal/...
+
+      - name: Vet
+        run: go vet ./cmd/... ./internal/...
+
+      - name: Test
+        run: go test ./cmd/... ./internal/...
+
+  # ── Frontend ──────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend build / lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 1
+
+  # ── Docker image build (proves the Dockerfile itself works) ─────────────────
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    needs: [go, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: ghcr.io/vul-os/cackle:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Boot guard: build the real binary and load it in real Chromium ──────────
+  boot:
+    name: Boot guard (real Chromium, --demo)
+    runs-on: ubuntu-latest
+    needs: [go, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install root devDependencies (playwright)
+        run: npm ci
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: web
+        run: npm ci && npm run build
+
+      # Mirrors `make build`: copy the built SPA where the embed_frontend
+      # build tag expects it, build the real single binary, clean up the copy.
+      - name: Build cackle (frontend embedded)
+        run: |
+          rm -rf cmd/cackle/dist
+          cp -r web/dist cmd/cackle/dist
+          CGO_ENABLED=0 go build -tags embed_frontend -o cackle ./cmd/cackle
+          rm -rf cmd/cackle/dist
+
+      - name: Boot check — fail on uncaught exception or empty #root
+        run: node scripts/boot-check.mjs --bin ./cackle --port 8089

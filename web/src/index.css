@@ -1,0 +1,129 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+    /* Cackle red — energetic, high-contrast, works on both themes */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 8%;
+
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 40%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 8%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 88%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 8%;
+
+    --primary: 355 85% 54%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 12%;
+
+    --accent: 355 85% 96%;
+    --accent-foreground: 355 70% 32%;
+
+    --destructive: 0 84% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 60% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 24 60% 12%;
+
+    --ring: 355 85% 54%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 12% 6%;
+    --foreground: 0 0% 96%;
+
+    --muted: 240 8% 13%;
+    --muted-foreground: 240 5% 65%;
+
+    --popover: 240 12% 8%;
+    --popover-foreground: 0 0% 96%;
+
+    --border: 240 8% 18%;
+    --input: 240 8% 20%;
+
+    --card: 240 10% 9%;
+    --card-foreground: 0 0% 96%;
+
+    --primary: 355 90% 61%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 8% 15%;
+    --secondary-foreground: 0 0% 96%;
+
+    --accent: 355 55% 18%;
+    --accent-foreground: 355 90% 78%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 55% 45%;
+    --success-foreground: 152 90% 8%;
+
+    --warning: 40 92% 55%;
+    --warning-foreground: 24 60% 10%;
+
+    --ring: 355 90% 61%;
+
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  ::selection {
+    @apply bg-primary/25;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-sans);
+    letter-spacing: -0.02em;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Big, glanceable, sun-readable scanner surface. Intentionally outside the
+   @layer system — this screen has its own visual language (it's a kiosk
+   surface, not a form) and must stay legible at arm's length in daylight. */
+.scanner-surface {
+  background: radial-gradient(120% 120% at 50% -10%, hsl(var(--primary) / 0.18), transparent 60%),
+    hsl(var(--background));
+}

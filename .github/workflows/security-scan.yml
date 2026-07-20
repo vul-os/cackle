@@ -1,0 +1,111 @@
+# .github/workflows/security-scan.yml — security scanning for Cackle
+#
+# Triggers on:
+#   - push to any branch
+#   - pull request
+#   - weekly schedule (Monday 03:00 UTC)
+#
+# Jobs:
+#   govulncheck   — Go known-vulnerability scan (advisory, non-blocking)
+#   npm-audit     — npm audit --audit-level=high (advisory, non-blocking)
+#   secret-scan   — gitleaks over the full git history (BLOCKING — fails the
+#                   build on any finding; secrets are the one class of issue
+#                   this repo never ships with, house rule)
+#
+# IGNORE MECHANISMS
+# ─────────────────
+# • govulncheck: add vuln IDs to .govulncheck-ignore (one per line, `#`
+#   comments allowed). No native allowlist, so this workflow post-filters.
+# • npm audit: use "overrides"/"resolutions" in web/package.json, or lower
+#   the --audit-level below if it gets too noisy.
+# • gitleaks: add real false positives to .gitleaks.toml (allowlist section).
+#   This is intentionally the HARD gate — do not add continue-on-error here.
+
+name: Security Scan
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Go known-vulnerability scan (advisory) ──────────────────────────────────
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        run: |
+          RAW_OUTPUT=$(govulncheck ./cmd/... ./internal/... 2>&1) || EXIT_CODE=$?
+          echo "$RAW_OUTPUT"
+
+          IGNORE_FILE=".govulncheck-ignore"
+          if [ -f "$IGNORE_FILE" ]; then
+            IGNORED=$(grep -v '^\s*#' "$IGNORE_FILE" | grep -v '^\s*$' | tr '\n' '|' | sed 's/|$//')
+            if [ -n "$IGNORED" ] && echo "$RAW_OUTPUT" | grep -qE "($IGNORED)"; then
+              echo "NOTE: some findings suppressed by $IGNORE_FILE — review periodically."
+              FILTERED=$(echo "$RAW_OUTPUT" | grep -vE "($IGNORED)" || true)
+              if ! echo "$FILTERED" | grep -q "^Vulnerability #"; then
+                echo "All vulnerabilities are in the ignore list. Passing."
+                exit 0
+              fi
+            fi
+          fi
+
+          exit ${EXIT_CODE:-0}
+
+  # ── npm audit (advisory) ─────────────────────────────────────────────────────
+  npm-audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install (root tooling deps)
+        run: npm install --no-audit --no-fund
+
+      - name: Install (web app deps)
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Run npm audit — root
+        run: npm audit --audit-level=high || true
+
+      - name: Run npm audit — web
+        working-directory: web
+        run: npm audit --audit-level=high || true
+
+  # ── Secret scan (BLOCKING) ───────────────────────────────────────────────────
+  secret-scan:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
