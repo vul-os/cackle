@@ -27,7 +27,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.7'  # patched toolchain; go.mod declares the module minimum
+          go-version: '1.25'  # latest 1.25.x patch — auto-picks stdlib security fixes
           cache: true
 
       # Scoped patterns — NEVER bare `./...`: web/node_modules can (and does)
@@ -103,7 +103,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.7'  # patched toolchain; go.mod declares the module minimum
+          go-version: '1.25'  # latest 1.25.x patch — auto-picks stdlib security fixes
           cache: true
 
       - uses: actions/setup-node@v4
