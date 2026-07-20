@@ -86,6 +86,13 @@ var (
 	ErrMpesaMalformedResponse        = errors.New("payments: mpesa: malformed API response")
 	ErrMpesaResponseTooLarge         = errors.New("payments: mpesa: response body exceeds size limit")
 	ErrMpesaMissingCheckoutRequestID = errors.New("payments: mpesa: callback carried no CheckoutRequestID to verify")
+	// ErrMpesaOrderLookupRequired is returned by NewMpesa when constructed
+	// with a nil OrderLookup. This adapter cannot function without one —
+	// see MpesaProvider.orderLookup's doc comment — so refusing to
+	// construct at all (rather than constructing a permanently-broken
+	// provider that fails closed on every single Verify/Webhook call) is
+	// the earlier, clearer failure.
+	ErrMpesaOrderLookupRequired = errors.New("payments: mpesa: a non-nil OrderLookup is required")
 )
 
 // MpesaProvider implements Provider against the Safaricom Daraja STK Push
@@ -98,6 +105,18 @@ type MpesaProvider struct {
 	httpClient     *http.Client
 	baseURL        string
 
+	// orderLookup resolves the STORED order's amount/currency by
+	// reference (== Daraja's CheckoutRequestID, since Cackle's order ID
+	// IS the provider reference — see Order's doc comment). This adapter
+	// needs it for a reason none of its siblings do: Daraja's STK Push
+	// Query API (what Verify/Webhook call to authenticate a settlement)
+	// does not echo back a settled amount at all, only a ResultCode — see
+	// resultFromQuery's doc comment for why echoing the STORED amount
+	// back is safe specifically here. Every call site MUST supply this at
+	// construction (NewMpesa refuses a nil one, see
+	// ErrMpesaOrderLookupRequired) — there is no working fallback.
+	orderLookup OrderLookup
+
 	tokenMu      sync.Mutex
 	cachedToken  string
 	tokenExpires time.Time
@@ -106,13 +125,19 @@ type MpesaProvider struct {
 // NewMpesa constructs an MpesaProvider from EnvMpesaConsumerKey,
 // EnvMpesaConsumerSecret, EnvMpesaShortcode, and EnvMpesaPasskey.
 // EnvMpesaBaseURL is optional (defaults to the production API host).
-func NewMpesa() (*MpesaProvider, error) {
+// lookup MUST be non-nil (ErrMpesaOrderLookupRequired otherwise) — see
+// MpesaProvider.orderLookup's doc comment for why this adapter, uniquely
+// among this package's providers, cannot Verify/Webhook without one.
+func NewMpesa(lookup OrderLookup) (*MpesaProvider, error) {
 	key := strings.TrimSpace(os.Getenv(EnvMpesaConsumerKey))
 	secret := strings.TrimSpace(os.Getenv(EnvMpesaConsumerSecret))
 	shortcode := strings.TrimSpace(os.Getenv(EnvMpesaShortcode))
 	passkey := strings.TrimSpace(os.Getenv(EnvMpesaPasskey))
 	if key == "" || secret == "" || shortcode == "" || passkey == "" {
 		return nil, ErrMpesaCredentialsNotConfigured
+	}
+	if lookup == nil {
+		return nil, ErrMpesaOrderLookupRequired
 	}
 	base := strings.TrimSpace(os.Getenv(EnvMpesaBaseURL))
 	if base == "" {
@@ -125,6 +150,7 @@ func NewMpesa() (*MpesaProvider, error) {
 		passkey:        passkey,
 		httpClient:     &http.Client{Timeout: mpesaHTTPTimeout},
 		baseURL:        base,
+		orderLookup:    lookup,
 	}, nil
 }
 
@@ -364,31 +390,31 @@ func resultFromQuery(q mpesaQueryResult, raw []byte, reference string, wantAmoun
 // CheckoutRequestID (Cackle's reference, as returned by Begin).
 //
 // Unlike other adapters, Verify alone cannot reconcile an amount (Daraja
-// doesn't echo it back on the query endpoint) — callers MUST still run
-// this through HandleVerify/Reconcile with the stored order so a
-// mismatched CURRENCY is still caught; the amount match is guaranteed
-// structurally here (see resultFromQuery) rather than by comparison.
-//
-// This method requires the stored order to look itself up: since the
-// Provider interface's Verify only takes a reference, this adapter
-// resolves the order amount via the ctx-scoped orderAmountLookup set by
-// WithMpesaOrderLookup — callers MUST wire that up (via
-// WithMpesaOrderLookup) before calling Verify or Webhook, or both return
-// an error rather than silently reporting an unverifiable amount.
+// doesn't echo it back on the query endpoint), so it resolves the STORED
+// order's amount/currency itself via p.orderLookup (see that field's doc
+// comment) before it can build a Result at all. Callers should still run
+// this through HandleVerify/Reconcile with the stored order as usual (that
+// catches a mismatched CURRENCY, and is what every other adapter relies on
+// too) — the amount match here is guaranteed structurally (see
+// resultFromQuery) rather than by comparison, precisely because it was
+// read from the same stored order Reconcile will check against.
 func (p *MpesaProvider) Verify(ctx context.Context, reference string) (Result, error) {
 	reference = strings.TrimSpace(reference)
 	if reference == "" {
 		return Result{}, errors.New("payments: mpesa: reference is required")
 	}
-	wantAmount, wantCurrency, ok := mpesaOrderFromContext(ctx)
-	if !ok {
-		return Result{}, errors.New("payments: mpesa: Verify requires the stored order amount/currency in ctx (see WithMpesaOrder) because Daraja's query API does not echo back a settled amount")
+	if p.orderLookup == nil {
+		return Result{}, errors.New("payments: mpesa: Verify requires an OrderLookup (see MpesaProvider.orderLookup) because Daraja's query API does not echo back a settled amount")
+	}
+	ref, err := p.orderLookup.Lookup(ctx, reference)
+	if err != nil {
+		return Result{}, fmt.Errorf("payments: mpesa: look up stored order for %q: %w", reference, err)
 	}
 	q, raw, err := p.query(ctx, reference)
 	if err != nil {
 		return Result{}, err
 	}
-	return resultFromQuery(q, raw, reference, wantAmount, wantCurrency)
+	return resultFromQuery(q, raw, reference, ref.AmountMinor, ref.Currency)
 }
 
 // Webhook parses Daraja's STK callback ONLY to extract CheckoutRequestID
@@ -422,32 +448,6 @@ func (p *MpesaProvider) Webhook(ctx context.Context, r *http.Request) (Result, e
 	// From here on this is IDENTICAL to Verify's authenticated re-check —
 	// the untrusted callback contributed nothing but a lookup key.
 	return p.Verify(ctx, checkoutRequestID)
-}
-
-type mpesaOrderContextKey struct{}
-
-type mpesaOrderInfo struct {
-	amountMinor int64
-	currency    string
-}
-
-// WithMpesaOrder attaches the stored order's amount/currency to ctx so
-// Verify/Webhook can build a Result without trusting anything from the
-// network for the settled amount (see the Verify doc comment for why this
-// is required specifically for this adapter). Callers must look up the
-// order themselves (by the reference/CheckoutRequestID they are about to
-// pass to Verify, or that a Webhook route parsed from the URL path)
-// BEFORE calling Verify/Webhook.
-func WithMpesaOrder(ctx context.Context, amountMinor int64, currency string) context.Context {
-	return context.WithValue(ctx, mpesaOrderContextKey{}, mpesaOrderInfo{amountMinor, currency})
-}
-
-func mpesaOrderFromContext(ctx context.Context) (amountMinor int64, currency string, ok bool) {
-	info, ok := ctx.Value(mpesaOrderContextKey{}).(mpesaOrderInfo)
-	if !ok {
-		return 0, "", false
-	}
-	return info.amountMinor, info.currency, true
 }
 
 func (p *MpesaProvider) do(ctx context.Context, token, path string, body any) ([]byte, int, error) {

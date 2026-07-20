@@ -39,6 +39,248 @@ func TestListOrgMembers(t *testing.T) {
 	}
 }
 
+// TestUpdateOrgMemberRole_OwnerCanChangeAdminOrScanner covers the happy
+// path for PATCH /api/orgs/{id}/members/{user_id}: an owner can move a
+// non-owner member between admin and scanner freely.
+func TestUpdateOrgMemberRole_OwnerCanChangeAdminOrScanner(t *testing.T) {
+	h := newTestHarness(t)
+	fx := h.newPublishedEvent(t, "role-change")
+
+	memberToken, memberID := h.signupUser("member-role-change@example.com", "member-password-123", "Member")
+	if err := h.store.AddOrgMember(h.t.Context(), &store.OrgMember{OrgID: fx.orgID, UserID: memberID, Role: "scanner"}); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+
+	rec := h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+memberID, fx.ownerToken, map[string]any{"role": "admin"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("promote to admin: status %d body %s", rec.Code, rec.Body.String())
+	}
+	resp := decodeBody[struct {
+		Member struct {
+			UserID string `json:"user_id"`
+			Role   string `json:"role"`
+		} `json:"member"`
+	}](t, rec)
+	if resp.Member.Role != "admin" || resp.Member.UserID != memberID {
+		t.Fatalf("unexpected member after promotion: %+v", resp.Member)
+	}
+
+	// The promoted admin can now do admin-only things (e.g. list members).
+	rec = h.do(http.MethodGet, "/api/orgs/"+fx.orgID+"/members", memberToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("promoted admin list members: status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// Demote back to scanner.
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+memberID, fx.ownerToken, map[string]any{"role": "scanner"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("demote to scanner: status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// An unrecognised role is a clean 400, not a 500 or silent no-op.
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+memberID, fx.ownerToken, map[string]any{"role": "superadmin"})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("bogus role: expected 400, got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// A nonexistent target user is a clean 404.
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/does-not-exist", fx.ownerToken, map[string]any{"role": "admin"})
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("nonexistent member: expected 404, got %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestUpdateOrgMemberRole_AdminCannotChangeRoles proves the route sits at
+// the OWNER bar, not admin+: an admin attempting to change anyone's role
+// (including their own) is forbidden, same as a plain member would be.
+func TestUpdateOrgMemberRole_AdminCannotChangeRoles(t *testing.T) {
+	h := newTestHarness(t)
+	fx := h.newPublishedEvent(t, "role-change-admin")
+
+	adminToken, adminID := h.signupUser("admin-role-change@example.com", "admin-password-123", "Admin")
+	if err := h.store.AddOrgMember(h.t.Context(), &store.OrgMember{OrgID: fx.orgID, UserID: adminID, Role: "admin"}); err != nil {
+		t.Fatalf("add admin: %v", err)
+	}
+
+	rec := h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+adminID, adminToken, map[string]any{"role": "owner"})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("admin self-promoting to owner: expected 403, got %d body %s", rec.Code, rec.Body.String())
+	}
+	assertErrorShape(t, rec)
+}
+
+// TestUpdateOrgMemberRole_RefusesDemotingLastOwner is the mandatory
+// regression test called out in the task: demoting an org's only owner
+// must be refused outright, since it would permanently lock everyone out
+// of managing the org (no owner left to reverse the mistake).
+func TestUpdateOrgMemberRole_RefusesDemotingLastOwner(t *testing.T) {
+	h := newTestHarness(t)
+	fx := h.newPublishedEvent(t, "last-owner")
+
+	// fx's owner is the org's ONLY owner. Demoting them must fail.
+	rec := h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+fx.ownerID, fx.ownerToken, map[string]any{"role": "admin"})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("demote sole owner: expected 409, got %d body %s", rec.Code, rec.Body.String())
+	}
+	assertErrorShape(t, rec)
+
+	// Role must be unchanged — the owner still has full access afterward.
+	rec = h.do(http.MethodGet, "/api/orgs/"+fx.orgID+"/members", fx.ownerToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("owner should retain access after refused demotion: status %d", rec.Code)
+	}
+	membersResp := decodeBody[struct {
+		Members []struct {
+			UserID string `json:"user_id"`
+			Role   string `json:"role"`
+		} `json:"members"`
+	}](t, rec)
+	found := false
+	for _, m := range membersResp.Members {
+		if m.UserID == fx.ownerID {
+			found = true
+			if m.Role != "owner" {
+				t.Fatalf("sole owner's role changed to %q despite refusal", m.Role)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("owner missing from members list")
+	}
+
+	// Promote a second member to owner: NOW demoting the first owner must
+	// succeed, since at least one owner always remains.
+	_, secondID := h.signupUser("second-owner-last-owner@example.com", "second-password-123", "Second")
+	if err := h.store.AddOrgMember(h.t.Context(), &store.OrgMember{OrgID: fx.orgID, UserID: secondID, Role: "scanner"}); err != nil {
+		t.Fatalf("add second member: %v", err)
+	}
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+secondID, fx.ownerToken, map[string]any{"role": "owner"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("promote second owner: status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+fx.ownerID, fx.ownerToken, map[string]any{"role": "admin"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("demote original owner once a co-owner exists: status %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestOrgInvite_AdminCannotSelfEscalateToOwner is the regression test for a
+// verified privilege-escalation finding: an admin (admin+-gated on
+// POST /api/orgs/{id}/invites) could previously invite ITSELF (or anyone
+// else) at role "owner", accept the invite, and walk away with full
+// owner-level authority — including reading the org's bank account — even
+// though PATCH /api/orgs/{id}/members/{user_id} (owner-only, with its own
+// last-owner guard) correctly refused the equivalent role change through
+// the front door. The invite route was a backdoor around that gate.
+// CreateInvite must refuse to mint an invite for a role higher than the
+// inviter's own (orgs.ErrRoleEscalation, surfaced here as 403).
+func TestOrgInvite_AdminCannotSelfEscalateToOwner(t *testing.T) {
+	h := newTestHarness(t)
+	fx := h.newPublishedEvent(t, "invite-escalation")
+
+	adminToken, adminID := h.signupUser("admin-escalation@example.com", "admin-password-123", "Admin")
+	if err := h.store.AddOrgMember(h.t.Context(), &store.OrgMember{OrgID: fx.orgID, UserID: adminID, Role: "admin"}); err != nil {
+		t.Fatalf("add admin: %v", err)
+	}
+
+	// The exact reproduction: an admin invites the email address of an
+	// account they ALREADY control (their own) at role "owner".
+	rec := h.do(http.MethodPost, "/api/orgs/"+fx.orgID+"/invites", adminToken, map[string]any{
+		"email": "admin-escalation@example.com", "role": "owner",
+	})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("admin self-inviting as owner: expected 403, got %d body %s", rec.Code, rec.Body.String())
+	}
+	assertErrorShape(t, rec)
+
+	// Also refused when inviting a THIRD PARTY at owner — not just self.
+	rec = h.do(http.MethodPost, "/api/orgs/"+fx.orgID+"/invites", adminToken, map[string]any{
+		"email": "accomplice-escalation@example.com", "role": "owner",
+	})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("admin inviting a third party as owner: expected 403, got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// The admin's own role must remain admin — no invite was created, no
+	// membership was touched.
+	rec = h.do(http.MethodGet, "/api/orgs/"+fx.orgID+"/members", fx.ownerToken, nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list members: status %d", rec.Code)
+	}
+	members := decodeBody[struct {
+		Members []struct {
+			UserID string `json:"user_id"`
+			Role   string `json:"role"`
+		} `json:"members"`
+	}](t, rec)
+	for _, m := range members.Members {
+		if m.UserID == adminID && m.Role != "admin" {
+			t.Fatalf("admin's role changed to %q despite refused invite", m.Role)
+		}
+	}
+
+	// An admin inviting at admin or scanner (at or below their own rank)
+	// still works fine — this is a ceiling, not a total lockout.
+	rec = h.do(http.MethodPost, "/api/orgs/"+fx.orgID+"/invites", adminToken, map[string]any{
+		"email": "legit-invitee-escalation@example.com", "role": "admin",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("admin inviting at admin (own rank): expected 201, got %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// The owner, by contrast, CAN mint an owner-role invite.
+	rec = h.do(http.MethodPost, "/api/orgs/"+fx.orgID+"/invites", fx.ownerToken, map[string]any{
+		"email": "new-owner-escalation@example.com", "role": "owner",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("owner inviting at owner: expected 201, got %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestOrgInvite_AcceptRefusesStaleInviteAboveInviterCurrentRole covers the
+// defence-in-depth half of the same fix: AcceptInvite re-checks, at accept
+// time, that the invite's role does not exceed what the inviter (recorded
+// on the invite row at creation time) can CURRENTLY grant. A stale invite
+// minted before this fix existed (or by any future bug upstream of
+// CreateInvite's own guard) must not still be redeemable for a role above
+// the inviter's current rank — here simulated by demoting the inviter
+// after the invite was minted but before it's accepted.
+func TestOrgInvite_AcceptRefusesStaleInviteAboveInviterCurrentRole(t *testing.T) {
+	h := newTestHarness(t)
+	fx := h.newPublishedEvent(t, "invite-stale-escalation")
+
+	// A second owner mints a legitimate owner-role invite...
+	secondOwnerToken, secondOwnerID := h.signupUser("second-owner-stale@example.com", "second-password-123", "Second Owner")
+	if err := h.store.AddOrgMember(h.t.Context(), &store.OrgMember{OrgID: fx.orgID, UserID: secondOwnerID, Role: "owner"}); err != nil {
+		t.Fatalf("add second owner: %v", err)
+	}
+	rec := h.do(http.MethodPost, "/api/orgs/"+fx.orgID+"/invites", secondOwnerToken, map[string]any{
+		"email": "invitee-stale-escalation@example.com", "role": "owner",
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("mint owner invite: status %d body %s", rec.Code, rec.Body.String())
+	}
+	inv := decodeBody[struct {
+		Token string `json:"token"`
+	}](t, rec)
+
+	// ...but is then demoted (still leaving the org with fx's original
+	// owner in place, so this isn't blocked by the last-owner guard).
+	rec = h.do(http.MethodPatch, "/api/orgs/"+fx.orgID+"/members/"+secondOwnerID, fx.ownerToken, map[string]any{"role": "admin"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("demote second owner: status %d body %s", rec.Code, rec.Body.String())
+	}
+
+	// The now-stale owner-role invite must be refused at accept time, even
+	// though it was validly minted at the time.
+	inviteeToken, _ := h.signupUser("invitee-stale-escalation@example.com", "invitee-password-123", "Invitee")
+	rec = h.do(http.MethodPost, "/api/invites/accept", inviteeToken, map[string]any{"token": inv.Token})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("accept stale owner invite: expected 400 (invalid), got %d body %s", rec.Code, rec.Body.String())
+	}
+}
+
 // --- invites -------------------------------------------------------------
 
 func TestOrgInvite_AcceptAddsMemberAtInvitedRole(t *testing.T) {

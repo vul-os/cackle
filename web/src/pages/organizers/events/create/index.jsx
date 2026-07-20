@@ -9,7 +9,6 @@ import { X } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
-import { setPendingDraft, clearPendingDraft } from '../pending-draft';
 import WizardStepper from './stepper';
 import BasicsStep from './steps/basics';
 import ScheduleVenueStep from './steps/schedule-venue';
@@ -176,9 +175,6 @@ const CreateEventWizard = () => {
                 });
                 const createdEvent = created?.event ?? created;
                 setEventId(createdEvent.id);
-                // See pending-draft.js — the Events list can't show this draft
-                // yet, so remember it locally to offer a way back.
-                setPendingDraft(activeOrg?.id, createdEvent.id);
             } else {
                 await eventsApi.update(eventId, {
                     venue_name: data.venue_name,
@@ -203,7 +199,6 @@ const CreateEventWizard = () => {
         setIsPublishing(true);
         try {
             await eventsApi.publish(eventId);
-            clearPendingDraft(activeOrg?.id);
             toast({ title: 'Published', description: 'Your event is now live.' });
             navigate(`/admin/events/${eventId}`);
         } catch (err) {

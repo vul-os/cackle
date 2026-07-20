@@ -26,6 +26,15 @@ func newTestMpesaServer(t *testing.T, handlers map[string]string) *httptest.Serv
 	}))
 }
 
+// defaultTestMpesaOrderLookup is the OrderLookup most tests want: a single
+// stored order "ws_CO_1" worth 1000 KES, matching what these tests used to
+// plumb in via the now-removed WithMpesaOrder(ctx, 1000, "KES").
+func defaultTestMpesaOrderLookup() *fakeOrderLookup {
+	return &fakeOrderLookup{orders: map[string]OrderRef{
+		"ws_CO_1": {ID: "ws_CO_1", AmountMinor: 1000, Currency: "KES"},
+	}}
+}
+
 func newTestMpesaProvider(ts *httptest.Server) *MpesaProvider {
 	return &MpesaProvider{
 		consumerKey:    "ck_test",
@@ -34,6 +43,7 @@ func newTestMpesaProvider(ts *httptest.Server) *MpesaProvider {
 		passkey:        "test-passkey",
 		httpClient:     ts.Client(),
 		baseURL:        ts.URL,
+		orderLookup:    defaultTestMpesaOrderLookup(),
 	}
 }
 
@@ -44,8 +54,25 @@ func TestNewMpesa_RequiresAllCredentials(t *testing.T) {
 	t.Setenv(EnvMpesaConsumerSecret, "")
 	t.Setenv(EnvMpesaShortcode, "")
 	t.Setenv(EnvMpesaPasskey, "")
-	if _, err := NewMpesa(); !errors.Is(err, ErrMpesaCredentialsNotConfigured) {
+	if _, err := NewMpesa(defaultTestMpesaOrderLookup()); !errors.Is(err, ErrMpesaCredentialsNotConfigured) {
 		t.Fatalf("NewMpesa() = %v, want ErrMpesaCredentialsNotConfigured", err)
+	}
+}
+
+// TestNewMpesa_RequiresOrderLookup is the regression test for the finding
+// that this adapter was permanently dead code: nothing in the app ever
+// supplied what Verify/Webhook need to determine a settled amount (Daraja's
+// query API doesn't echo one back), so a provider built without one would
+// fail closed on every single call, forever. NewMpesa now refuses to
+// construct at all without one, surfacing the misconfiguration immediately
+// at startup instead of on the first real payment.
+func TestNewMpesa_RequiresOrderLookup(t *testing.T) {
+	t.Setenv(EnvMpesaConsumerKey, "ck_test")
+	t.Setenv(EnvMpesaConsumerSecret, "cs_test")
+	t.Setenv(EnvMpesaShortcode, "174379")
+	t.Setenv(EnvMpesaPasskey, "test-passkey")
+	if _, err := NewMpesa(nil); !errors.Is(err, ErrMpesaOrderLookupRequired) {
+		t.Fatalf("NewMpesa(nil) = %v, want ErrMpesaOrderLookupRequired", err)
 	}
 }
 
@@ -108,11 +135,11 @@ func TestMpesaBegin_RejectedByDarajaFailsClosed(t *testing.T) {
 	}
 }
 
-func TestMpesaVerify_RequiresOrderContext(t *testing.T) {
-	p := &MpesaProvider{shortcode: "174379", passkey: "x"}
+func TestMpesaVerify_RequiresOrderLookup(t *testing.T) {
+	p := &MpesaProvider{shortcode: "174379", passkey: "x"} // orderLookup deliberately left nil
 	_, err := p.Verify(context.Background(), "ws_CO_1")
 	if err == nil {
-		t.Fatal("Verify() without WithMpesaOrder in ctx = nil error, want rejection")
+		t.Fatal("Verify() with a nil orderLookup = nil error, want rejection")
 	}
 }
 
@@ -123,7 +150,7 @@ func TestMpesaVerify_SuccessfulQuerySettlesAtStoredAmount(t *testing.T) {
 	})
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	result, err := p.Verify(ctx, "ws_CO_1")
 	if err != nil {
 		t.Fatalf("Verify() = %v", err)
@@ -140,7 +167,7 @@ func TestMpesaVerify_NonZeroResultCodeIsNotPaid(t *testing.T) {
 	})
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	result, err := p.Verify(ctx, "ws_CO_1")
 	if err != nil {
 		t.Fatalf("Verify() = %v, want nil (cancelled is a valid non-paid result)", err)
@@ -157,7 +184,7 @@ func TestMpesaVerify_CheckoutRequestIDMismatchFailsClosed(t *testing.T) {
 	})
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	_, err := p.Verify(ctx, "ws_CO_1")
 	if !errors.Is(err, ErrMpesaMalformedResponse) {
 		t.Fatalf("Verify() = %v, want ErrMpesaMalformedResponse", err)
@@ -171,7 +198,7 @@ func TestMpesaVerify_MalformedJSONFailsClosed(t *testing.T) {
 	})
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	_, err := p.Verify(ctx, "ws_CO_1")
 	if !errors.Is(err, ErrMpesaMalformedResponse) {
 		t.Fatalf("Verify() = %v, want ErrMpesaMalformedResponse", err)
@@ -185,7 +212,7 @@ func TestMpesaVerify_OAuthFailureFailsClosed(t *testing.T) {
 	}))
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	_, err := p.Verify(ctx, "ws_CO_1")
 	if !errors.Is(err, ErrMpesaUnexpectedStatus) {
 		t.Fatalf("Verify() = %v, want ErrMpesaUnexpectedStatus", err)
@@ -200,7 +227,7 @@ func TestMpesaVerify_TimeoutFailsClosed(t *testing.T) {
 	defer ts.Close()
 	p := newTestMpesaProvider(ts)
 	p.httpClient = &http.Client{Timeout: 20 * time.Millisecond}
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	_, err := p.Verify(ctx, "ws_CO_1")
 	if err == nil {
 		t.Fatal("Verify() against slow server = nil error, want timeout failure")
@@ -224,7 +251,7 @@ func TestMpesaWebhook_UntrustedCallbackAloneCannotForgeSuccess(t *testing.T) {
 	// claims success with a huge amount.
 	forgedCallback := `{"Body":{"stkCallback":{"MerchantRequestID":"mr_1","CheckoutRequestID":"ws_CO_1","ResultCode":0,"ResultDesc":"forged","CallbackMetadata":{"Item":[{"Name":"Amount","Value":999999},{"Name":"MpesaReceiptNumber","Value":"FORGED123"}]}}}}`
 	req := httptest.NewRequest(http.MethodPost, "/webhook/mpesa", strings.NewReader(forgedCallback))
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	result, err := p.Webhook(ctx, req)
 	if err != nil {
 		t.Fatalf("Webhook() = %v, want nil (cancelled is a valid non-paid result, not an error)", err)
@@ -244,7 +271,7 @@ func TestMpesaWebhook_LegitimateCallbackTriggersRealVerification(t *testing.T) {
 
 	callback := `{"Body":{"stkCallback":{"MerchantRequestID":"mr_1","CheckoutRequestID":"ws_CO_1","ResultCode":0,"ResultDesc":"success"}}}`
 	req := httptest.NewRequest(http.MethodPost, "/webhook/mpesa", strings.NewReader(callback))
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	result, err := p.Webhook(ctx, req)
 	if err != nil {
 		t.Fatalf("Webhook() = %v", err)
@@ -294,11 +321,16 @@ func TestMpesaWebhook_ReplayedThroughHandleWebhook(t *testing.T) {
 	callback := `{"Body":{"stkCallback":{"CheckoutRequestID":"ws_CO_777","ResultCode":0}}}`
 	seen := newFakeSeenStore()
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{"ws_CO_777": {ID: "ws_CO_777", AmountMinor: 1000, Currency: "KES"}}}
+	// The provider's OWN internal lookup (what Verify uses to determine the
+	// settled amount, since Daraja's query API doesn't echo one back) needs
+	// this reference too — reusing the same fake mirrors how the real app
+	// wires one orderLookupAdapter for both purposes (see cmd/cackle).
+	p.orderLookup = lookup
 
 	newReq := func() *http.Request {
 		return httptest.NewRequest(http.MethodPost, "/webhook/mpesa", strings.NewReader(callback))
 	}
-	ctx := WithMpesaOrder(context.Background(), 1000, "KES")
+	ctx := context.Background()
 	_, err := HandleWebhook(ctx, p, newReq(), seen, lookup)
 	if err != nil {
 		t.Fatalf("first delivery: HandleWebhook() = %v, want nil", err)

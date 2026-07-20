@@ -29,12 +29,17 @@ const bankAccountSchema = z.object({
 });
 
 const PayoutsOverview = () => {
+    const { activeOrg } = useAuth();
     const [state, setState] = useState({ rows: [], loading: true, error: null });
 
     const load = useCallback(async () => {
+        if (!activeOrg?.id) {
+            setState({ rows: [], loading: false, error: null });
+            return;
+        }
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const data = await eventsApi.list();
+            const data = await eventsApi.listForOrg(activeOrg.id);
             const eventList = Array.isArray(data) ? data : (data?.events ?? []);
             const results = await Promise.allSettled(eventList.map((ev) => payoutsApi.forEvent(ev.id)));
             const rows = eventList.map((ev, i) => {
@@ -46,7 +51,7 @@ const PayoutsOverview = () => {
         } catch (err) {
             setState({ rows: [], loading: false, error: err.message || 'Could not load payouts.' });
         }
-    }, []);
+    }, [activeOrg?.id]);
 
     useEffect(() => {
         load();

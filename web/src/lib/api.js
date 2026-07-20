@@ -230,25 +230,30 @@ export const auth = {
 
 export const events = {
     /**
-     * GET /api/events — published events only, regardless of caller. As of
-     * this wave the backend does NOT branch on org auth to include the
-     * caller's own drafts (internal/events.Service has a ListByOrg for
-     * that, but nothing in internal/httpapi routes to it yet) — so the
-     * organiser console's own draft events are invisible here. See
-     * pages/organizers/events/pending-draft.js for the frontend-only
-     * stopgap (remembering an in-progress draft's id locally) until a
-     * proper org-scoped listing route exists.
+     * GET /api/events — the PUBLIC storefront listing: published events
+     * only, regardless of caller (even an org admin/owner's own drafts are
+     * excluded — see docs/API.md). Use `listForOrg` instead anywhere the
+     * caller is managing their own org's events (Events list, dashboard,
+     * payouts) — that route includes drafts.
      */
     list: (params) => get('/events', params),
+    /**
+     * GET /api/orgs/{id}/events — every event belonging to orgId,
+     * regardless of status (draft/published/cancelled), most recently
+     * created first. Requires scanner-or-above membership on the org.
+     * This is what the organiser console's Events list/dashboard/payouts
+     * pages should call — unlike `list`, it includes the caller's own
+     * drafts.
+     */
+    listForOrg: (orgId) => get(`/orgs/${orgId}/events`),
     get: (slug) => get(`/events/${encodeURIComponent(slug)}`),
     create: (data) => post('/events', data),
     update: (id, data) => patch(`/events/${id}`, data),
     /**
-     * Not part of the documented API as of this wave — no confirmed
-     * DELETE /api/events/{id} route exists yet. Kept as a thin wrapper so
-     * the delete-confirmation UI has one call site to update the moment
-     * the backend lands it; callers must handle the "not implemented"
-     * shape (404/405) rather than assume success.
+     * DELETE /api/events/{id} — admin+ auth. Refused (409 `conflict`) if
+     * the event has ever had a ticket issued against it; cancel the event
+     * instead (`update(id, { status: 'cancelled' })`) once that's true. See
+     * docs/API.md for the full rule.
      */
     remove: (id) => del(`/events/${id}`),
     publish: (id) => post(`/events/${id}/publish`),
@@ -259,6 +264,14 @@ export const events = {
      * params may include { q, status, limit, offset } — all optional.
      */
     attendees: (id, params) => get(`/events/${id}/attendees`, params),
+    /**
+     * GET /api/events/{id}/orders — admin+ auth. Every order placed
+     * against the event, most recent first: { orders: [{...,
+     * marked_by, marked_at}] }. This is the organiser orders screen's
+     * data source — see the `orders` export below for the mark-paid/
+     * mark-failed actions on top of it.
+     */
+    orders: (id) => get(`/events/${id}/orders`),
 };
 
 // ---------------------------------------------------------------------------
@@ -324,10 +337,9 @@ export const orgMembers = {
     revokeInvite: (inviteId) => del(`/invites/${inviteId}`),
     acceptInvite: (token) => post('/invites/accept', { token }),
     /**
-     * Not part of the documented API as of this wave — only listing members
-     * is confirmed. Kept as a thin wrapper so the role-change control has one
-     * call site to update the moment the backend lands it; callers must
-     * handle the "not implemented" shape (404/405) rather than assume success.
+     * PATCH /api/orgs/{id}/members/{user_id} {role} — owner-only. Refused
+     * (409 `conflict`) if it would demote the org's last remaining owner
+     * — see docs/API.md.
      */
     updateRole: (orgId, userId, role) => patch(`/orgs/${orgId}/members/${userId}`, { role }),
 };
@@ -357,6 +369,21 @@ export const orders = {
     create: (data) => post('/orders', data),
     list: () => get('/orders'),
     get: (id) => get(`/orders/${id}`),
+    /**
+     * POST /api/orders/{id}/mark-paid — admin+ on the order's event's org.
+     * Settles a `manual`-provider order (bank transfer / cash at the door /
+     * invoice — see PAYMENTS.md) and issues its tickets, exactly like any
+     * other provider's webhook or verify poll would. Idempotent: calling
+     * this again on an already-paid order returns the same tickets rather
+     * than issuing more.
+     */
+    markPaid: (id) => post(`/orders/${id}/mark-paid`),
+    /**
+     * POST /api/orders/{id}/mark-failed — admin+ on the order's event's
+     * org. Records that a manual order will never be paid and releases the
+     * inventory it had reserved back to sale.
+     */
+    markFailed: (id) => post(`/orders/${id}/mark-failed`),
 };
 
 // ---------------------------------------------------------------------------

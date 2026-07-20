@@ -9,7 +9,6 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Calendar, Plus, QrCode, Ticket, Building2, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi } from '@/lib/api';
-import ContinueDraftBanner from './events/continue-draft-banner';
 import { formatMoney } from '@/lib/money';
 
 const statusVariant = {
@@ -43,12 +42,12 @@ const HomePage = () => {
     const [statsById, setStatsById] = useState({});
 
     useEffect(() => {
-        if (!orgs || orgs.length === 0) return;
+        if (!activeOrg?.id) return;
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
 
         eventsApi
-            .list()
+            .listForOrg(activeOrg.id)
             .then(async (data) => {
                 if (cancelled) return;
                 const list = Array.isArray(data) ? data : (data?.events ?? []);
@@ -75,7 +74,7 @@ const HomePage = () => {
         return () => {
             cancelled = true;
         };
-    }, [orgs]);
+    }, [activeOrg?.id]);
 
     const eventsById = useMemo(() => Object.fromEntries(state.events.map((e) => [e.id, e])), [state.events]);
 
@@ -138,8 +137,6 @@ const HomePage = () => {
                 </div>
                 <p className="text-muted-foreground">Manage events, sell tickets, and run the gate — all from here.</p>
             </div>
-
-            <ContinueDraftBanner />
 
             {state.error && (
                 <ErrorState className="mb-8" description={state.error} onRetry={() => window.location.reload()} />

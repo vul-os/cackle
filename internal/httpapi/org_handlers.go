@@ -36,6 +36,55 @@ func (s *server) handleListOrgMembers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"members": members})
 }
 
+type updateMemberRoleRequest struct {
+	Role string `json:"role"`
+}
+
+// handleUpdateOrgMemberRole serves PATCH /api/orgs/{id}/members/{user_id}
+// {role} — owner-only (role changes, like the org's own payout/bank-account
+// surfaces, sit at the owner bar, not admin+: an admin promoting themselves
+// or another admin to owner would be a privilege escalation an admin-level
+// gate can't itself refuse). Refuses (409 conflict) to demote the org's
+// last remaining owner — see orgs.ErrLastOwner's doc for why that would be
+// unrecoverable.
+func (s *server) handleUpdateOrgMemberRole(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	orgID := chi.URLParam(r, "id")
+	targetUserID := chi.URLParam(r, "user_id")
+
+	ok, err := s.deps.Auth.CanManageOrg(r.Context(), user.ID, orgID, auth.RoleOwner)
+	if err != nil {
+		internalError(w, s.log(), "update member role rbac", err)
+		return
+	}
+	if !ok {
+		forbidden(w, "you are not an owner of this org")
+		return
+	}
+
+	var req updateMemberRoleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		badRequest(w, "invalid JSON body")
+		return
+	}
+
+	member, err := s.deps.Orgs.UpdateMemberRole(r.Context(), orgID, targetUserID, req.Role)
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			notFound(w, "member not found")
+		case errors.Is(err, orgs.ErrInvalidInput):
+			badRequest(w, "role must be one of owner, admin, scanner")
+		case errors.Is(err, orgs.ErrLastOwner):
+			conflict(w, "cannot demote the last owner of an org — promote another member to owner first")
+		default:
+			internalError(w, s.log(), "update member role", err)
+		}
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"member": member})
+}
+
 type createInviteRequest struct {
 	Email string `json:"email"`
 	Role  string `json:"role"`
@@ -66,11 +115,14 @@ func (s *server) handleCreateOrgInvite(w http.ResponseWriter, r *http.Request) {
 
 	inv, token, err := s.deps.Orgs.CreateInvite(r.Context(), orgID, req.Email, req.Role, user.ID)
 	if err != nil {
-		if errors.Is(err, orgs.ErrInvalidInput) {
+		switch {
+		case errors.Is(err, orgs.ErrRoleEscalation):
+			forbidden(w, "you cannot invite someone at a role higher than your own")
+		case errors.Is(err, orgs.ErrInvalidInput):
 			badRequest(w, "email and a valid role (owner, admin, scanner) are required")
-			return
+		default:
+			internalError(w, s.log(), "create invite", err)
 		}
-		internalError(w, s.log(), "create invite", err)
 		return
 	}
 

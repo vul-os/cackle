@@ -138,6 +138,78 @@ func toImageViews(images []store.Image) []imageView {
 	return out
 }
 
+// handleListOrgEvents serves GET /api/orgs/{id}/events — every event
+// belonging to the org, ANY status (draft, published, cancelled), most
+// recently created first. This is the org-scoped counterpart to GET
+// /api/events (which is public and published-only, and must stay that
+// way): it is what lets an organiser's own draft events show up in their
+// Events list and dashboard instead of vanishing the moment they navigate
+// away (drafts have no other visible home — GET /api/events/{slugOrID}
+// still resolves one directly by id/slug, but there was previously no
+// listing route that included them).
+//
+// RBAC is scanner+ (any org member), matching the read-only bar already
+// used for stats/attendees — every member of the org, not just
+// admins/owners, has a legitimate reason to see what events exist.
+func (s *server) handleListOrgEvents(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	orgID := chi.URLParam(r, "id")
+
+	ok, err := s.deps.Auth.CanManageOrg(r.Context(), user.ID, orgID, auth.RoleScanner)
+	if err != nil {
+		internalError(w, s.log(), "list org events rbac", err)
+		return
+	}
+	if !ok {
+		forbidden(w, "you are not a member of this org")
+		return
+	}
+
+	list, err := s.deps.Events.ListByOrg(r.Context(), orgID)
+	if err != nil {
+		internalError(w, s.log(), "list org events", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"events": list})
+}
+
+// handleDeleteEvent serves DELETE /api/events/{id} — admin+ on the event's
+// org. Refused with 409 conflict if the event has any issued tickets (see
+// events.Service.Delete / events.ErrEventHasTickets): once real money and
+// tickets exist behind an event, cancelling it (PATCH .../events/{id}
+// {"status":"cancelled"}) is the correct move — buyers keep their order
+// history and tickets aren't silently orphaned. An event with zero issued
+// tickets (a draft nobody has bought into, or a published event that
+// simply hasn't sold anything yet) can be deleted outright.
+func (s *server) handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+	eventID := chi.URLParam(r, "id")
+
+	ok, err := s.deps.Auth.CanManageEvent(r.Context(), user.ID, eventID, auth.RoleAdmin)
+	if err != nil {
+		internalError(w, s.log(), "delete event rbac", err)
+		return
+	}
+	if !ok {
+		forbidden(w, "you are not an admin/owner of this event's org")
+		return
+	}
+
+	if err := s.deps.Events.Delete(r.Context(), eventID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			notFound(w, "event not found")
+			return
+		}
+		if errors.Is(err, events.ErrEventHasTickets) {
+			conflict(w, err.Error())
+			return
+		}
+		internalError(w, s.log(), "delete event", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleListCategories serves GET /api/categories — public, derived from
 // currently published events only (a category with zero live events isn't
 // worth a browse-page tab).

@@ -31,6 +31,21 @@ var (
 	// issued to — a token is only redeemable by the account it was sent
 	// to, not by whoever happens to hold the link.
 	ErrEmailMismatch = errors.New("orgs: this invite was issued to a different email address")
+	// ErrLastOwner is returned by UpdateMemberRole when the change would
+	// leave an org with zero owners (demoting its one and only owner) —
+	// that would permanently lock everyone out of managing the org (no
+	// owner left to re-promote anyone, change billing, etc), so it is
+	// refused outright rather than silently allowed.
+	ErrLastOwner = errors.New("orgs: cannot demote the last owner of an org")
+	// ErrRoleEscalation is returned by CreateInvite when the inviter tries
+	// to mint an invite for a role higher than their own (e.g. an admin
+	// inviting themselves, or anyone else, as owner). The invite route is
+	// admin+-gated at the HTTP layer (see internal/httpapi's RBAC), which
+	// is deliberately more permissive than "owner only" so admins can
+	// grow the team — but that must never be a backdoor to self-promote
+	// to owner (or promote an accomplice) by going through an invite
+	// instead of the owner-only PATCH .../members/{user_id} route.
+	ErrRoleEscalation = errors.New("orgs: cannot invite at a role higher than your own")
 )
 
 // DefaultInviteTTL is how long a freshly created invite is valid.
@@ -154,6 +169,13 @@ func normalizeEmail(email string) (string, error) {
 // CreateInvite mints a new single-use, hashed, expiring invite for email to
 // join orgID at role. Returns the created Invite plus the plaintext token —
 // the ONLY time it is ever available; only its sha256 hash is persisted.
+//
+// invitedBy's OWN current role in orgID is looked up and enforced as a
+// ceiling on role: the invite route is admin+-gated (an admin can grow the
+// team), but an admin must never be able to mint an owner-role invite —
+// for themselves or anyone else — and walk in the door role changes
+// (owner-only, see UpdateMemberRole) correctly keep shut. Refused with
+// ErrRoleEscalation if role exceeds invitedBy's own rank.
 func (s *Service) CreateInvite(ctx context.Context, orgID, email, role, invitedBy string) (*Invite, string, error) {
 	norm, err := normalizeEmail(email)
 	if err != nil {
@@ -161,6 +183,17 @@ func (s *Service) CreateInvite(ctx context.Context, orgID, email, role, invitedB
 	}
 	if !validRoles[role] {
 		return nil, "", fmt.Errorf("%w: role must be one of owner, admin, scanner", ErrInvalidInput)
+	}
+
+	inviter, err := s.store.GetOrgMember(ctx, orgID, invitedBy)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, "", fmt.Errorf("%w: inviter is not a member of this org", ErrInvalidInput)
+		}
+		return nil, "", fmt.Errorf("orgs: create invite: look up inviter: %w", err)
+	}
+	if !auth.RoleMeets(auth.Role(inviter.Role), auth.Role(role)) {
+		return nil, "", fmt.Errorf("%w: your own role is %q", ErrRoleEscalation, inviter.Role)
 	}
 
 	plaintext, hash, err := auth.NewOpaqueToken()
@@ -234,6 +267,29 @@ func (s *Service) AcceptInvite(ctx context.Context, token string, user *store.Us
 		return nil, ErrEmailMismatch
 	}
 
+	// Defence in depth against CreateInvite's own role-escalation ceiling
+	// (see ErrRoleEscalation) being bypassed by a stale invite — one
+	// minted before that check existed, or by any future bug in
+	// CreateInvite: re-verify at accept time that the inviter's CURRENT
+	// role in the org still supports the role the invite grants. If the
+	// inviter has since been demoted, removed from the org entirely, or
+	// the invite simply never recorded who created it, the invite is
+	// treated as invalid rather than honoured — an invite's authority can
+	// never exceed what its inviter could grant right now.
+	if inv.InvitedBy == nil {
+		return nil, ErrInviteInvalid
+	}
+	inviter, err := s.store.GetOrgMember(ctx, inv.OrgID, *inv.InvitedBy)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, ErrInviteInvalid
+		}
+		return nil, fmt.Errorf("orgs: accept invite: look up inviter: %w", err)
+	}
+	if !auth.RoleMeets(auth.Role(inviter.Role), auth.Role(inv.Role)) {
+		return nil, ErrInviteInvalid
+	}
+
 	if err := s.store.MarkOrgInviteAccepted(ctx, inv.ID, s.now()); err != nil {
 		return nil, fmt.Errorf("orgs: accept invite: mark accepted: %w", err)
 	}
@@ -252,6 +308,45 @@ func (s *Service) AcceptInvite(ctx context.Context, token string, user *store.Us
 		return m, nil
 	}
 	return member, nil
+}
+
+// UpdateMemberRole changes an existing member's role within orgID. Refused
+// with ErrInvalidInput if role isn't one of owner/admin/scanner, with
+// store.ErrNotFound (unwrapped) if userID isn't a member of orgID at all,
+// and with ErrLastOwner if userID is currently the org's only owner and
+// role would move them off "owner" — see ErrLastOwner's doc. Callers
+// (internal/httpapi) are expected to have already checked the caller
+// themselves holds at least RoleOwner on orgID; this method only protects
+// the *target*'s last-owner invariant, not who's allowed to call it.
+func (s *Service) UpdateMemberRole(ctx context.Context, orgID, userID, role string) (*Member, error) {
+	if !validRoles[role] {
+		return nil, fmt.Errorf("%w: role must be one of owner, admin, scanner", ErrInvalidInput)
+	}
+
+	existing, err := s.store.GetOrgMember(ctx, orgID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if existing.Role == string(auth.RoleOwner) && role != string(auth.RoleOwner) {
+		owners, err := s.store.CountOrgOwners(ctx, orgID)
+		if err != nil {
+			return nil, fmt.Errorf("orgs: update member role: count owners: %w", err)
+		}
+		if owners <= 1 {
+			return nil, ErrLastOwner
+		}
+	}
+
+	if err := s.store.UpdateOrgMemberRole(ctx, orgID, userID, role); err != nil {
+		return nil, fmt.Errorf("orgs: update member role: %w", err)
+	}
+
+	m, err := s.store.GetOrgMemberWithUser(ctx, orgID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("orgs: update member role: reload: %w", err)
+	}
+	return &Member{UserID: m.UserID, Name: m.Name, Email: m.Email, Role: m.Role}, nil
 }
 
 // accountNumberLast4 masks a bank account number down to its last 4

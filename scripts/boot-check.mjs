@@ -80,9 +80,29 @@ async function main() {
 
     const pageErrors = [];
     const consoleErrors = [];
+    const badResponses = [];
     page.on('pageerror', (err) => pageErrors.push(String(err)));
     page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text());
+      if (msg.type() !== 'error') return;
+      // Chromium emits "Failed to load resource: ..." for every non-2xx
+      // response, including ones the app expects. An anonymous visitor's
+      // /api/auth/me probe legitimately 401s on every cold load, and failing
+      // the build on it made this guard cry wolf on every green push.
+      // Real HTTP problems are caught by the response listener below, which
+      // knows the status and the URL; this filter only drops the duplicate,
+      // context-free console echo.
+      if (/^Failed to load resource:/.test(msg.text())) return;
+      consoleErrors.push(msg.text());
+    });
+    // Expected non-2xx responses on an anonymous first load. Anything else in
+    // the 4xx/5xx range is a genuine failure.
+    const EXPECTED_NON_2XX = [{ status: 401, path: '/api/auth/me' }];
+    page.on('response', (res) => {
+      const status = res.status();
+      if (status < 400) return;
+      const path = new URL(res.url()).pathname;
+      if (EXPECTED_NON_2XX.some((e) => e.status === status && e.path === path)) return;
+      badResponses.push(`${status} ${res.request().method()} ${path}`);
     });
 
     await page.goto(`${BASE}${ROUTE}`, { waitUntil: 'domcontentloaded', timeout: 20_000 });
@@ -118,6 +138,11 @@ async function main() {
     if (consoleErrors.length) {
       console.error(`boot-check: FAIL — ${consoleErrors.length} console.error() call(s):`);
       for (const e of consoleErrors) console.error('  ' + e);
+      ok = false;
+    }
+    if (badResponses.length) {
+      console.error(`boot-check: FAIL — ${badResponses.length} unexpected non-2xx response(s):`);
+      for (const r of badResponses) console.error('  ' + r);
       ok = false;
     }
 

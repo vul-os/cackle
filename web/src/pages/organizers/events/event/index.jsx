@@ -11,7 +11,6 @@ import { CalendarX } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
-import { setPendingDraft, clearPendingDraft } from '../pending-draft';
 
 function toApiPayload(form) {
     return {
@@ -88,18 +87,10 @@ const EventPage = () => {
             toast({ title: 'Deleted', description: 'The event has been removed.' });
             navigate('/admin/events');
         } catch (err) {
-            // DELETE /api/events/{id} isn't confirmed in the documented API as of
-            // this wave — a 404/405 here means the route genuinely doesn't exist
-            // yet, not that anything went wrong on the user's end. Say so plainly
-            // rather than pretending the delete happened.
-            if (err.status === 404 || err.status === 405) {
-                toast({
-                    title: 'Not available yet',
-                    description: 'Deleting events isn’t wired up on this server build. Set status to cancelled instead.',
-                });
-            } else {
-                toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
-            }
+            // 409 conflict: the event has issued tickets — the server steers
+            // toward cancelling instead (see docs/API.md). Its message
+            // already says so; just surface it rather than a generic one.
+            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
         } finally {
             setIsDeleting(false);
             setShowDeleteDialog(false);
@@ -150,10 +141,6 @@ const EventPage = () => {
                 ),
             );
 
-            // The duplicate is a draft and — like any draft — invisible in the
-            // Events list until published (see pending-draft.js); remember it
-            // so there's a way back if the organiser navigates away first.
-            setPendingDraft(activeOrg.id, newEvent.id);
             toast({ title: 'Duplicated', description: 'A new draft was created with the same details and ticket types.' });
             navigate(`/admin/events/${newEvent.id}`);
         } catch (err) {
@@ -168,7 +155,6 @@ const EventPage = () => {
         try {
             await eventsApi.publish(id);
             handleInputChange('status', 'published');
-            clearPendingDraft(activeOrg?.id);
             toast({ title: 'Published', description: 'Your event is now live.' });
         } catch (err) {
             toast({ title: 'Could not publish', description: err.message, variant: 'destructive' });

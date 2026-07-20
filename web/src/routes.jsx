@@ -34,6 +34,7 @@ import CreateEventWizard from './pages/organizers/events/create';
 import EventPage from './pages/organizers/events/event';
 import EventStatsPage from './pages/organizers/events/event/stats';
 import EventAttendeesPage from './pages/organizers/events/event/attendees';
+import EventOrdersPage from './pages/organizers/events/event/orders';
 import EventTicketTypesPage from './pages/organizers/events/event/tickets';
 import EventImagesPage from './pages/organizers/events/event/images';
 import TeamPage from './pages/organizers/team';
@@ -185,6 +186,14 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <EventAttendeesPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/events/:id/orders"
+                    element={
+                        <ProtectedRoute>
+                            <EventOrdersPage />
                         </ProtectedRoute>
                     }
                 />

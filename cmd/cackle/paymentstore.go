@@ -42,6 +42,26 @@ func (a paymentRecordStoreAdapter) ListPaymentRecords(ctx context.Context, provi
 	return out, nil
 }
 
+// mpesaOrderLookupAdapter satisfies payments.OrderLookup against
+// *store.Store directly (not internal/orders.Service — that Service
+// doesn't exist yet at the point in run() where payment providers are
+// constructed and registered). internal/payments.MpesaProvider needs this
+// at construction time: unlike this package's other adapters, Daraja's STK
+// Push Query API never echoes back a settled amount, so Verify/Webhook
+// must resolve the order's own stored amount/currency themselves (see
+// MpesaProvider.orderLookup's doc comment) — Cackle's order ID IS the
+// provider reference (see payments.Order's doc comment), so this is a
+// direct-by-ID lookup.
+type mpesaOrderLookupAdapter struct{ store *store.Store }
+
+func (a mpesaOrderLookupAdapter) Lookup(ctx context.Context, reference string) (payments.OrderRef, error) {
+	o, err := a.store.GetOrderByID(ctx, reference)
+	if err != nil {
+		return payments.OrderRef{}, err
+	}
+	return payments.OrderRef{ID: o.ID, AmountMinor: o.TotalMinor, Currency: o.Currency}, nil
+}
+
 func fromStoreRecord(r *store.PaymentRecord) payments.PaymentRecord {
 	out := payments.PaymentRecord{
 		Provider:     r.Provider,

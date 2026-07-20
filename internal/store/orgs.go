@@ -251,6 +251,45 @@ func (s *Store) ListOrgMembers(ctx context.Context, orgID string) ([]OrgMember, 
 	return out, rows.Err()
 }
 
+// GetOrgMemberWithUser looks up a single membership joined with the
+// member's own name/email — the shape a role-change response needs so the
+// caller never has to make a separate user lookup. Returns ErrNotFound if
+// the user is not a member of the org.
+func (s *Store) GetOrgMemberWithUser(ctx context.Context, orgID, userID string) (*OrgMemberWithUser, error) {
+	var m OrgMemberWithUser
+	var createdAt string
+	err := s.db.QueryRowContext(ctx, `
+		SELECT m.user_id, u.name, u.email, m.role, m.created_at
+		FROM org_members m
+		JOIN users u ON u.id = m.user_id
+		WHERE m.org_id = ? AND m.user_id = ?`, orgID, userID,
+	).Scan(&m.UserID, &m.Name, &m.Email, &m.Role, &createdAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: scan org member with user: %w", err)
+	}
+	if m.CreatedAt, err = textToTime(createdAt); err != nil {
+		return nil, fmt.Errorf("store: parse org member created_at: %w", err)
+	}
+	return &m, nil
+}
+
+// CountOrgOwners returns how many members of orgID currently hold the
+// "owner" role — the check UpdateMemberRole uses to refuse demoting the
+// last owner (which would lock everyone out of managing the org
+// permanently).
+func (s *Store) CountOrgOwners(ctx context.Context, orgID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM org_members WHERE org_id = ? AND role = 'owner'`, orgID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("store: count org owners: %w", err)
+	}
+	return n, nil
+}
+
 // EventOrgID returns the org_id owning an event. This thin read is exposed
 // from store (rather than internal/events) because internal/auth's RBAC
 // helpers need it and must not depend on internal/events. Returns

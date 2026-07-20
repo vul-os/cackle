@@ -460,6 +460,126 @@ func TestStatsCorrectness(t *testing.T) {
 	}
 }
 
+func TestListByOrgIncludesEveryStatus(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	org := mustOrg(t, st)
+	svc := New(st)
+
+	draft, err := svc.Create(ctx, org.ID, validCreateInput("org-draft"))
+	if err != nil {
+		t.Fatalf("create draft: %v", err)
+	}
+	pub, err := svc.Create(ctx, org.ID, validCreateInput("org-published"))
+	if err != nil {
+		t.Fatalf("create pub: %v", err)
+	}
+	if _, err := svc.Publish(ctx, pub.ID); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+
+	// A second org's events must never leak into the first org's listing.
+	otherOrg := mustOrg(t, st)
+	if _, err := svc.Create(ctx, otherOrg.ID, validCreateInput("other-org-draft")); err != nil {
+		t.Fatalf("create other org event: %v", err)
+	}
+
+	list, err := svc.ListByOrg(ctx, org.ID)
+	if err != nil {
+		t.Fatalf("ListByOrg: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("ListByOrg = %d events, want 2 (draft + published)", len(list))
+	}
+	var sawDraft, sawPublished bool
+	for _, e := range list {
+		if e.OrgID != org.ID {
+			t.Fatalf("ListByOrg leaked an event from another org: %+v", e)
+		}
+		if e.ID == draft.ID {
+			sawDraft = true
+		}
+		if e.ID == pub.ID {
+			sawPublished = true
+		}
+	}
+	if !sawDraft {
+		t.Fatal("ListByOrg did not include the draft event")
+	}
+	if !sawPublished {
+		t.Fatal("ListByOrg did not include the published event")
+	}
+}
+
+func TestDeleteRefusesEventWithIssuedTickets(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	org := mustOrg(t, st)
+	svc := New(st)
+
+	ev, err := svc.Create(ctx, org.ID, validCreateInput("delete-event"))
+	if err != nil {
+		t.Fatalf("Create event: %v", err)
+	}
+	tt, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{Name: "General", PriceMinor: 1000, QuantityTotal: 10})
+	if err != nil {
+		t.Fatalf("CreateTicketType: %v", err)
+	}
+
+	// A pending (never-paid) order has NO issued tickets yet — deleting the
+	// event must still succeed and take the order/order_items with it.
+	pendingOrd := &store.Order{EventID: ev.ID, BuyerEmail: "pending@example.com", Status: "pending", Currency: "ZAR"}
+	if _, err := st.CreateOrderWithItems(ctx, pendingOrd, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 1, UnitPriceMinor: 1000}}); err != nil {
+		t.Fatalf("seed pending order: %v", err)
+	}
+
+	ev2, err := svc.Create(ctx, org.ID, validCreateInput("delete-event-2"))
+	if err != nil {
+		t.Fatalf("Create event 2: %v", err)
+	}
+
+	// ev2 has a genuinely settled order with an issued ticket — must refuse.
+	tt2, err := svc.CreateTicketType(ctx, ev2.ID, TicketTypeInput{Name: "General", PriceMinor: 1000, QuantityTotal: 10})
+	if err != nil {
+		t.Fatalf("CreateTicketType 2: %v", err)
+	}
+	ord := &store.Order{EventID: ev2.ID, BuyerEmail: "buyer@example.com", Status: "pending", Currency: "ZAR", TotalMinor: 1000}
+	if _, err := st.CreateOrderWithItems(ctx, ord, []store.OrderLine{{TicketTypeID: tt2.ID, Quantity: 1, UnitPriceMinor: 1000}}); err != nil {
+		t.Fatalf("seed order: %v", err)
+	}
+	tid := store.NewID()
+	capToken, _, err := svc.IssueTicket(ctx, ev2.ID, tickets.Payload{TID: tid, EID: ev2.ID, TT: tt2.ID})
+	if err != nil {
+		t.Fatalf("IssueTicket: %v", err)
+	}
+	if settled, err := st.SettleOrder(ctx, ord.ID, time.Now(), []store.Ticket{
+		{ID: tid, OrderID: ord.ID, EventID: ev2.ID, TicketTypeID: tt2.ID, Serial: tid, Capability: capToken, IssuedAt: time.Now()},
+	}); err != nil || !settled {
+		t.Fatalf("SettleOrder: settled=%v err=%v", settled, err)
+	}
+
+	if err := svc.Delete(ctx, ev2.ID); !errors.Is(err, ErrEventHasTickets) {
+		t.Fatalf("delete event with issued ticket: got %v, want ErrEventHasTickets", err)
+	}
+	// Nothing was removed.
+	if _, err := svc.Get(ctx, ev2.ID); err != nil {
+		t.Fatalf("event with issued ticket should still exist: %v", err)
+	}
+
+	// ev (only ever had a pending, never-paid order) CAN be deleted.
+	if err := svc.Delete(ctx, ev.ID); err != nil {
+		t.Fatalf("Delete (no issued tickets): %v", err)
+	}
+	if _, err := svc.Get(ctx, ev.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("deleted event should be gone: got %v", err)
+	}
+
+	// Deleting a nonexistent event is ErrNotFound, not a generic error.
+	if err := svc.Delete(ctx, "nonexistent-id"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("delete nonexistent event: got %v, want ErrNotFound", err)
+	}
+}
+
 // admit inserts a raw admissions row directly, since internal/scan (which
 // owns writing that table in production) is out of this package's scope.
 func admit(ctx context.Context, st *store.Store, eventID, ticketID string) error {

@@ -265,6 +265,37 @@ func (s *Store) ListEventsByOrg(ctx context.Context, orgID string) ([]Event, err
 	return s.queryEvents(ctx, eventSelectColumns+` FROM events WHERE org_id = ? ORDER BY created_at DESC`, orgID)
 }
 
+// CountTicketsForEvent returns how many tickets have ever been issued for
+// an event (any ticket status — valid, void, or refunded; a ticket only
+// ever exists once at all if a paid order settled, see
+// internal/store.SettleOrder). This is the check DeleteEvent's caller
+// (internal/events.Service.Delete) uses to refuse hard-deleting an event
+// that has real issued tickets behind it — cancelling is the correct move
+// once money/tickets exist, deleting is only for an event nobody has
+// bought into yet.
+func (s *Store) CountTicketsForEvent(ctx context.Context, eventID string) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tickets WHERE event_id = ?`, eventID).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("store: count tickets for event: %w", err)
+	}
+	return n, nil
+}
+
+// DeleteEvent removes an event outright. Callers MUST have already verified
+// there are no issued tickets against it (see CountTicketsForEvent) —
+// this method itself does not re-check, it trusts internal/events.Delete to
+// have done so. Foreign keys cascade: ticket_types, event_keys, payouts,
+// and any still-pending (never-paid) orders/order_items for this event are
+// removed along with it. Returns ErrNotFound if the event does not exist.
+func (s *Store) DeleteEvent(ctx context.Context, id string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM events WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("store: delete event: %w", err)
+	}
+	return rowsAffectedOrNotFound(res)
+}
+
 func (s *Store) queryEvents(ctx context.Context, query string, args ...any) ([]Event, error) {
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {

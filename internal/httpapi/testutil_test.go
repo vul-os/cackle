@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -18,6 +20,67 @@ import (
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 )
+
+// testPaymentRecordStoreAdapter satisfies payments.RecordStore against
+// *store.Store, mirroring cmd/cackle's own paymentRecordStoreAdapter
+// (kept here too rather than imported since that one lives in package
+// main). This is what lets these tests exercise the manual provider's
+// real, restart-durable persistence path — including the MarkedBy/
+// MarkedAt audit trail — rather than a stripped-down in-memory
+// stand-in that wouldn't catch a persistence regression.
+type testPaymentRecordStoreAdapter struct{ store *store.Store }
+
+func (a testPaymentRecordStoreAdapter) GetPaymentRecord(ctx context.Context, provider, reference string) (payments.PaymentRecord, bool, error) {
+	rec, err := a.store.GetPaymentRecord(ctx, provider, reference)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return payments.PaymentRecord{}, false, nil
+		}
+		return payments.PaymentRecord{}, false, err
+	}
+	out := payments.PaymentRecord{
+		Provider: rec.Provider, Reference: rec.Reference, AmountMinor: rec.AmountMinor,
+		Currency: rec.Currency, Status: payments.Status(rec.Status), Instructions: rec.Instructions,
+		MarkedBy: rec.MarkedBy, CreatedAt: rec.CreatedAt, UpdatedAt: rec.UpdatedAt,
+	}
+	if rec.MarkedAt != nil {
+		out.MarkedAt = *rec.MarkedAt
+	}
+	return out, true, nil
+}
+
+func (a testPaymentRecordStoreAdapter) PutPaymentRecord(ctx context.Context, rec payments.PaymentRecord) error {
+	out := &store.PaymentRecord{
+		Provider: rec.Provider, Reference: rec.Reference, AmountMinor: rec.AmountMinor,
+		Currency: rec.Currency, Status: string(rec.Status), Instructions: rec.Instructions,
+		MarkedBy: rec.MarkedBy, CreatedAt: rec.CreatedAt, UpdatedAt: rec.UpdatedAt,
+	}
+	if !rec.MarkedAt.IsZero() {
+		markedAt := rec.MarkedAt
+		out.MarkedAt = &markedAt
+	}
+	return a.store.PutPaymentRecord(ctx, out)
+}
+
+func (a testPaymentRecordStoreAdapter) ListPaymentRecords(ctx context.Context, provider string) ([]payments.PaymentRecord, error) {
+	rows, err := a.store.ListPaymentRecords(ctx, provider)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]payments.PaymentRecord, len(rows))
+	for i := range rows {
+		r := rows[i]
+		out[i] = payments.PaymentRecord{
+			Provider: r.Provider, Reference: r.Reference, AmountMinor: r.AmountMinor,
+			Currency: r.Currency, Status: payments.Status(r.Status), Instructions: r.Instructions,
+			MarkedBy: r.MarkedBy, CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		}
+		if r.MarkedAt != nil {
+			out[i].MarkedAt = *r.MarkedAt
+		}
+	}
+	return out, nil
+}
 
 // testHarness wires up a full, in-memory Cackle stack (real SQLite via
 // :memory:, real auth/events/orders services, the stub payment provider)
@@ -54,6 +117,20 @@ func newTestHarness(t *testing.T) *testHarness {
 	}
 	if err := reg.Register(stub); err != nil {
 		t.Fatalf("register stub provider: %v", err)
+	}
+
+	// manual is Cackle's DEFAULT payment provider in production (see
+	// internal/payments/manual.go) — registered here too, store-backed
+	// exactly like cmd/cackle wires it up, so tests can exercise the
+	// mark-paid/mark-failed HTTP routes end to end (including restart-
+	// durable persistence of the MarkedBy/MarkedAt audit trail) rather
+	// than only ever exercising the stub provider's auto-settle path.
+	manual, err := payments.NewManualWithStore(context.Background(), nil, testPaymentRecordStoreAdapter{store: st})
+	if err != nil {
+		t.Fatalf("new manual provider: %v", err)
+	}
+	if err := reg.Register(manual); err != nil {
+		t.Fatalf("register manual provider: %v", err)
 	}
 
 	ordersSvc := orders.New(st, eventsSvc, reg)

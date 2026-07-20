@@ -20,10 +20,8 @@ import { useAuth } from '@/context/use-auth';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { toast } from '@/components/ui/use-toast';
 import DeleteEventDialog from './event/delete-dialog';
-import ContinueDraftBanner from './continue-draft-banner';
 import { categoryLabel } from './categories';
 import { slugify } from './slug';
-import { setPendingDraft } from './pending-draft';
 
 const statusVariant = {
     draft: 'secondary',
@@ -41,15 +39,19 @@ const EventsPage = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchEvents = useCallback(() => {
+        if (!activeOrg?.id) {
+            setState({ events: [], loading: false, error: null });
+            return;
+        }
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
-            .list()
+            .listForOrg(activeOrg.id)
             .then((data) => {
                 const list = Array.isArray(data) ? data : (data?.events ?? []);
                 setState({ events: list, loading: false, error: null });
             })
             .catch((err) => setState({ events: [], loading: false, error: err.message || 'Could not load events.' }));
-    }, []);
+    }, [activeOrg?.id]);
 
     useEffect(() => {
         fetchEvents();
@@ -99,10 +101,6 @@ const EventsPage = () => {
                 ),
             );
 
-            // The duplicate is a draft and — like any draft — invisible in the
-            // Events list until published (see pending-draft.js); remember it
-            // so there's a way back if the organiser navigates away first.
-            setPendingDraft(activeOrg.id, newEvent.id);
             toast({ title: 'Duplicated', description: 'A new draft was created with the same details and ticket types.' });
             navigate(`/admin/events/${newEvent.id}`);
         } catch (err) {
@@ -121,14 +119,10 @@ const EventsPage = () => {
             setState((s) => ({ ...s, events: s.events.filter((e) => e.id !== deleteTarget.id) }));
             setDeleteTarget(null);
         } catch (err) {
-            if (err.status === 404 || err.status === 405) {
-                toast({
-                    title: 'Not available yet',
-                    description: 'Deleting events isn’t wired up on this server build. Set status to cancelled instead.',
-                });
-            } else {
-                toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
-            }
+            // 409 conflict: the event has issued tickets — the server steers
+            // toward cancelling instead (see docs/API.md). Its message
+            // already says so; just surface it rather than a generic one.
+            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
         } finally {
             setIsDeleting(false);
         }
@@ -156,8 +150,6 @@ const EventsPage = () => {
                     Create Event
                 </Button>
             </div>
-
-            <ContinueDraftBanner />
 
             <div className="relative mb-6">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

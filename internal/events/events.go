@@ -44,6 +44,13 @@ var (
 	// ErrTicketTypeHasSales is returned by DeleteTicketType when the
 	// ticket type has already reserved/sold inventory (quantity_sold > 0).
 	ErrTicketTypeHasSales = errors.New("events: cannot delete a ticket type with sold or reserved tickets")
+	// ErrEventHasTickets is returned by Delete when at least one ticket has
+	// ever been issued for the event (i.e. at least one order settled —
+	// see internal/store.SettleOrder). Hard-deleting would either orphan
+	// those tickets/orders or cascade-delete real buyers' purchase
+	// history; cancelling the event (Update with Status "cancelled") is
+	// the correct move once real money/tickets exist behind it.
+	ErrEventHasTickets = errors.New("events: cannot delete an event with issued tickets; cancel it instead")
 )
 
 // Event is a ticketed event owned by an org.
@@ -370,6 +377,32 @@ func (s *Service) Publish(ctx context.Context, eventID string) (*Event, error) {
 	default:
 		return nil, fmt.Errorf("%w: cannot publish an event with status %q", ErrInvalidTransition, e.Status)
 	}
+}
+
+// Delete removes an event outright. Refused with ErrEventHasTickets if any
+// ticket has ever been issued against it (regardless of that ticket's
+// current status — valid, void, or refunded all count: a refund doesn't
+// erase the fact that a real sale and admission history exist) — cancel
+// the event instead (Update with Status "cancelled") once that's true.
+// Returns store.ErrNotFound if the event does not exist.
+func (s *Service) Delete(ctx context.Context, eventID string) error {
+	if _, err := s.store.GetEventByID(ctx, eventID); err != nil {
+		return err
+	}
+	n, err := s.store.CountTicketsForEvent(ctx, eventID)
+	if err != nil {
+		return fmt.Errorf("events: delete: %w", err)
+	}
+	if n > 0 {
+		return fmt.Errorf("%w: %d ticket(s) issued", ErrEventHasTickets, n)
+	}
+	if err := s.store.DeleteEvent(ctx, eventID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return err
+		}
+		return fmt.Errorf("events: delete: %w", err)
+	}
+	return nil
 }
 
 // Get looks up an event by ID. Returns store.ErrNotFound if absent.

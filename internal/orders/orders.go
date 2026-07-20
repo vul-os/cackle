@@ -71,6 +71,10 @@ var (
 	// terminal status other than "paid" (e.g. "failed", "refunded",
 	// "cancelled") and therefore cannot be settled.
 	ErrOrderNotSettleable = errors.New("orders: order cannot be settled from its current status")
+	// ErrOrderNotPending is returned by MarkFailed when the order is not
+	// currently pending (it was already settled paid, or already marked
+	// failed) — there is nothing left to release a second time.
+	ErrOrderNotPending = errors.New("orders: order is not pending")
 )
 
 // Order is a buyer's purchase of one or more ticket types for an event.
@@ -376,6 +380,57 @@ func (s *Service) ListForUser(ctx context.Context, userID string) ([]Order, erro
 		out[i] = toOrder(&rows[i], nil)
 	}
 	return out, nil
+}
+
+// ListForEvent returns every order placed against an event, most recent
+// first — the organiser-facing counterpart to ListForUser (which is scoped
+// to a buyer's own purchases). Line items are not populated (mirrors
+// ListForUser); callers needing a single order's items should call Get.
+func (s *Service) ListForEvent(ctx context.Context, eventID string) ([]Order, error) {
+	rows, err := s.store.ListOrdersForEvent(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Order, len(rows))
+	for i := range rows {
+		out[i] = toOrder(&rows[i], nil)
+	}
+	return out, nil
+}
+
+// MarkFailed marks a still-pending order as failed and releases the
+// inventory it had reserved back to each ticket type it purchased from —
+// the same release-on-abandoned-payment path Create itself uses when Begin
+// fails after inventory was already reserved (see
+// store.CancelOrderReleaseInventory). This is the caller-side step that
+// settles the manual payment provider's organiser-facing "mark failed"
+// action (see internal/payments/manual.go's MarkFailed): the provider only
+// records ITS OWN belief about the charge; this is what actually frees the
+// ticket_types capacity and flips the order status so the seats go back on
+// sale.
+//
+// Only a currently-pending order can be marked failed this way — ErrOrderNotPending
+// is returned otherwise (already paid, or already failed), which also
+// makes this safe to call twice: CancelOrderReleaseInventory is itself a
+// conditional UPDATE ... WHERE status = 'pending' at the SQL layer, so a
+// second call can never double-release the same inventory.
+func (s *Service) MarkFailed(ctx context.Context, orderID string) (*Order, error) {
+	if _, err := s.store.GetOrderByID(ctx, orderID); err != nil {
+		return nil, err
+	}
+	released, err := s.store.CancelOrderReleaseInventory(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("orders: mark failed: %w", err)
+	}
+	if !released {
+		return nil, ErrOrderNotPending
+	}
+	fresh, err := s.store.GetOrderByID(ctx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("orders: mark failed: %w", err)
+	}
+	out := toOrder(fresh, nil)
+	return &out, nil
 }
 
 // Settle reconciles a payment provider's settlement result against the

@@ -122,6 +122,7 @@ func New(deps Deps) http.Handler {
 			r.Post("/", s.requireUser(s.handleCreateEvent))
 			r.Get("/{id}", s.handleGetPublicEvent)
 			r.Patch("/{id}", s.requireUser(s.handleUpdateEvent))
+			r.Delete("/{id}", s.requireUser(s.handleDeleteEvent))
 			r.Post("/{id}/publish", s.requireUser(s.handlePublishEvent))
 			r.Get("/{id}/stats", s.requireUser(s.handleEventStats))
 			r.Get("/{id}/ticket-types", s.requireUser(s.handleListTicketTypes))
@@ -130,6 +131,7 @@ func New(deps Deps) http.Handler {
 			r.Get("/{id}/attendees", s.requireUser(s.handleListEventAttendees))
 			r.Post("/{id}/images", s.requireUser(s.handleUploadImage))
 			r.Get("/{id}/payouts", s.requireUser(s.handleEventPayouts))
+			r.Get("/{id}/orders", s.requireUser(s.handleListEventOrders))
 		})
 
 		r.Get("/categories", s.handleListCategories)
@@ -143,7 +145,9 @@ func New(deps Deps) http.Handler {
 		r.Delete("/images/{id}", s.requireUser(s.handleDeleteImage))
 
 		r.Route("/orgs/{id}", func(r chi.Router) {
+			r.Get("/events", s.requireUser(s.handleListOrgEvents))
 			r.Get("/members", s.requireUser(s.handleListOrgMembers))
+			r.Patch("/members/{user_id}", s.requireUser(s.handleUpdateOrgMemberRole))
 			r.Get("/invites", s.requireUser(s.handleListOrgInvites))
 			r.Post("/invites", s.requireUser(s.handleCreateOrgInvite))
 			r.Get("/bank-account", s.requireUser(s.handleGetBankAccount))
@@ -157,6 +161,8 @@ func New(deps Deps) http.Handler {
 			r.Post("/", s.handleCreateOrder) // buyer auth optional — see handler doc
 			r.Get("/", s.requireUser(s.handleListMyOrders))
 			r.Get("/{id}", s.requireUser(s.handleGetOrder))
+			r.Post("/{id}/mark-paid", s.requireUser(s.handleMarkOrderPaid))
+			r.Post("/{id}/mark-failed", s.requireUser(s.handleMarkOrderFailed))
 		})
 
 		r.Route("/payments", func(r chi.Router) {

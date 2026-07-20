@@ -30,10 +30,12 @@ GET    /api/events                 ?q=&category=&from=&to=&limit=   public, publ
 GET    /api/events/{slug}          public → event + ticket_types + issuer pubkey + gallery
 POST   /api/events                 org auth
 PATCH  /api/events/{id}
+DELETE /api/events/{id}            admin+ auth
 POST   /api/events/{id}/publish
 GET    /api/events/{id}/stats      → sold, revenue_minor, admitted, by_type[]
 GET    /api/events/{id}/attendees  ?q=&status=&limit=&offset=   scanner+ auth
                                    → {attendees:[...], total, limit, offset}
+GET    /api/orgs/{id}/events       scanner+ auth → {events:[...]}  every event, ANY status
 ```
 
 ### Money
@@ -75,6 +77,32 @@ event page need to work for an anonymous visitor. Every other event route
 requires an authenticated session with a role on the event's org, checked
 server-side, every time — see the RBAC rule in
 [ARCHITECTURE.md](ARCHITECTURE.md#security-bar).
+
+`GET /api/events` is deliberately published-only, even for a caller who is
+an admin/owner of the org that drew the draft: it is the public storefront
+browse endpoint and must never leak a draft to it. An organiser's own
+in-progress events (drafts, and cancelled events, which also never appear
+in the public listing) instead show up via `GET /api/orgs/{id}/events` —
+every event belonging to the org, regardless of status, most recently
+created first. It requires scanner-or-above membership on the org (the
+same bar as `stats`/`attendees`/`scan-bundle` — any member has a reason to
+see what events exist, not just admins/owners); a member of a *different*
+org gets `forbidden`, never a filtered/empty result that could be mistaken
+for "this org has no events."
+
+`DELETE /api/events/{id}` requires admin+ on the event's org and hard-deletes
+the event, its ticket types, its issuer key(s), and (via cascade) any
+orders/order_items that were still `pending` (i.e. abandoned carts that
+never actually paid). It is refused with `conflict` if the event has ever
+had a ticket issued against it (a ticket only exists once a real order
+settled — see [PAYMENTS.md](PAYMENTS.md)), regardless of that ticket's
+current status (valid, void, or refunded all count): deleting would either
+orphan a real buyer's purchase/admission history or silently erase it, so
+Cackle refuses outright. Cancel the event instead
+(`PATCH /api/events/{id} {"status":"cancelled"}`) once real tickets exist —
+buyers keep their order history, and the event simply stops appearing as
+purchasable. An event nobody has ever bought a ticket for (any draft, or a
+published event with zero sales) can be deleted outright.
 
 `GET /api/events/{id}/attendees` is the organiser-facing ticket-holder
 roster — every issued ticket for the event, one row per ticket, with the
@@ -162,6 +190,7 @@ DELETE /api/ticket-types/{id}
 
 ```
 GET    /api/orgs/{id}/members                       → {members:[{user_id,name,email,role}]}   admin+ auth
+PATCH  /api/orgs/{id}/members/{user_id}  {role}     → {member:{user_id,name,email,role}}       owner auth
 POST   /api/orgs/{id}/invites   {email,role}        → {invite_id,token,expires_at}             admin+ auth
 GET    /api/orgs/{id}/invites                       → {invites:[{id,email,role,expires_at,created_at}]}   admin+ auth
 DELETE /api/invites/{id}                                                                        admin+ auth
@@ -173,6 +202,18 @@ GET    /api/banks                                   → {banks:[{name,slug,code,
 
 GET    /api/events/{id}/payouts                     → {payouts:{gross_minor,fees_minor,net_minor,currency,status,rows:[{id,amount_minor,currency,status,provider_ref,created_at,paid_at}]}}   admin+ auth
 ```
+
+**Member role changes** are owner-only — one bar higher than every other
+member/invite route in this table (admin+), since a role change can itself
+grant/revoke owner-level authority and an admin gate can't be trusted to
+police its own ceiling. `role` is one of `owner`, `admin`, `scanner`, same
+as invites. It is refused with `conflict` if it would leave the org with
+zero owners (demoting/reassigning its one and only remaining owner) —
+that would permanently lock everyone out of managing the org (billing,
+re-promoting anyone, anything owner-gated) with no way back in, so Cackle
+refuses outright rather than allowing it and hoping nobody needed owner
+access again. Promote a second member to owner first if the intent is to
+step the original owner down.
 
 **Invites** are single-use and expiring (7 days): the token is 32 random
 bytes, and only its sha256 hash is ever persisted — the plaintext value in

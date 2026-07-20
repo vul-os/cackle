@@ -165,6 +165,21 @@ func run(args []string, stdout, stderr *os.File) error {
 	} else if !errors.Is(err, payments.ErrLNbitsNotConfigured) {
 		return fmt.Errorf("configure lnbits: %w", err)
 	}
+	// mpesa (Kenya M-Pesa STK Push) is entirely optional, same shape as
+	// lnbits: NewMpesa returns ErrMpesaCredentialsNotConfigured (not
+	// registered, not a fatal error for the process as a whole) unless an
+	// operator has set all four CACKLE_MPESA_* env vars. It needs its own
+	// OrderLookup wired in at construction (mpesaOrderLookupAdapter, backed
+	// directly by st — internal/orders.Service doesn't exist yet at this
+	// point in run()) because Daraja's settlement API never echoes back an
+	// amount; see MpesaProvider.orderLookup's doc comment.
+	if mp, err := payments.NewMpesa(mpesaOrderLookupAdapter{store: st}); err == nil {
+		if err := registry.Register(mp); err != nil {
+			return fmt.Errorf("configure mpesa: %w", err)
+		}
+	} else if !errors.Is(err, payments.ErrMpesaCredentialsNotConfigured) {
+		return fmt.Errorf("configure mpesa: %w", err)
+	}
 
 	ordersSvc := orders.New(st, eventsSvc, registry)
 	orgsSvc := orgs.New(st, bankingProvider)

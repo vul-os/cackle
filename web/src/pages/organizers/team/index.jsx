@@ -102,11 +102,10 @@ const TeamPage = () => {
             setState((s) => ({ ...s, members: s.members.map((m) => (m.user_id === member.user_id ? { ...m, role } : m)) }));
             toast({ title: 'Role updated', description: `${member.name || member.email} is now ${ROLE_LABEL[role]}.` });
         } catch (err) {
-            if (err.status === 404 || err.status === 405) {
-                toast({ title: 'Not available yet', description: 'Changing a member’s role isn’t wired up on this server build.' });
-            } else {
-                toast({ title: 'Could not update role', description: err.message, variant: 'destructive' });
-            }
+            // 409 conflict: demoting the org's last remaining owner is
+            // refused server-side (see docs/API.md) — its message already
+            // explains why; just surface it rather than a generic one.
+            toast({ title: 'Could not update role', description: err.message, variant: 'destructive' });
         } finally {
             setRoleChangingId(null);
         }

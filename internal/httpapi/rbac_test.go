@@ -43,6 +43,27 @@ func TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers(t *testing.T) {
 
 	imageID := h.seedImage(t, fx.eventID)
 
+	// Seed fixture for the mark-paid/mark-failed routes below: a real
+	// manual-provider order (guest checkout, no buyer auth required — see
+	// handleCreateOrder's doc) that never actually gets marked in this test
+	// (every attempt here is expected to be denied at 401/403 before it
+	// touches provider state), so reusing the same order id for both rows
+	// is safe.
+	manualOrderRec := h.do(http.MethodPost, "/api/orders", "", createOrderRequest{
+		EventID:  fx.eventID,
+		Items:    []orderItemRequest{{TicketTypeID: fx.ticketTypeID, Quantity: 1}},
+		Buyer:    buyerRequest{Email: "buyer-rbac-manual@example.com", Name: "Buyer"},
+		Provider: "manual",
+	})
+	if manualOrderRec.Code != http.StatusCreated {
+		t.Fatalf("seed manual order: status %d body %s", manualOrderRec.Code, manualOrderRec.Body.String())
+	}
+	manualOrder := decodeBody[struct {
+		Order struct {
+			ID string `json:"id"`
+		} `json:"order"`
+	}](t, manualOrderRec)
+
 	type route struct {
 		name   string
 		method string
@@ -56,6 +77,7 @@ func TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers(t *testing.T) {
 			Title string `json:"title"`
 		}{OrgID: fx.orgID, Title: "Should not be created"}},
 		{"update event", http.MethodPatch, "/api/events/" + fx.eventID, map[string]any{"title": "hijacked"}},
+		{"delete event", http.MethodDelete, "/api/events/" + fx.eventID, nil},
 		{"publish event", http.MethodPost, "/api/events/" + fx.eventID + "/publish", nil},
 		{"event stats", http.MethodGet, "/api/events/" + fx.eventID + "/stats", nil},
 		{"list ticket types (management)", http.MethodGet, "/api/events/" + fx.eventID + "/ticket-types", nil},
@@ -74,7 +96,9 @@ func TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers(t *testing.T) {
 		// route, but RBAC runs before multipart parsing in
 		// handleUploadImage, so a plain JSON body still exercises the
 		// 401/403 paths correctly (it never reaches the body at all).
+		{"list org events", http.MethodGet, "/api/orgs/" + fx.orgID + "/events", nil},
 		{"list org members", http.MethodGet, "/api/orgs/" + fx.orgID + "/members", nil},
+		{"update member role", http.MethodPatch, "/api/orgs/" + fx.orgID + "/members/" + fx.ownerID, map[string]any{"role": "admin"}},
 		{"create org invite", http.MethodPost, "/api/orgs/" + fx.orgID + "/invites", map[string]any{"email": "someone@example.com", "role": "scanner"}},
 		{"list org invites", http.MethodGet, "/api/orgs/" + fx.orgID + "/invites", nil},
 		{"delete org invite", http.MethodDelete, "/api/invites/" + invite.InviteID, nil},
@@ -89,6 +113,11 @@ func TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers(t *testing.T) {
 		// and covered here so a regression fails CI instead of shipping
 		// quietly.
 		{"event payouts", http.MethodGet, "/api/events/" + fx.eventID + "/payouts", nil},
+		// Wave: manual payment provider settlement (DEFECT 1 fix) — the
+		// organiser orders screen and its mark-paid/mark-failed actions.
+		{"list event orders", http.MethodGet, "/api/events/" + fx.eventID + "/orders", nil},
+		{"mark order paid", http.MethodPost, "/api/orders/" + manualOrder.Order.ID + "/mark-paid", nil},
+		{"mark order failed", http.MethodPost, "/api/orders/" + manualOrder.Order.ID + "/mark-failed", nil},
 	}
 
 	for _, rt := range routes {

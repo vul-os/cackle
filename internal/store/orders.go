@@ -283,6 +283,31 @@ func (s *Store) ListOrdersForUser(ctx context.Context, userID string) ([]Order, 
 	return out, rows.Err()
 }
 
+// ListOrdersForEvent returns every order placed against an event, most
+// recent first — the organiser-facing counterpart to ListOrdersForUser
+// (which is scoped to a buyer's own purchases). This backs the organiser
+// orders screen, which is what makes the `manual` payment provider's
+// mark-paid/mark-failed actions reachable at all — see
+// internal/httpapi/orders_handlers.go.
+func (s *Store) ListOrdersForEvent(ctx context.Context, eventID string) ([]Order, error) {
+	rows, err := s.db.QueryContext(ctx, orderSelectColumns+`
+		FROM orders WHERE event_id = ? ORDER BY created_at DESC`, eventID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list orders for event: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Order
+	for rows.Next() {
+		o, err := scanOrderRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) scanOrder(row *sql.Row) (*Order, error) {
 	var o Order
 	var userID, providerRef sql.NullString
