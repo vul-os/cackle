@@ -40,10 +40,18 @@ type EventMeta struct {
 //     still admittable at that gate until it re-pulls a fresh bundle. That
 //     is an inherent limitation of fully offline operation, not a bug; the
 //     mitigation is operational (re-sync the bundle periodically, e.g. at
-//     shift changes), not a code fix. When TicketIndex is empty (an older
-//     bundle predating this field, or an event with no issued tickets yet)
-//     DecideWithBundle falls back to signature-only behaviour rather than
-//     refusing to admit anyone — see its doc comment.
+//     shift changes), not a code fix.
+//   - TicketIndexPresent: whether TicketIndex is authoritative. This is the
+//     crucial distinction. An empty TicketIndex is ambiguous on its own:
+//     it could mean "no tickets have been issued yet" OR "every ticket for
+//     this event has been voided/refunded". Treating both as "no data, fall
+//     back to signature-only" would silently re-admit every physically-held
+//     ticket for a fully-cancelled event. So the server ALWAYS sets
+//     TicketIndexPresent=true (it queried the authoritative valid set, even
+//     if that set is empty); an empty present index therefore means "admit
+//     nothing". TicketIndexPresent=false is reserved for a legacy or
+//     hand-built bundle that carries no index data at all, and only then
+//     does DecideWithBundle fall back to signature-only checking.
 //   - Allocation: optional — present only when this specific device is a
 //     delegated sub-issuer allowed to mint tickets of its own while
 //     disconnected (see allocation.go). nil for an ordinary scan-only gate.
@@ -52,11 +60,12 @@ type EventMeta struct {
 //     staleness threshold (Bundle itself does not enforce a threshold —
 //     that policy decision belongs to the caller).
 type Bundle struct {
-	Event       EventMeta       `json:"event"`
-	IssuerKeys  tickets.KeyRing `json:"issuer_keys"`
-	TicketIndex []string        `json:"ticket_index"`
-	Allocation  *Allocation     `json:"allocation,omitempty"`
-	IssuedAt    time.Time       `json:"issued_at"`
+	Event              EventMeta       `json:"event"`
+	IssuerKeys         tickets.KeyRing `json:"issuer_keys"`
+	TicketIndex        []string        `json:"ticket_index"`
+	TicketIndexPresent bool            `json:"ticket_index_present"`
+	Allocation         *Allocation     `json:"allocation,omitempty"`
+	IssuedAt           time.Time       `json:"issued_at"`
 }
 
 // Validate checks internal consistency of a Bundle before a gate starts
@@ -69,9 +78,10 @@ type Bundle struct {
 // first loaded.
 //
 // Validate deliberately does NOT require TicketIndex to be non-empty: an
-// empty (or absent, pre-this-field) index is a legitimate value meaning
-// "fall back to signature-only checking" — see DecideWithBundle — not a
-// malformed bundle.
+// empty index is a legitimate value. Its MEANING depends on
+// TicketIndexPresent — an empty present index means "admit nothing" (every
+// ticket revoked, or none issued), while an absent index (present=false)
+// means "fall back to signature-only checking". See DecideWithBundle.
 func (b Bundle) Validate() error {
 	if b.Event.EventID == "" {
 		return fmt.Errorf("scan: bundle: event_id is empty")

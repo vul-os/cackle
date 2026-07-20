@@ -91,19 +91,27 @@ func Decide(ctx context.Context, cap string, ring tickets.KeyRing, eventID strin
 }
 
 // DecideWithBundle is Decide plus one additional, purely-local check: when
-// b.TicketIndex is present and non-empty, a ticket whose id is absent from
-// it is rejected as Invalid even though its signature verifies cleanly.
-// That is the whole point of TicketIndex (see bundle.go) — a signature only
-// proves a capability was validly issued, never that it wasn't later voided
-// or refunded, and this is what closes that gap.
+// the bundle carries an authoritative ticket index, a ticket whose id is
+// absent from it is rejected as Invalid even though its signature verifies
+// cleanly. That is the whole point of TicketIndex (see bundle.go) — a
+// signature only proves a capability was validly issued, never that it
+// wasn't later voided or refunded, and this is what closes that gap.
 //
-// Compatibility fallback, stated plainly: when TicketIndex is empty (an
-// older bundle downloaded before this field existed, or an event with no
-// issued tickets at bundle time) DecideWithBundle does NOT reject every
-// scan — it falls back to signature-only behaviour identical to Decide.
-// Refusing to admit anyone just because the index is missing would trade
-// one failure mode (admitting a revoked ticket) for a worse one (admitting
-// nobody). This is a deliberate compatibility choice, not an oversight.
+// The index is authoritative when b.TicketIndexPresent is true, which the
+// server ALWAYS sets — it queried the current valid set to build the
+// bundle. Crucially, an authoritative index that happens to be EMPTY means
+// "admit nothing": every ticket for this event has been voided/refunded (or
+// none was ever issued). Earlier this was inferred from length alone, which
+// could not tell "all tickets revoked" apart from "no index data", and so
+// would have silently re-admitted every physically-held ticket for a
+// cancelled event. It no longer can.
+//
+// Compatibility fallback, stated plainly: only when b.TicketIndexPresent is
+// false — a legacy or hand-built bundle carrying no index data at all — does
+// DecideWithBundle fall back to signature-only behaviour identical to
+// Decide. Refusing to admit anyone just because a legacy bundle lacks the
+// field would trade one failure mode for a worse one. This fallback is
+// keyed on the explicit "present" flag, never on the index being empty.
 //
 // Point-in-time limitation, also stated plainly: TicketIndex is a snapshot
 // as of the bundle's IssuedAt. A ticket refunded after a gate downloaded
@@ -122,7 +130,10 @@ func DecideWithBundle(ctx context.Context, cap string, b Bundle, seen SeenSet, n
 		return terminal
 	}
 
-	if len(b.TicketIndex) > 0 && !ticketIndexContains(b.TicketIndex, payload.TID) {
+	// An authoritative index (present=true) is checked even when empty —
+	// empty means "admit nothing". Only an absent index (present=false)
+	// falls through to signature-only admission.
+	if b.TicketIndexPresent && !ticketIndexContains(b.TicketIndex, payload.TID) {
 		return Result{Status: Invalid, Reason: "ticket revoked or not issued for this event"}
 	}
 

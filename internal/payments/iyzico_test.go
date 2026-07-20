@@ -145,10 +145,10 @@ func TestIyzicoVerify_TimeoutFailsClosed(t *testing.T) {
 	}
 }
 
-// TestIyzicoWebhook_UnsignedCallbackAloneCannotForgeSuccess mirrors the
-// M-Pesa security regression test: the callback itself carries no
-// verifiable status, only a token, so a forged callback claiming success
-// must not matter -- only the authenticated retrieve call's answer does.
+// TestIyzicoWebhook_UnsignedCallbackAloneCannotForgeSuccess guards the same
+// property several unsigned-callback adapters rely on: the callback itself
+// carries no verifiable status, only a token, so a forged callback claiming
+// success must not matter -- only the authenticated retrieve call's answer does.
 func TestIyzicoWebhook_UnsignedCallbackAloneCannotForgeSuccess(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Authenticated retrieve says FAILURE...

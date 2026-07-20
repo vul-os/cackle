@@ -128,13 +128,16 @@ const ScannerPage = () => {
         const keyRing = buildKeyRing(bundle.issuer_keys);
         // ticket_index (see docs/OFFLINE-GATES.md) is the set of ticket ids
         // currently valid for this event as of when the bundle was
-        // downloaded — an older cached bundle predating this field simply
-        // won't have it, which is fine: useScanEngine falls back to
-        // signature-only checking when it's missing/empty.
+        // downloaded. ticket_index_present says whether that set is
+        // AUTHORITATIVE: a server-built bundle always sets it true, so an
+        // empty index means "admit nothing" (all revoked / none issued), NOT
+        // "no data". Only a legacy bundle lacking the flag falls back to
+        // signature-only checking. This mirrors Go's DecideWithBundle exactly.
         setSession({
             event: normaliseSessionEvent(bundle.event, event),
             keyRing,
             ticketIndex: Array.isArray(bundle.ticket_index) ? bundle.ticket_index : [],
+            ticketIndexPresent: bundle.ticket_index_present === true,
         });
     };
 
@@ -149,6 +152,7 @@ const ScannerPage = () => {
                 event={session.event}
                 keyRing={session.keyRing}
                 ticketIndex={session.ticketIndex}
+                ticketIndexPresent={session.ticketIndexPresent}
                 gateId={gateId}
                 onExit={() => setSession(null)}
             />

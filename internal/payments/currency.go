@@ -16,10 +16,6 @@ import (
 //   - Flutterwave, Xendit, Midtrans, Mercado Pago, dLocal, PayU and iyzico
 //     all take (or can take) a decimal string/number in MAJOR units on
 //     their public APIs (e.g. "100.50" meaning R100.50, not 10050).
-//   - M-Pesa's Daraja STK Push API takes a bare integer number of KES
-//     shillings (no decimals at all — Safaricom truncates/rejects
-//     fractional amounts), which happens to equal "major units" because
-//     KES is a 2-decimal currency but M-Pesa simply doesn't support cents.
 //
 // Getting this conversion wrong by one exponent is a 100x-money bug (see
 // PAYMENTS-CONTRACT.md's warning about "cents" not being universal). Every

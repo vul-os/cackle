@@ -45,12 +45,17 @@ function describeError(err) {
  * admission.go): it is the scan bundle's `ticket_index` — the set of
  * ticket IDs currently valid (issued, not void, not refunded) for this
  * event as of when the bundle was downloaded. A ticket whose signature
- * verifies but whose id is ABSENT from a non-empty ticketIndex is treated
- * as invalid — this is what catches a ticket that was refunded after
- * issuance, which a signature alone can never reveal. When ticketIndex is
- * missing or empty (an older cached bundle, or an event with no tickets
- * issued yet) this deliberately falls back to signature-only checking
- * rather than refusing every scan — see docs/OFFLINE-GATES.md.
+ * verifies but whose id is ABSENT from an AUTHORITATIVE ticketIndex is
+ * treated as invalid — this is what catches a ticket refunded after
+ * issuance, which a signature alone can never reveal.
+ *
+ * `ticketIndexPresent` says whether the index is authoritative, and it is
+ * the crux: a server-built bundle always sets it, so an EMPTY authoritative
+ * index means "admit nothing" (every ticket revoked, or none issued) — not
+ * "no data". Only a legacy bundle without the flag falls back to
+ * signature-only checking. Inferring this from length alone would silently
+ * re-admit every physically-held ticket for a fully-cancelled event.
+ * See docs/OFFLINE-GATES.md.
  *
  * Like the rest of this hook, this check is purely local: ticketIndex is
  * whatever was cached in IndexedDB alongside the rest of the bundle, so a
@@ -58,10 +63,13 @@ function describeError(err) {
  * until the gate re-pulls a fresh bundle — an inherent limitation of
  * offline operation, not a bug.
  */
-export function useScanEngine({ eventId, keyRing, ticketIndex, gateId }) {
+export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, gateId }) {
     const online = useOnline();
+    // Always build the set — even when empty — so an authoritative empty
+    // index admits nothing. Whether it is consulted at all is gated on
+    // ticketIndexPresent below, never on the set being non-empty.
     const ticketIndexSet = useMemo(
-        () => (Array.isArray(ticketIndex) && ticketIndex.length > 0 ? new Set(ticketIndex) : null),
+        () => new Set(Array.isArray(ticketIndex) ? ticketIndex : []),
         [ticketIndex],
     );
     const [tally, setTally] = useState({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
@@ -140,12 +148,13 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, gateId }) {
                     note = 'Ticket belongs to a different event';
                     ticketId = payload.tid;
                     holderName = payload.nm;
-                } else if (ticketIndexSet && !ticketIndexSet.has(payload.tid)) {
+                } else if (ticketIndexPresent && !ticketIndexSet.has(payload.tid)) {
                     // Signature verifies, right event — but not in the
-                    // index the gate downloaded, e.g. because it was
-                    // refunded after issuance. Mirrors Go's
-                    // scan.DecideWithBundle: reject as invalid, and (like
-                    // any other Invalid result) never record a ticket id.
+                    // authoritative index the gate downloaded, e.g. because
+                    // it was refunded after issuance (or the whole event was
+                    // cancelled, leaving an empty-but-authoritative index).
+                    // Mirrors Go's scan.DecideWithBundle: reject as invalid,
+                    // and (like any Invalid result) never record a ticket id.
                     result = 'invalid';
                     note = 'Ticket revoked or not issued for this event';
                 } else {
@@ -174,7 +183,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, gateId }) {
                 }, 400);
             }
         },
-        [eventId, keyRing, ticketIndexSet, gateId, refreshCounts, syncNow],
+        [eventId, keyRing, ticketIndexSet, ticketIndexPresent, gateId, refreshCounts, syncNow],
     );
 
     return { online, tally, pendingCount, lastResult, isSyncing, syncNow, handleDecode, deviceId: deviceId.current };

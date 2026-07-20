@@ -178,14 +178,19 @@ func TestDecide_WithSQLiteSeenSet(t *testing.T) {
 
 // issueTestBundle wraps issueTestTicket into a full Bundle ready for
 // DecideWithBundle, with a caller-supplied ticket_index.
+// Convention: a nil ticketIndex models an ABSENT index (legacy bundle,
+// TicketIndexPresent=false → signature-only fallback). A non-nil slice —
+// EVEN AN EMPTY ONE — models an AUTHORITATIVE index (present=true), so an
+// empty non-nil index means "admit nothing".
 func issueTestBundle(t testing.TB, eventID, ticketID string, nbf, exp int64, ticketIndex []string) (Bundle, string) {
 	t.Helper()
 	ring, token := issueTestTicket(t, eventID, ticketID, nbf, exp)
 	b := Bundle{
-		Event:       EventMeta{EventID: eventID},
-		IssuerKeys:  ring,
-		TicketIndex: ticketIndex,
-		IssuedAt:    time.Unix(nbf, 0),
+		Event:              EventMeta{EventID: eventID},
+		IssuerKeys:         ring,
+		TicketIndex:        ticketIndex,
+		TicketIndexPresent: ticketIndex != nil,
+		IssuedAt:           time.Unix(nbf, 0),
 	}
 	return b, token
 }
@@ -249,25 +254,44 @@ func TestDecideWithBundle_Invalid_RevokedTicket_SignatureOtherwisePerfect(t *tes
 	}
 }
 
-func TestDecideWithBundle_FallsBackToSignatureOnly_WhenIndexEmpty(t *testing.T) {
-	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, nil)
-	seen := NewMemorySeenSet()
-	now := time.Unix(1500, 0)
-
-	res := DecideWithBundle(context.Background(), token, b, seen, now)
-	if res.Status != Admitted {
-		t.Fatalf("expected Admitted (signature-only fallback) with empty index, got %s (%s)", res.Status, res.Reason)
-	}
-}
-
 func TestDecideWithBundle_FallsBackToSignatureOnly_WhenIndexAbsent(t *testing.T) {
-	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{})
+	// nil index => TicketIndexPresent=false => a legacy/hand-built bundle with
+	// no index data at all. This is the ONLY case that falls back to
+	// signature-only admission.
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, nil)
+	if b.TicketIndexPresent {
+		t.Fatalf("nil index must model an absent (not present) index")
+	}
 	seen := NewMemorySeenSet()
 	now := time.Unix(1500, 0)
 
 	res := DecideWithBundle(context.Background(), token, b, seen, now)
 	if res.Status != Admitted {
 		t.Fatalf("expected Admitted (signature-only fallback) with absent index, got %s (%s)", res.Status, res.Reason)
+	}
+}
+
+func TestDecideWithBundle_Invalid_WhenIndexPresentButEmpty(t *testing.T) {
+	// The bug this whole field fixes: an authoritative but EMPTY index means
+	// every ticket was voided/refunded (or none issued) — admit NOTHING. A
+	// perfectly-signed, current, right-event ticket must still be rejected.
+	// Before TicketIndexPresent existed this was indistinguishable from
+	// "no index data" and silently admitted, which would re-admit every
+	// physically-held ticket for a fully-cancelled event.
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{})
+	if !b.TicketIndexPresent {
+		t.Fatalf("a non-nil (even empty) index must model an authoritative/present index")
+	}
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Invalid {
+		t.Fatalf("expected Invalid (present-but-empty index admits nothing), got %s (%s)", res.Status, res.Reason)
+	}
+	// And it must not consume the dedupe slot.
+	if seenAlready, _ := seen.Seen(context.Background(), "ticket-1"); seenAlready {
+		t.Fatalf("a ticket rejected by an empty authoritative index must not be recorded as seen")
 	}
 }
 

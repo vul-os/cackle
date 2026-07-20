@@ -108,6 +108,7 @@ func TestBundle_Validate_ZeroIssuedAt(t *testing.T) {
 func TestBundle_JSONRoundTrip(t *testing.T) {
 	b := validBundle(t)
 	b.TicketIndex = []string{"ticket-1", "ticket-2", "ticket-3"}
+	b.TicketIndexPresent = true
 	b.Allocation = &Allocation{
 		ID: "alloc-1", EventID: "event-1", DeviceID: "gate-7",
 		TicketTypeID: "tt-1", Count: 5,
@@ -122,10 +123,16 @@ func TestBundle_JSONRoundTrip(t *testing.T) {
 	if !bytesContain(data, `"ticket_index"`) {
 		t.Fatalf("expected ticket_index key in marshaled bundle, got: %s", data)
 	}
+	if !bytesContain(data, `"ticket_index_present"`) {
+		t.Fatalf("expected ticket_index_present key in marshaled bundle, got: %s", data)
+	}
 
 	var decoded Bundle
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Unmarshal: %v", err)
+	}
+	if decoded.TicketIndexPresent != b.TicketIndexPresent {
+		t.Fatalf("ticket_index_present mismatch after round trip: got %v want %v", decoded.TicketIndexPresent, b.TicketIndexPresent)
 	}
 
 	if decoded.Event.EventID != b.Event.EventID {

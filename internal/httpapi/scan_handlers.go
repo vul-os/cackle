@@ -239,11 +239,12 @@ func (s *server) handleScanBundle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bundle := scan.Bundle{
-		Event:       eventToMeta(ev),
-		IssuerKeys:  ring,
-		TicketIndex: ticketIDs,
-		Allocation:  nil, // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
-		IssuedAt:    time.Now(),
+		Event:              eventToMeta(ev),
+		IssuerKeys:         ring,
+		TicketIndex:        ticketIDs,
+		TicketIndexPresent: true, // ticketIDs is the authoritative valid set from the DB, even if empty
+		Allocation:         nil,  // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
+		IssuedAt:           time.Now(),
 	}
 	if err := bundle.Validate(); err != nil {
 		internalError(w, s.log(), "scan-bundle validate", err)
@@ -302,9 +303,10 @@ func (s *server) handleScan(w http.ResponseWriter, r *http.Request) {
 
 	seen := &dbSeenSet{db: s.deps.Store.DB(), eventID: req.EventID, gateID: req.GateID, deviceID: req.DeviceID, scannedBy: user.ID}
 	bundle := scan.Bundle{
-		Event:       scan.EventMeta{EventID: req.EventID},
-		IssuerKeys:  ring,
-		TicketIndex: ticketIDs,
+		Event:              scan.EventMeta{EventID: req.EventID},
+		IssuerKeys:         ring,
+		TicketIndex:        ticketIDs,
+		TicketIndexPresent: true, // ticketIDs is the authoritative valid set from the DB, even if empty
 	}
 	result := scan.DecideWithBundle(ctx, req.Capability, bundle, seen, scannedAt)
 

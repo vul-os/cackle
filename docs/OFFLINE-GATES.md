@@ -34,6 +34,7 @@ unplugged:
   "event": { "...": "event metadata" },
   "issuer_keys": [{ "kid": "...", "public_key": "..." }],
   "ticket_index": ["<ticket_id>", "..."],
+  "ticket_index_present": true,
   "allocation": { "...": "see below" },
   "issued_at": "2026-07-20T18:00:00Z"
 }
@@ -50,15 +51,22 @@ unplugged:
   says nothing about whether it was later voided/refunded, and an offline
   gate has no other way to find out. `ticket_index` closes that gap: a
   scan whose signature verifies cleanly but whose `tid` is **absent** from
-  a non-empty `ticket_index` is rejected (`result=invalid`, reason "ticket
-  revoked or not issued for this event") — see `internal/scan.DecideWithBundle`.
+  an authoritative `ticket_index` is rejected (`result=invalid`, reason
+  "ticket revoked or not issued for this event") — see
+  `internal/scan.DecideWithBundle`.
 
   Two things worth stating plainly rather than glossing over:
-  - **Compatibility fallback.** If `ticket_index` is empty or absent (an
-    older cached bundle from before this field existed, or an event with no
-    tickets issued yet), a gate falls back to signature-only checking
-    rather than refusing to admit anyone. An empty index is not the same
-    thing as "nobody is valid."
+  - **`ticket_index_present` decides whether the index is authoritative,
+    and an empty authoritative index means "admit nothing".** The server
+    always sets `ticket_index_present: true` — it queried the current valid
+    set to build the bundle, even when that set is empty. So an event whose
+    every ticket has been refunded (or a cancelled event) ships an empty but
+    *present* index, and a gate admits no one, exactly as it should. Only a
+    legacy bundle that predates the field carries `ticket_index_present:
+    false`, and *only then* does a gate fall back to signature-only
+    checking. This distinction matters: inferring "no data" from an empty
+    index alone would silently re-admit every physically-held ticket for a
+    fully-cancelled event — the one failure this design must not have.
   - **Point-in-time snapshot, not a live feed.** `ticket_index` reflects
     ticket status *at the moment the bundle was generated*. A ticket
     refunded five minutes after a gate downloaded its bundle is still

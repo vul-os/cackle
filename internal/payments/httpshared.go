@@ -7,7 +7,7 @@ import (
 
 // This file is small shared HTTP-safety infrastructure used by the
 // regional-processor adapters in this package (flutterwave.go, xendit.go,
-// midtrans.go, razorpay.go, payu.go, mercadopago.go, dlocal.go, mpesa.go,
+// midtrans.go, razorpay.go, payu.go, mercadopago.go, dlocal.go,
 // yoco.go, payfast.go, iyzico.go). It intentionally does NOT reuse
 // paystack.go's private paystackReadLimited (kept scoped to Paystack so
 // that adapter's existing tests/sentinel error are untouched) nor

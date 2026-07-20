@@ -298,8 +298,8 @@ code an attendee presents at the gate.
 
 ```
 GET    /api/events/{id}/scan-bundle  scanner auth → {event, issuer_keys[], ticket_index[],
-                                     allocation, issued_at} — everything a gate needs to
-                                     run for the whole event with the network unplugged
+                                     ticket_index_present, allocation, issued_at} —
+                                     everything a gate needs to run the whole event offline
 POST   /api/scan                     {event_id, capability, device_id, gate_id, scanned_at}
                                      → {result, ticket, holder}
 POST   /api/scan/sync                {admissions:[...]} batch upload of offline scans;
@@ -317,13 +317,18 @@ path, and are the reason this product exists — see
 
 `ticket_index` is the set of ticket IDs currently valid (issued, not void,
 not refunded) for the event, as of `issued_at`. A capability whose
-signature verifies but whose `tid` is absent from a non-empty
-`ticket_index` is reported `result: "invalid"` — this is what stops a
-refunded ticket from being admitted purely on the strength of its
-signature. An empty/absent `ticket_index` (older bundle, or an event with
-no tickets issued yet) is a deliberate fallback to signature-only
-checking, not "reject everyone" — and even a fresh `ticket_index` is only
-a snapshot as of `issued_at`: a ticket refunded after a gate downloaded its
+signature verifies but whose `tid` is absent from an **authoritative**
+index is reported `result: "invalid"` — this is what stops a refunded
+ticket from being admitted purely on the strength of its signature.
+`ticket_index_present` says whether the index is authoritative: the server
+always sets it `true` (it queried the current valid set to build the
+bundle), so an **empty** authoritative index means *admit nothing* — every
+ticket voided/refunded, or none issued — **not** "no data". Only a legacy
+bundle carrying `ticket_index_present: false` falls back to signature-only
+checking. Distinguishing "present but empty" from "absent" is deliberate:
+inferring it from length alone would silently re-admit every physically-held
+ticket for a fully-cancelled event. Even a fresh `ticket_index` is only a
+snapshot as of `issued_at`: a ticket refunded after a gate downloaded its
 bundle stays admittable at that gate until it re-syncs. See
 [OFFLINE-GATES.md](OFFLINE-GATES.md) for the full reasoning.
 

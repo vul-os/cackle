@@ -30,7 +30,7 @@ const TALLY_TILES = [
     { key: 'invalid', label: 'Invalid', color: 'text-rose-400', combineWith: 'wrong_event' },
 ];
 
-const ScanView = ({ event, keyRing, ticketIndex, gateId, onExit }) => {
+const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, gateId, onExit }) => {
     const videoRef = useRef(null);
     const scannerRef = useRef(null);
     const [cameraError, setCameraError] = useState(null);
@@ -42,6 +42,7 @@ const ScanView = ({ event, keyRing, ticketIndex, gateId, onExit }) => {
         eventId: event.id,
         keyRing,
         ticketIndex,
+        ticketIndexPresent,
         gateId,
     });
 
