@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -66,6 +67,24 @@ const (
 	sessionSecretByteLen = 32
 )
 
+// defaultBaseURLFor derives a sensible public base URL from the listen
+// address, so that running on a non-default port does not silently emit
+// links pointing at port 8080. A wildcard or empty host becomes localhost;
+// anything genuinely public should be set via CACKLE_BASE_URL.
+func defaultBaseURLFor(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return defaultBaseURL
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	if port == "" {
+		return "http://" + host
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
 // Load resolves configuration from flags, then the environment, then
 // defaults. If no session secret is configured anywhere, one is generated
 // and persisted next to the database file so restarts keep sessions valid.
@@ -73,9 +92,13 @@ func Load(f Flags) (*Config, error) {
 	cfg := &Config{
 		Addr:              firstNonEmpty(f.Addr, os.Getenv(envAddr), defaultAddr),
 		DB:                firstNonEmpty(f.DB, os.Getenv(envDB), defaultDB),
-		BaseURL:           firstNonEmpty(f.BaseURL, os.Getenv(envBaseURL), defaultBaseURL),
 		PaystackSecretKey: os.Getenv(envPaystackKey),
 	}
+
+	// BaseURL defaults to whatever we are actually listening on. Pinning it to
+	// port 8080 regardless of --addr meant password-reset links and payment
+	// callbacks pointed at a port nothing was serving.
+	cfg.BaseURL = firstNonEmpty(f.BaseURL, os.Getenv(envBaseURL), defaultBaseURLFor(cfg.Addr))
 
 	if f.DemoSet {
 		cfg.Demo = f.Demo

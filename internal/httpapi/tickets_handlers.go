@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -20,7 +21,58 @@ func (s *server) handleListMyTickets(w http.ResponseWriter, r *http.Request) {
 		internalError(w, s.log(), "list my tickets", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"tickets": list})
+	writeJSON(w, http.StatusOK, map[string]any{"tickets": s.decorateTickets(r, list)})
+}
+
+// decoratedTicket is a ticket plus the human-readable names a buyer-facing
+// screen needs. The raw Ticket carries only foreign keys, which left "my
+// tickets" rendering "Event" and "Ticket" as literal placeholder text.
+// Enrichment is best-effort: a lookup failure degrades to the bare ticket
+// rather than failing the request.
+type decoratedTicket struct {
+	*orders.Ticket
+	EventTitle     string `json:"event_title,omitempty"`
+	EventVenue     string `json:"event_venue_name,omitempty"`
+	EventStartsAt  string `json:"event_starts_at,omitempty"`
+	TicketTypeName string `json:"ticket_type_name,omitempty"`
+}
+
+// decorateTickets resolves event and ticket-type names for a ticket list,
+// caching per event so a list of N tickets across M events costs M lookups,
+// not N.
+func (s *server) decorateTickets(r *http.Request, list []orders.Ticket) []decoratedTicket {
+	ctx := r.Context()
+	type eventInfo struct {
+		title, venue, startsAt string
+		typeNames              map[string]string
+	}
+	cache := map[string]*eventInfo{}
+
+	out := make([]decoratedTicket, 0, len(list))
+	for i := range list {
+		t := &list[i]
+		d := decoratedTicket{Ticket: t}
+
+		info, ok := cache[t.EventID]
+		if !ok {
+			info = &eventInfo{typeNames: map[string]string{}}
+			if ev, err := s.deps.Events.Get(ctx, t.EventID); err == nil {
+				info.title, info.venue = ev.Title, ev.VenueName
+				info.startsAt = ev.StartsAt.Format(time.RFC3339)
+			}
+			if tts, err := s.deps.Events.ListTicketTypes(ctx, t.EventID); err == nil {
+				for _, tt := range tts {
+					info.typeNames[tt.ID] = tt.Name
+				}
+			}
+			cache[t.EventID] = info
+		}
+
+		d.EventTitle, d.EventVenue, d.EventStartsAt = info.title, info.venue, info.startsAt
+		d.TicketTypeName = info.typeNames[t.TicketTypeID]
+		out = append(out, d)
+	}
+	return out
 }
 
 // ticketOwnedBy reports whether ticket belongs to userID, and 404s (never
@@ -49,7 +101,7 @@ func (s *server) handleGetTicket(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ticket": t})
+	writeJSON(w, http.StatusOK, map[string]any{"ticket": s.decorateTickets(r, []orders.Ticket{*t})[0]})
 }
 
 // handleTicketPDF serves GET /api/tickets/{id}/pdf: a minimal, dependency-free

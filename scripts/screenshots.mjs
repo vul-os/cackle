@@ -57,8 +57,8 @@ const LOCAL_PORT = 8087;
 const LOCAL_BASE = `http://127.0.0.1:${LOCAL_PORT}`;
 const BASE = EXTERNAL_URL ?? LOCAL_BASE;
 
-const DEMO_EMAIL = process.env.CACKLE_DEMO_EMAIL || 'organiser@cackle.demo';
-const DEMO_PASSWORD = process.env.CACKLE_DEMO_PASSWORD || 'cackle-demo';
+const DEMO_EMAIL = process.env.CACKLE_DEMO_EMAIL || 'demo@cackle.events';
+const DEMO_PASSWORD = process.env.CACKLE_DEMO_PASSWORD || 'demo1234';
 
 const VIEWPORT = { width: 1440, height: 900 };
 const THEME_STORAGE_KEYS = ['cackle-ui-theme', 'vite-ui-theme']; // shadcn ThemeProvider storageKey — cover both the current and legacy default
@@ -291,9 +291,44 @@ async function loginViaUI(page) {
   }
   await email.fill(DEMO_EMAIL);
   await password.fill(DEMO_PASSWORD);
-  await page.keyboard.press('Enter');
+
+  // Click the real submit button; pressing Enter does not reliably submit
+  // every form and previously failed silently.
+  const submit = page
+    .locator('button[type="submit"], form button:has-text("Sign In")')
+    .first();
+  if (await submit.count()) {
+    await submit.click();
+  } else {
+    await page.keyboard.press('Enter');
+  }
+
   await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
   await sleep(500);
+
+  // VERIFY. Without this the run happily screenshots 13 copies of the
+  // sign-in page and reports "0 failed" — which is exactly what it did.
+  const authed = await page.evaluate(async () => {
+    try {
+      // The app authenticates with a Bearer token from localStorage, not a
+      // cookie — verify the way the app itself does.
+      const tok = localStorage.getItem('cackle_token');
+      if (!tok) return 0;
+      const res = await fetch('/api/auth/me', {
+        credentials: 'include',
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      return res.status;
+    } catch {
+      return 0;
+    }
+  });
+  if (authed !== 200) {
+    throw new Error(
+      `demo login did not authenticate (GET /api/auth/me -> ${authed}); ` +
+        `check DEMO_EMAIL/DEMO_PASSWORD and that the token is sent on same-origin requests`,
+    );
+  }
 }
 
 async function makeThemeContext(browser, theme) {

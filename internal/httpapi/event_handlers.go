@@ -75,11 +75,18 @@ func (s *server) handleListPublicEvents(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"events": list})
 }
 
-// handleGetPublicEvent serves GET /api/events/{slug} — public, by slug,
-// published only (enforced by events.Service.GetBySlug per its own doc).
+// handleGetPublicEvent serves GET /api/events/{slugOrID} — public, published
+// only (enforced by events.Service.GetBySlug per its own doc).
+//
+// It accepts either a slug or an event ULID. Slug-only lookup meant the
+// organiser UI, whose routes are /admin/events/:id, 404'd on every event —
+// the whole event editor rendered "Event not found".
 func (s *server) handleGetPublicEvent(w http.ResponseWriter, r *http.Request) {
-	slug := chi.URLParam(r, "id")
-	ev, err := s.deps.Events.GetBySlug(r.Context(), slug)
+	ref := chi.URLParam(r, "id")
+	ev, err := s.deps.Events.GetBySlug(r.Context(), ref)
+	if errors.Is(err, store.ErrNotFound) {
+		ev, err = s.deps.Events.Get(r.Context(), ref)
+	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			notFound(w, "event not found")

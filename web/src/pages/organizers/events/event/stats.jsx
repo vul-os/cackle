@@ -38,7 +38,7 @@ const EventStatsPage = () => {
             .stats(id)
             .then((data) => {
                 if (cancelled) return;
-                setState({ stats: data, loading: false, error: null });
+                setState({ stats: data?.stats ?? data, loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
