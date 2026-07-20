@@ -2,31 +2,32 @@
 // providers that implement it.
 //
 // The central design constraint: Cackle never holds funds. The organiser's
-// own payment account (Paystack merchant account, bank EFT details, etc)
-// receives the money directly; Cackle only initiates the charge, records
-// what happened, and verifies it out-of-band before issuing tickets. There
-// is no escrow, no platform wallet, no "hold and release" step anywhere in
-// this package.
+// own payment account (a card processor's merchant account, a bank
+// account, a self-hosted BTCPay/LNbits node, whatever) receives the money
+// directly; Cackle only initiates the charge, records what happened, and
+// verifies it out-of-band before issuing tickets. There is no escrow, no
+// platform wallet, no "hold and release" step anywhere in this package.
 //
 // Providers are never hardcoded into callers. Everything goes through the
-// Provider interface and is looked up by name from a Registry, so a
-// self-hoster can plug in their own provider (a different gateway, a manual
-// EFT-only flow, whatever) without touching anyone else's code.
+// Provider interface and is looked up by name from a Registry (see
+// registry.go), so a self-hoster can plug in their own provider (a
+// different gateway, a bank-transfer-only flow, whatever) without touching
+// anyone else's code. The DEFAULT provider is "manual" (see manual.go): no
+// network calls, no API keys, works in every country — every other
+// provider is an optional, off-by-default adapter on top of it.
 //
 // # Money representation
 //
-// Amounts are integer cents (subunits) throughout this package, matching
-// the rest of Cackle's schema (money is never a float). Paystack's API
-// takes amounts in the smallest currency subunit too, and for every
-// currency Cackle currently supports (ZAR — South African cents) that
-// subunit factor is 100, i.e. R1.00 == 100. That means Order.TotalCents
-// and Result.AmountCents map onto Paystack's `amount` field with NO
-// conversion required — see the comment on paystackAmountSubunitFactor in
-// paystack.go for the one place this assumption is pinned down. This would
-// NOT hold for a zero-decimal currency (Paystack itself has none today,
-// but if Cackle ever adds a currency where major-unit == subunit, this
-// package would need a per-currency table before trusting the 1:1 mapping
-// blindly).
+// Cackle is country- and currency-agnostic: there is no privileged
+// country, currency, or processor. Amounts in this package are always an
+// integer count of the currency's own minor units (AmountMinor) plus an
+// ISO-4217 currency code — NEVER "cents", because that word is wrong for
+// roughly a dozen real currencies (JPY/KRW/VND/CLP/ISK have zero decimal
+// places, KWD/BHD/JOD/OMR/TND have three). The authoritative exponent
+// table lives in internal/money; this package never assumes 2. Provider
+// adapters are responsible for converting AmountMinor to/from whatever
+// subunit convention their own API uses (most match ISO-4217 minor units,
+// but check each one — see the per-adapter file for the citation).
 //
 // # Fail-closed discipline
 //
@@ -45,9 +46,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -56,42 +55,146 @@ type Status string
 
 const (
 	// StatusPending means the charge was started but has not settled yet
-	// (the buyer may still be on the payment page).
+	// (the buyer may still be on the payment page, or an organiser
+	// hasn't marked a manual order paid yet).
 	StatusPending Status = "pending"
-	// StatusPaid means the provider has confirmed funds settled. This is
-	// the ONLY status that should ever cause tickets to be issued.
+	// StatusPaid means the provider (or, for the manual provider, the
+	// organiser) has confirmed funds settled. This is the ONLY status
+	// that should ever cause tickets to be issued.
 	StatusPaid Status = "paid"
-	// StatusFailed covers abandoned, declined, reversed, or otherwise
-	// unsuccessful charges.
+	// StatusFailed covers abandoned, declined, reversed, cancelled, or
+	// otherwise unsuccessful charges.
 	StatusFailed Status = "failed"
 )
+
+// Flow describes the shape of the buyer-facing interaction a Provider
+// uses to collect payment. Callers (checkout UI) use this to decide how
+// to present a provider — send the buyer somewhere, embed something
+// inline, or just show instructions/an invoice.
+type Flow string
+
+const (
+	// FlowRedirect sends the buyer's browser to a hosted payment page
+	// (Charge.RedirectURL) and back via Order.CallbackURL.
+	FlowRedirect Flow = "redirect"
+	// FlowInline settles without leaving the checkout page (an embedded
+	// widget, a direct API call the client makes itself, etc).
+	FlowInline Flow = "inline"
+	// FlowManual means there is no payment page or widget at all: the
+	// buyer is shown instructions (bank details, pay-at-the-door, an
+	// invoice reference) and an organiser later marks the order paid.
+	// See manual.go — this is Cackle's default flow.
+	FlowManual Flow = "manual"
+	// FlowInvoice means the provider generates a payable invoice/request
+	// (common for crypto and some B2B gateways) rather than a page or an
+	// inline widget.
+	FlowInvoice Flow = "invoice"
+)
+
+// Capabilities describes what a Provider can do, so callers (the
+// Registry, checkout UI, org settings) can filter and validate providers
+// without hardcoding per-provider knowledge anywhere else.
+type Capabilities struct {
+	// Currencies is the set of ISO-4217 codes this provider's configured
+	// merchant account(s) can settle. Empty means "broad support / ask
+	// the provider at Begin time" — callers should not treat an empty
+	// slice as "supports everything" without also validating the
+	// specific currency via internal/money and, where possible, the
+	// provider's own error at Begin.
+	Currencies []string
+	// Countries is the set of ISO-3166-1 alpha-2 countries this
+	// provider's merchant account(s) are registered in. Empty means
+	// broad/unspecified.
+	Countries []string
+	// Flow is the buyer-facing interaction shape — see the Flow
+	// constants.
+	Flow Flow
+	// Refunds reports whether this provider exposes a refund API
+	// (whether or not Cackle has wired it up yet).
+	Refunds bool
+	// Payouts reports whether this provider can pay an organiser out
+	// directly (transfers/recipients), independent of Cackle.
+	Payouts bool
+	// Webhooks reports whether Webhook is actually supported. false
+	// means Webhook always returns an error (see manual.go and stub.go)
+	// and callers must rely on Verify (polling) instead.
+	Webhooks bool
+	// ZeroDecimalOK reports whether this provider correctly handles
+	// zero- and three-decimal currencies (JPY, KWD, ...) rather than
+	// assuming every currency has two decimal places.
+	ZeroDecimalOK bool
+}
+
+// SupportsCurrency reports whether code (case-insensitive, any
+// whitespace-trimmed ISO-4217 code) is usable with this provider. An empty
+// Currencies list is treated as "unrestricted" — callers still validate
+// code itself via internal/money separately.
+func (c Capabilities) SupportsCurrency(code string) bool {
+	if len(c.Currencies) == 0 {
+		return true
+	}
+	code = strings.ToUpper(strings.TrimSpace(code))
+	for _, cur := range c.Currencies {
+		if strings.EqualFold(cur, code) {
+			return true
+		}
+	}
+	return false
+}
+
+// SupportsCountry reports whether cc (case-insensitive ISO-3166-1 alpha-2)
+// is usable with this provider. An empty Countries list is treated as
+// "unrestricted".
+func (c Capabilities) SupportsCountry(cc string) bool {
+	if len(c.Countries) == 0 {
+		return true
+	}
+	cc = strings.ToUpper(strings.TrimSpace(cc))
+	for _, country := range c.Countries {
+		if strings.EqualFold(country, cc) {
+			return true
+		}
+	}
+	return false
+}
 
 // Order is the minimal, storage-agnostic view of an order that a Provider
 // needs to begin a charge. Callers (internal/orders, internal/httpapi)
 // build this from their own persisted order; this package never touches
 // the database itself.
 type Order struct {
-	// ID is the caller's own order identifier (a ULID in Cackle's schema).
-	// It is used as the provider reference so a charge can always be
-	// traced back to exactly one order, and reconciled against it later.
-	ID string
+	// Reference is the caller's own order identifier (a ULID in Cackle's
+	// schema). It is handed to the provider as ITS charge reference so a
+	// charge can always be traced back to exactly one order, and
+	// reconciled against it later — see Reconcile and OrderRef.ID, which
+	// this must equal.
+	Reference string
 	// EventID is the event the order belongs to, carried through as
 	// provider metadata for support/audit purposes only — never trusted
 	// for reconciliation.
 	EventID string
+	// OrgID is the organiser's own identifier, also carried through as
+	// metadata only — the org whose own payment account should receive
+	// this money.
+	OrgID string
 	// BuyerEmail and BuyerName identify the buyer to the provider (e.g.
-	// Paystack requires an email to initialize a transaction).
+	// most hosted-page providers require an email to initialize a
+	// transaction).
 	BuyerEmail string
 	BuyerName  string
-	// TotalCents is the authoritative order total, in integer cents. This
-	// is the amount that will later be reconciled against whatever the
-	// provider reports as settled — see Reconcile.
-	TotalCents int64
-	// Currency is an ISO 4217 code, e.g. "ZAR". Empty defaults to "ZAR"
-	// in providers that need a currency (Cackle's schema default).
+	// AmountMinor is the authoritative order total, expressed in the
+	// SMALLEST unit of Currency (its ISO-4217 minor unit — see
+	// internal/money; this is NOT always "cents": 0 for JPY, 3 for KWD).
+	// This is the amount that will later be reconciled against whatever
+	// the provider reports as settled — see Reconcile.
+	AmountMinor int64
+	// Currency is an ISO-4217 alpha-3 code. Callers must set this
+	// explicitly — Cackle has no privileged default currency; validate
+	// with internal/money before constructing an Order.
 	Currency string
 	// CallbackURL is where the buyer's browser should land after leaving
-	// the provider's hosted payment page. Optional.
+	// the provider's hosted payment page. Optional; only meaningful for
+	// FlowRedirect providers.
 	CallbackURL string
 	// Metadata is passed through to the provider verbatim where
 	// supported, for support/debugging. Never used for reconciliation.
@@ -109,10 +212,11 @@ type Charge struct {
 	Reference string
 	// RedirectURL is a hosted payment page the buyer's browser should be
 	// sent to. Empty for providers that settle inline or give
-	// instructions instead (manual EFT, the stub provider).
+	// instructions instead (FlowManual, FlowInvoice, the stub provider).
 	RedirectURL string
 	// Instructions is human-readable text for non-redirect flows (manual
-	// EFT reference, PayShap instructions, "this is a demo" notices).
+	// payment instructions, an invoice reference, "this is a demo"
+	// notices).
 	Instructions string
 }
 
@@ -123,26 +227,27 @@ type Result struct {
 	Provider string
 	// Reference is the order reference this result is about. Callers
 	// MUST use this — not anything else in the request — to look up the
-	// order before trusting AmountCents/Currency/Status. See Reconcile.
+	// order before trusting AmountMinor/Currency/Status. See Reconcile.
 	Reference string
 	// EventID is a provider-specific identifier that uniquely identifies
-	// THIS settlement notification (e.g. a Paystack transaction id). It
-	// is used for webhook replay protection — see SeenStore — and must
-	// be non-empty whenever Status is StatusPaid.
+	// THIS settlement notification (e.g. a processor's transaction id).
+	// It is used for webhook replay protection — see SeenStore — and
+	// must be non-empty whenever Status is StatusPaid.
 	EventID string
 	// Status is the settlement state. Only StatusPaid may ever result in
 	// tickets being issued.
 	Status Status
-	// AmountCents is what the PROVIDER reports as settled, in integer
-	// cents. This is provider-reported data, echoed back over the
-	// network — it must be reconciled against the caller's own stored
-	// order total (Reconcile) before being trusted for anything.
-	AmountCents int64
+	// AmountMinor is what the PROVIDER reports as settled, in the
+	// currency's own minor units (see Order.AmountMinor). This is
+	// provider-reported data, echoed back over the network — it must be
+	// reconciled against the caller's own stored order total (Reconcile)
+	// before being trusted for anything.
+	AmountMinor int64
 	// Currency is what the provider reports settled in. Same caveat as
-	// AmountCents: reconcile before trusting.
+	// AmountMinor: reconcile before trusting.
 	Currency string
-	// PaidAt is when the provider says the charge settled. Zero value if
-	// unknown or not yet paid.
+	// PaidAt is when the provider (or organiser, for manual) says the
+	// charge settled. Zero value if unknown or not yet paid.
 	PaidAt time.Time
 	// Raw is the provider's raw response/webhook payload, kept for audit
 	// logging. It is response data, not a secret — safe to log/store,
@@ -156,9 +261,14 @@ type Result struct {
 // name, so a self-hoster can add their own without touching shared code.
 type Provider interface {
 	// Name is the stable, lowercase identifier this provider registers
-	// under (e.g. "paystack", "stub"). It is persisted in orders.provider
-	// and used as the {provider} path segment in the webhook route.
+	// under (e.g. "manual", "stripe", "paystack"). It is persisted in
+	// orders.provider and used as the {provider} path segment in the
+	// webhook route.
 	Name() string
+	// Capabilities describes what this provider supports — see the
+	// Capabilities doc comment. It must be safe to call at any time
+	// (including before Begin) and MUST NOT make a network call.
+	Capabilities() Capabilities
 	// Begin returns a redirect URL (or inline instructions) for an order.
 	// It must not mutate any state Cackle considers authoritative for
 	// ticket issuance — issuance only happens after Verify or Webhook
@@ -172,6 +282,9 @@ type Provider interface {
 	// Webhook validates the provider's signature on r and returns the
 	// settled result. Fail CLOSED: a missing or invalid signature, or a
 	// malformed payload, must be an error — never a best-effort Result.
+	// Providers whose Capabilities().Webhooks is false must always
+	// return an error here (never silently succeed) — see manual.go and
+	// stub.go.
 	Webhook(ctx context.Context, r *http.Request) (Result, error)
 }
 
@@ -179,9 +292,9 @@ type Provider interface {
 // Reconcile checks a provider Result against. Callers construct this from
 // their own database read — this package never queries storage itself.
 type OrderRef struct {
-	ID         string
-	TotalCents int64
-	Currency   string
+	ID          string
+	AmountMinor int64
+	Currency    string
 }
 
 // Sentinel errors for Reconcile and the webhook/verify orchestration
@@ -194,11 +307,12 @@ var (
 	ErrReferenceMismatch = errors.New("payments: reference does not match order")
 	// ErrAmountMismatch is the core anti-fraud check: the provider's
 	// settled amount does not equal the order's stored total. This is
-	// exactly how ticketing platforms get robbed (pay R10, claim R1000)
-	// — always reject rather than clamp or "trust the higher one".
+	// exactly how ticketing platforms get robbed (pay 10, claim 1000) —
+	// always reject rather than clamp or "trust the higher one".
 	ErrAmountMismatch = errors.New("payments: settled amount does not match order total")
 	// ErrCurrencyMismatch: settled currency differs from the order's
-	// stored currency.
+	// stored currency. Cackle never treats two different currencies as
+	// interchangeable, even ones that look numerically close.
 	ErrCurrencyMismatch = errors.New("payments: settled currency does not match order currency")
 	// ErrNotPaid: the provider result is not (yet, or no longer) a
 	// successful settlement. Callers must not issue tickets.
@@ -211,10 +325,17 @@ var (
 
 // Reconcile fails closed unless result is an actual settled payment for
 // exactly the order described by want: same reference, StatusPaid, and an
-// amount/currency that match the order's own stored total exactly. Never
+// amount/currency that match the order's own stored total EXACTLY. Never
 // call this with a "want" built from anything the client sent — want must
 // come from the caller's own database read of the order, keyed by
 // result.Reference.
+//
+// Unlike the pre-v2 version of this package, there is no implicit
+// currency default here: Cackle is currency-agnostic, so an empty
+// Currency on either side is compared literally (empty == empty), not
+// silently treated as any particular currency. Callers are responsible
+// for always populating a real ISO-4217 currency on both the stored order
+// and the provider Result.
 func Reconcile(result Result, want OrderRef) error {
 	if result.Reference == "" || result.Reference != want.ID {
 		return fmt.Errorf("%w: result reference %q, order %q", ErrReferenceMismatch, result.Reference, want.ID)
@@ -222,18 +343,10 @@ func Reconcile(result Result, want OrderRef) error {
 	if result.Status != StatusPaid {
 		return fmt.Errorf("%w: status=%q", ErrNotPaid, result.Status)
 	}
-	if result.AmountCents != want.TotalCents {
-		return fmt.Errorf("%w: provider reported %d, order total is %d", ErrAmountMismatch, result.AmountCents, want.TotalCents)
+	if result.AmountMinor != want.AmountMinor {
+		return fmt.Errorf("%w: provider reported %d, order total is %d", ErrAmountMismatch, result.AmountMinor, want.AmountMinor)
 	}
-	wantCurrency := want.Currency
-	if wantCurrency == "" {
-		wantCurrency = "ZAR"
-	}
-	gotCurrency := result.Currency
-	if gotCurrency == "" {
-		gotCurrency = "ZAR"
-	}
-	if !strings.EqualFold(gotCurrency, wantCurrency) {
+	if !strings.EqualFold(result.Currency, want.Currency) {
 		return fmt.Errorf("%w: provider reported %q, order currency is %q", ErrCurrencyMismatch, result.Currency, want.Currency)
 	}
 	return nil
@@ -259,13 +372,14 @@ type OrderLookup interface {
 	Lookup(ctx context.Context, reference string) (OrderRef, error)
 }
 
-// ErrUnhandledEvent is returned by a Provider's Webhook method (see
-// paystack.go) for a validly-signed webhook whose event type this build
-// does not treat as a settlement (e.g. Paystack's transfer.* events).
-// Callers wiring the HTTP route should treat this specific error as "ack
-// with 200, do nothing" — NOT as a hard failure — so the provider doesn't
-// retry forever, while every other error from Webhook remains a hard
-// failure that must not be acknowledged as success.
+// ErrUnhandledEvent is returned by a Provider's Webhook method for a
+// validly-signed webhook whose event type this build does not treat as a
+// settlement (e.g. a transfer.* event on a provider that also emits
+// payout webhooks). Callers wiring the HTTP route should treat this
+// specific error as "ack with 200, do nothing" — NOT as a hard failure —
+// so the provider doesn't retry forever, while every other error from
+// Webhook remains a hard failure that must not be acknowledged as
+// success.
 var ErrUnhandledEvent = errors.New("payments: unhandled webhook event type")
 
 // HandleWebhook is the recommended orchestration for a webhook HTTP route:
@@ -340,62 +454,4 @@ func checkReplay(ctx context.Context, seen SeenStore, provider string, result Re
 		return fmt.Errorf("%w: provider=%s event=%s", ErrReplayed, provider, result.EventID)
 	}
 	return nil
-}
-
-// Registry looks up providers by name so callers never hardcode one.
-type Registry struct {
-	mu        sync.RWMutex
-	providers map[string]Provider
-}
-
-// NewRegistry returns an empty Registry.
-func NewRegistry() *Registry {
-	return &Registry{providers: make(map[string]Provider)}
-}
-
-// Register adds p under p.Name(). It refuses a nil provider, an empty
-// name, a duplicate name, and — as defense in depth alongside the checks
-// already inside NewStub — refuses to register anything named
-// ProviderNameStub if a real Paystack secret is configured in this
-// environment, so the demo/test provider can't end up live even if
-// something upstream constructed it incorrectly.
-func (r *Registry) Register(p Provider) error {
-	if p == nil {
-		return errors.New("payments: cannot register a nil provider")
-	}
-	name := p.Name()
-	if strings.TrimSpace(name) == "" {
-		return errors.New("payments: provider Name() must not be empty")
-	}
-	if name == ProviderNameStub && realPaystackSecretConfigured() {
-		return ErrStubRefusesRealSecret
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.providers[name]; exists {
-		return fmt.Errorf("payments: provider %q already registered", name)
-	}
-	r.providers[name] = p
-	return nil
-}
-
-// Get looks up a provider by name.
-func (r *Registry) Get(name string) (Provider, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	p, ok := r.providers[name]
-	return p, ok
-}
-
-// Names returns the registered provider names, sorted.
-func (r *Registry) Names() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	names := make([]string, 0, len(r.providers))
-	for n := range r.providers {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
 }

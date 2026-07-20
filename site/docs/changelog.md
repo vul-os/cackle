@@ -23,7 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   append-only admission dedupe, and a batch sync endpoint for reconciling
   once back online. See [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md).
 - Events, ticket types, orgs and org roles (`owner` / `admin` / `scanner`),
-  orders and checkout, integer-cents accounting throughout.
+  orders and checkout, integer minor-unit accounting throughout.
 - Pluggable payment provider seam (`internal/payments`): a Paystack adapter
   and a `stub` provider used by `--demo` and tests. Cackle never holds funds.
   See [docs/PAYMENTS.md](docs/PAYMENTS.md).

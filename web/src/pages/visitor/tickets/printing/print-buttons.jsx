@@ -5,15 +5,15 @@ import { Link } from 'react-router-dom';
 
 export const PrintTicketButtons = ({ ticketId, onPrint, isPrinting }) => {
     return (
-        <div className="mt-4 flex gap-2 print:hidden">
-            <Button onClick={() => onPrint(ticketId)} variant="outline" size="sm" disabled={isPrinting}>
-                <Printer className="mr-2 h-4 w-4" />
-                {isPrinting ? 'Printing...' : 'Print Ticket'}
+        <div className="mt-4 flex flex-wrap gap-2 print:hidden">
+            <Button onClick={onPrint} variant="outline" size="sm" disabled={isPrinting}>
+                <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
+                {isPrinting ? 'Printing…' : 'Print ticket'}
             </Button>
             <Button variant="outline" size="sm" asChild>
                 <Link to={`/ticket/${ticketId}`}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Details
+                    <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                    View details
                 </Link>
             </Button>
         </div>
@@ -25,8 +25,8 @@ export const PrintAllButton = ({ onPrintAll, isPrinting, ticketsCount }) => {
 
     return (
         <Button onClick={onPrintAll} variant="outline" size="sm" className="print:hidden" disabled={isPrinting}>
-            <PrinterIcon className="mr-2 h-4 w-4" />
-            {isPrinting ? 'Printing...' : 'Print All Tickets'}
+            <PrinterIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+            {isPrinting ? 'Printing…' : `Print all (${ticketsCount})`}
         </Button>
     );
 };

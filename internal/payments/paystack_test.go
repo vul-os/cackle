@@ -72,8 +72,8 @@ func TestPaystackVerify_Success(t *testing.T) {
 	if result.Status != StatusPaid {
 		t.Fatalf("Status = %q, want paid", result.Status)
 	}
-	if result.AmountCents != 5000 {
-		t.Fatalf("AmountCents = %d, want 5000", result.AmountCents)
+	if result.AmountMinor != 5000 {
+		t.Fatalf("AmountMinor = %d, want 5000", result.AmountMinor)
 	}
 	if result.Currency != "ZAR" {
 		t.Fatalf("Currency = %q, want ZAR", result.Currency)
@@ -239,7 +239,7 @@ func TestPaystackBegin_Success(t *testing.T) {
 	defer ts.Close()
 
 	p := newTestPaystackProvider(t, ts)
-	charge, err := p.Begin(context.Background(), Order{ID: "ord_1", TotalCents: 5000, Currency: "ZAR", BuyerEmail: "a@b.com"})
+	charge, err := p.Begin(context.Background(), Order{Reference: "ord_1", AmountMinor: 5000, Currency: "ZAR", BuyerEmail: "a@b.com"})
 	if err != nil {
 		t.Fatalf("Begin() = %v", err)
 	}
@@ -259,7 +259,7 @@ func TestPaystackBegin_ProviderErrorFailsClosed(t *testing.T) {
 	defer ts.Close()
 
 	p := newTestPaystackProvider(t, ts)
-	_, err := p.Begin(context.Background(), Order{ID: "ord_1", TotalCents: 5000, BuyerEmail: "a@b.com"})
+	_, err := p.Begin(context.Background(), Order{Reference: "ord_1", AmountMinor: 5000, BuyerEmail: "a@b.com"})
 	if !errors.Is(err, ErrUnexpectedStatus) {
 		t.Fatalf("Begin() = %v, want ErrUnexpectedStatus", err)
 	}
@@ -269,9 +269,9 @@ func TestPaystackBegin_ValidationErrors(t *testing.T) {
 	p := &PaystackProvider{secretKey: testPaystackSecret, httpClient: http.DefaultClient, baseURL: "http://unused.invalid"}
 
 	cases := []Order{
-		{ID: "", TotalCents: 100, BuyerEmail: "a@b.com"},
-		{ID: "ord_1", TotalCents: 0, BuyerEmail: "a@b.com"},
-		{ID: "ord_1", TotalCents: 100, BuyerEmail: ""},
+		{Reference: "", AmountMinor: 100, BuyerEmail: "a@b.com"},
+		{Reference: "ord_1", AmountMinor: 0, BuyerEmail: "a@b.com"},
+		{Reference: "ord_1", AmountMinor: 100, BuyerEmail: ""},
 	}
 	for i, o := range cases {
 		if _, err := p.Begin(context.Background(), o); err == nil {
@@ -303,7 +303,7 @@ func TestPaystackWebhook_ValidSignatureSucceeds(t *testing.T) {
 	if result.Status != StatusPaid {
 		t.Fatalf("Status = %q, want paid", result.Status)
 	}
-	if result.Reference != "ord_1" || result.AmountCents != 5000 || result.Currency != "ZAR" {
+	if result.Reference != "ord_1" || result.AmountMinor != 5000 || result.Currency != "ZAR" {
 		t.Fatalf("unexpected result: %+v", result)
 	}
 	if result.EventID != "555" {
@@ -418,7 +418,7 @@ func TestPaystackWebhook_ReplayedThroughHandleWebhook(t *testing.T) {
 	sig := signPaystackBody(t, body)
 	p := &PaystackProvider{secretKey: testPaystackSecret}
 	seen := newFakeSeenStore()
-	lookup := &fakeOrderLookup{orders: map[string]OrderRef{"ord_1": {ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}}}
+	lookup := &fakeOrderLookup{orders: map[string]OrderRef{"ord_1": {ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}}}
 
 	_, err := HandleWebhook(context.Background(), p, paystackWebhookRequest(t, body, sig), seen, lookup)
 	if err != nil {

@@ -1,23 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Header from '@/pages/visitor/header';
-import { Card, CardContent } from '@/components/ui/card';
-import { AlertCircle, Ticket } from 'lucide-react';
+import { Ticket } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import TicketFilters from './ticket-filters';
 import PrintableTicket from './printing/layout';
 import EventInformation from './event-infomation';
+import PrintStyles from './printing/print-styles';
 import { usePrintTicket } from './printing/use-print-ticket';
 import { PrintTicketButtons, PrintAllButton } from './printing/print-buttons';
 import { tickets as ticketsApi } from '@/lib/api';
 
+const DEFAULT_FILTERS = { event: 'all', ticketType: 'all', status: 'all', time: 'all', search: '' };
+
 export default function TicketsListPage() {
     const [state, setState] = useState({ tickets: [], loading: true, error: null });
-    const [selectedEvent, setSelectedEvent] = useState('all');
-    const [selectedTicketType, setSelectedTicketType] = useState('all');
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
 
-    const { isPrinting, printSingleTicket, printAllTickets } = usePrintTicket();
+    const { isPrinting, printTarget, printSingleTicket, printAllTickets } = usePrintTicket();
+
+    const [reloadToken, setReloadToken] = useState(0);
+    const load = () => setReloadToken((n) => n + 1);
 
     useEffect(() => {
         let cancelled = false;
+        setState((s) => ({ ...s, loading: true, error: null }));
         ticketsApi
             .list()
             .then((data) => {
@@ -32,7 +41,7 @@ export default function TicketsListPage() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [reloadToken]);
 
     const { tickets, loading, error } = state;
 
@@ -49,120 +58,156 @@ export default function TicketsListPage() {
     });
     const typeOf = (t) => ({ id: t.ticket_type_id, name: t.ticket_type_name || 'Ticket' });
 
-    const events = tickets.reduce((acc, t) => {
-        if (t.event_id && !acc.find((e) => e.id === t.event_id)) acc.push(eventOf(t));
-        return acc;
-    }, []);
-    const ticketTypes = tickets.reduce((acc, t) => {
-        if (t.ticket_type_id && !acc.find((tt) => tt.id === t.ticket_type_id)) acc.push(typeOf(t));
-        return acc;
-    }, []);
+    const events = useMemo(
+        () =>
+            tickets.reduce((acc, t) => {
+                if (t.event_id && !acc.find((e) => e.id === t.event_id)) acc.push(eventOf(t));
+                return acc;
+            }, []),
+        [tickets],
+    );
+    const ticketTypes = useMemo(
+        () =>
+            tickets.reduce((acc, t) => {
+                if (t.ticket_type_id && !acc.find((tt) => tt.id === t.ticket_type_id)) acc.push(typeOf(t));
+                return acc;
+            }, []),
+        [tickets],
+    );
 
-    const filteredTickets = tickets.filter((t) => {
-        const eventMatch = selectedEvent === 'all' || t.event_id === selectedEvent;
-        const typeMatch = selectedTicketType === 'all' || t.ticket_type_id === selectedTicketType;
-        return eventMatch && typeMatch;
-    });
+    const filteredTickets = useMemo(() => {
+        const now = Date.now();
+        const q = filters.search.trim().toLowerCase();
+        return tickets.filter((t) => {
+            if (filters.event !== 'all' && t.event_id !== filters.event) return false;
+            if (filters.ticketType !== 'all' && t.ticket_type_id !== filters.ticketType) return false;
+            const status = t.status || 'valid';
+            if (filters.status !== 'all' && status !== filters.status) return false;
+            if (filters.time !== 'all' && t.event_starts_at) {
+                const startsAt = new Date(t.event_starts_at).getTime();
+                if (!Number.isNaN(startsAt)) {
+                    if (filters.time === 'upcoming' && startsAt < now) return false;
+                    if (filters.time === 'past' && startsAt >= now) return false;
+                }
+            }
+            if (q) {
+                const haystack = `${t.event_title || ''} ${t.event_venue_name || ''} ${t.ticket_type_name || ''}`.toLowerCase();
+                if (!haystack.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [tickets, filters]);
 
-    const groupedTickets = filteredTickets.reduce((acc, ticket) => {
-        const eventId = ticket.event_id ?? 'unknown';
-        const typeId = ticket.ticket_type_id ?? 'unknown';
-        acc[eventId] ||= { event: eventOf(ticket), ticketTypes: {} };
-        acc[eventId].ticketTypes[typeId] ||= { type: typeOf(ticket), tickets: [] };
-        acc[eventId].ticketTypes[typeId].tickets.push(ticket);
-        return acc;
-    }, {});
-
-    if (loading) {
-        return (
-            <>
-                <Header />
-                <div className="flex min-h-[400px] items-center justify-center pt-16">
-                    <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-foreground" />
-                </div>
-            </>
-        );
-    }
-
-    if (error) {
-        return (
-            <>
-                <Header />
-                <Card className="mx-auto mt-24 max-w-2xl">
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col items-center space-y-4 text-center">
-                            <AlertCircle className="h-12 w-12 text-destructive" />
-                            <h2 className="text-2xl font-semibold">Couldn&apos;t load tickets</h2>
-                            <p className="text-muted-foreground">{error}</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </>
-        );
-    }
-
-    if (tickets.length === 0) {
-        return (
-            <>
-                <Header />
-                <Card className="mx-auto mt-24 max-w-2xl">
-                    <CardContent className="pt-6">
-                        <div className="flex flex-col items-center space-y-4 text-center">
-                            <Ticket className="h-12 w-12 text-muted-foreground" />
-                            <h2 className="text-2xl font-semibold">No tickets yet</h2>
-                            <p className="text-muted-foreground">Tickets from paid orders will show up here.</p>
-                        </div>
-                    </CardContent>
-                </Card>
-            </>
-        );
-    }
+    const groupedTickets = useMemo(
+        () =>
+            filteredTickets.reduce((acc, ticket) => {
+                const eventId = ticket.event_id ?? 'unknown';
+                const typeId = ticket.ticket_type_id ?? 'unknown';
+                acc[eventId] ||= { event: eventOf(ticket), ticketTypes: {} };
+                acc[eventId].ticketTypes[typeId] ||= { type: typeOf(ticket), tickets: [] };
+                acc[eventId].ticketTypes[typeId].tickets.push(ticket);
+                return acc;
+            }, {}),
+        [filteredTickets],
+    );
 
     return (
         <>
             <Header />
-            <main className="mx-auto max-w-6xl p-4 pt-24">
-                <div className="mb-6">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h1 className="font-display text-3xl font-bold">My Tickets</h1>
-                        <PrintAllButton onPrintAll={() => printAllTickets(filteredTickets)} isPrinting={isPrinting} ticketsCount={filteredTickets.length} />
+            <PrintStyles />
+            <main className="mx-auto max-w-6xl p-4 pb-24 pt-24">
+                <div className="mb-6 print:hidden">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h1 className="font-display text-3xl font-bold">My tickets</h1>
+                            <p className="mt-1 text-sm text-muted-foreground">Every ticket issued to your paid orders.</p>
+                        </div>
+                        {!loading && !error && tickets.length > 0 && (
+                            <PrintAllButton onPrintAll={printAllTickets} isPrinting={isPrinting} ticketsCount={filteredTickets.length} />
+                        )}
                     </div>
 
-                    <TicketFilters
-                        selectedEvent={selectedEvent}
-                        setSelectedEvent={setSelectedEvent}
-                        selectedTicketType={selectedTicketType}
-                        setSelectedTicketType={setSelectedTicketType}
-                        events={events}
-                        ticketTypes={ticketTypes}
-                    />
+                    {!loading && !error && tickets.length > 0 && (
+                        <TicketFilters
+                            search={filters.search}
+                            setSearch={(search) => setFilters((f) => ({ ...f, search }))}
+                            selectedEvent={filters.event}
+                            setSelectedEvent={(event) => setFilters((f) => ({ ...f, event }))}
+                            selectedTicketType={filters.ticketType}
+                            setSelectedTicketType={(ticketType) => setFilters((f) => ({ ...f, ticketType }))}
+                            selectedStatus={filters.status}
+                            setSelectedStatus={(status) => setFilters((f) => ({ ...f, status }))}
+                            selectedTime={filters.time}
+                            setSelectedTime={(time) => setFilters((f) => ({ ...f, time }))}
+                            events={events}
+                            ticketTypes={ticketTypes}
+                        />
+                    )}
                 </div>
 
-                {Object.values(groupedTickets).map(({ event, ticketTypes: byType }) => (
-                    <div key={event.id} className="mb-8">
-                        <h2 className="mb-4 text-2xl font-semibold">{event.title}</h2>
+                {loading && <SkeletonList rows={3} />}
 
-                        {Object.values(byType).map(({ type, tickets: typeTickets }) => (
-                            <div key={type.id} className="mb-6">
-                                <h3 className="mb-3 border-l-4 border-primary pl-4 text-xl font-medium">
-                                    {type.name} ({typeTickets.length})
-                                </h3>
-                                <div className="grid grid-cols-1 gap-6">
-                                    {typeTickets.map((ticket) => (
-                                        <Card key={ticket.id} className="relative">
-                                            <CardContent className="p-6">
-                                                <PrintableTicket ticket={ticket} event={event} type={type} />
-                                                <PrintTicketButtons ticketId={ticket.id} onPrint={() => printSingleTicket(ticket.id)} isPrinting={isPrinting} />
-                                            </CardContent>
-                                        </Card>
-                                    ))}
+                {!loading && error && <ErrorState description={error} onRetry={load} />}
+
+                {!loading && !error && tickets.length === 0 && (
+                    <EmptyState
+                        icon={Ticket}
+                        title="No tickets yet"
+                        description="Tickets from paid orders will show up here."
+                        action={
+                            <Button asChild>
+                                <a href="/events">Browse events</a>
+                            </Button>
+                        }
+                    />
+                )}
+
+                {!loading && !error && tickets.length > 0 && filteredTickets.length === 0 && (
+                    <EmptyState
+                        icon={Ticket}
+                        title="No tickets match your filters"
+                        description="Try clearing a filter or your search."
+                        action={
+                            <Button variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                                Clear filters
+                            </Button>
+                        }
+                    />
+                )}
+
+                {!loading &&
+                    !error &&
+                    Object.values(groupedTickets).map(({ event, ticketTypes: byType }) => (
+                        <div key={event.id} className="mb-8">
+                            <h2 className="mb-4 text-2xl font-semibold">{event.title}</h2>
+
+                            {Object.values(byType).map(({ type, tickets: typeTickets }) => (
+                                <div key={type.id} className="mb-6">
+                                    <h3 className="mb-3 border-l-4 border-primary pl-4 text-xl font-medium">
+                                        {type.name} ({typeTickets.length})
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {typeTickets.map((ticket) => {
+                                            const hiddenWhilePrinting =
+                                                printTarget && printTarget !== 'all' && printTarget !== ticket.id;
+                                            return (
+                                                <div key={ticket.id} className={hiddenWhilePrinting ? 'print:hidden' : ''}>
+                                                    <PrintableTicket ticket={ticket} event={event} type={type} />
+                                                    <PrintTicketButtons
+                                                        ticketId={ticket.id}
+                                                        onPrint={() => printSingleTicket(ticket.id)}
+                                                        isPrinting={isPrinting}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
 
-                        <EventInformation event={event} />
-                    </div>
-                ))}
+                            <EventInformation event={event} />
+                        </div>
+                    ))}
             </main>
         </>
     );

@@ -2,9 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users, Image as ImageIcon, Copy } from 'lucide-react';
 
-export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmitting, onPublish, isPublishing }) => {
+export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmitting, onPublish, isPublishing, onDuplicate, isDuplicating }) => {
     return (
         <div className="mb-8">
             <Button variant="ghost" onClick={() => navigate('/admin/events')} className="mb-4">
@@ -42,6 +42,16 @@ export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmi
                         <Ticket className="mr-2 h-4 w-4" />
                         Ticket Types
                     </Button>
+                    <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/images`)} disabled={!editForm.id}>
+                        <ImageIcon className="mr-2 h-4 w-4" />
+                        Images
+                    </Button>
+                    {onDuplicate && (
+                        <Button variant="outline" onClick={onDuplicate} disabled={!editForm.id || isDuplicating}>
+                            {isDuplicating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
+                            Duplicate
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

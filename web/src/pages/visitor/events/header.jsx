@@ -3,7 +3,7 @@ import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
-const EventHeader = ({ title, venueName }) => {
+const EventHeader = ({ title, venueName, category }) => {
     const handleShare = async () => {
         const shareData = { title, url: window.location.href };
         try {
@@ -21,7 +21,12 @@ const EventHeader = ({ title, venueName }) => {
     return (
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-8 sm:p-12">
             <div className="mx-auto max-w-5xl">
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                    {category && (
+                        <span className="rounded-full bg-white/15 px-4 py-1.5 text-sm font-semibold capitalize text-white backdrop-blur-md">
+                            {category}
+                        </span>
+                    )}
                     {venueName && (
                         <span className="rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground">{venueName}</span>
                     )}

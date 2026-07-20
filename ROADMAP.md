@@ -15,10 +15,10 @@ point.
 - Single Go binary, embedded SQLite (`modernc.org/sqlite`, pure Go), embedded React frontend
 - Orgs, org membership, roles (`owner` / `admin` / `scanner`)
 - Events: draft → published → cancelled, ticket types with pricing, quantity caps, sales windows
-- Orders and checkout against live ticket-type availability, integer-cents money
+- Orders and checkout against live ticket-type availability, money as integer minor units in the event's currency
 - Ed25519-signed ticket capabilities (`internal/tickets`) — the offline-verifiable format, see [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md)
 - **Offline gate scan** — `scan-bundle` endpoint, pure offline `Verify()`, local append-only admission dedupe, batch sync back once online (`internal/scan`), see [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md)
-- Payment provider seam (`internal/payments`) with a Paystack adapter and a `stub` provider for `--demo` and tests — Cackle never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md)
+- Payment provider seam (`internal/payments`), `manual` as the always-on default, 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more), and a `stub` provider for `--demo` and tests — Cackle is country/currency agnostic and never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md)
 - Per-event sales/admission stats
 - `--demo` mode: fully seeded, zero setup
 
@@ -100,13 +100,13 @@ yet designed.**
 
 ## Later — optional escrow adapters
 
-Cackle's payment seam settles directly to the organiser today (Paystack,
-`stub`). An **optional** escrow adapter would hold funds until an event
-completes (or a dispute window closes) before releasing payout — useful for
-marketplaces that don't fully trust first-time organisers, irrelevant for
-everyone else. Strictly opt-in behind the same `Provider`-adjacent seam;
-Cackle's default posture (never hold funds) does not change. **Not yet
-built.**
+Cackle's payment seam settles directly to the organiser today (`manual` plus
+20+ optional adapters, and `stub` for demos/tests). An **optional** escrow
+adapter would hold funds until an event completes (or a dispute window
+closes) before releasing payout — useful for marketplaces that don't fully
+trust first-time organisers, irrelevant for everyone else. Strictly opt-in
+behind the same `Provider`-adjacent seam; Cackle's default posture (never
+hold funds) does not change. **Not yet built.**
 
 ## Later — post-quantum signature agility
 

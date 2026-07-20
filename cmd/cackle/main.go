@@ -21,6 +21,7 @@ import (
 	"github.com/vul-os/cackle/internal/events"
 	"github.com/vul-os/cackle/internal/httpapi"
 	"github.com/vul-os/cackle/internal/orders"
+	"github.com/vul-os/cackle/internal/orgs"
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 )
@@ -47,12 +48,14 @@ func run(args []string, stdout, stderr *os.File) error {
 		baseURL     string
 		demoFlag    bool
 		showVersion bool
+		mediaDir    string
 	)
 	fs.StringVar(&addr, "addr", "", "listen address (env CACKLE_ADDR, default :8080)")
 	fs.StringVar(&dbPath, "db", "", "path to SQLite database file (env CACKLE_DB, default ./cackle.db)")
 	fs.StringVar(&baseURL, "base-url", "", "externally-visible base URL (env CACKLE_BASE_URL)")
 	fs.BoolVar(&demoFlag, "demo", false, "boot fully seeded with demo data, no setup required")
 	fs.BoolVar(&showVersion, "version", false, "print version and exit")
+	fs.StringVar(&mediaDir, "media-dir", "", "directory uploaded event images are stored under (env CACKLE_MEDIA_DIR, default <db dir>/media)")
 
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -71,14 +74,19 @@ func run(args []string, stdout, stderr *os.File) error {
 	// must never appear in a log line, error message, or panic dump.
 
 	cfg, err := config.Load(config.Flags{
-		Addr:    addr,
-		DB:      dbPath,
-		BaseURL: baseURL,
-		Demo:    demoFlag,
-		DemoSet: demoFlag || flagWasSet(fs, "demo"),
+		Addr:     addr,
+		DB:       dbPath,
+		BaseURL:  baseURL,
+		Demo:     demoFlag,
+		DemoSet:  demoFlag || flagWasSet(fs, "demo"),
+		MediaDir: mediaDir,
 	})
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
+	}
+
+	if err := os.MkdirAll(cfg.MediaDir, 0o700); err != nil {
+		return fmt.Errorf("create media dir: %w", err)
 	}
 
 	st, err := store.Open(cfg.DB)
@@ -98,6 +106,22 @@ func run(args []string, stdout, stderr *os.File) error {
 	eventsSvc := events.New(st)
 
 	registry := payments.NewRegistry()
+	recordStore := paymentRecordStoreAdapter{store: st}
+
+	// manual is Cackle's DEFAULT payment provider: zero network calls,
+	// zero API keys, works in every country. It is ALWAYS registered —
+	// self-hosting Cackle with no payment configuration at all must still
+	// be able to run a real event. Its state (including the audit trail
+	// of who marked an order paid, and when) is backed by the database so
+	// it survives a restart.
+	manual, err := payments.NewManualWithStore(ctx, nil, recordStore)
+	if err != nil {
+		return fmt.Errorf("configure manual payment provider: %w", err)
+	}
+	if err := registry.Register(manual); err != nil {
+		return fmt.Errorf("configure manual payment provider: %w", err)
+	}
+
 	// The stub provider auto-settles every order the instant it's begun
 	// and refuses to register at all if a real Paystack secret is
 	// configured (see internal/payments/stub.go) — it is only ever wired
@@ -112,6 +136,12 @@ func run(args []string, stdout, stderr *os.File) error {
 			return fmt.Errorf("demo: register stub payment provider: %w", err)
 		}
 	}
+	// bankingProvider stays nil unless a real Paystack secret is
+	// configured — orgs.New treats that as a valid, supported
+	// configuration (see orgs.BankingProvider's doc comment): the bank
+	// list falls back to a small built-in one and bank account details are
+	// stored locally without a live recipient registration.
+	var bankingProvider orgs.BankingProvider
 	if cfg.PaystackSecretKey != "" {
 		ps, err := payments.NewPaystack()
 		if err != nil {
@@ -120,12 +150,27 @@ func run(args []string, stdout, stderr *os.File) error {
 		if err := registry.Register(ps); err != nil {
 			return fmt.Errorf("configure paystack: %w", err)
 		}
+		bankingProvider = ps
+	}
+	// lnbits is entirely optional: NewLNbitsWithStore returns
+	// ErrLNbitsNotConfigured (not registered, not an error for the
+	// process as a whole) unless an operator has actually set
+	// CACKLE_LNBITS_BASE_URL/API_KEY/WEBHOOK_SECRET. Any OTHER error
+	// (e.g. a malformed quote-TTL value) is a real misconfiguration and
+	// does fail startup.
+	if ln, err := payments.NewLNbitsWithStore(recordStore); err == nil {
+		if err := registry.Register(ln); err != nil {
+			return fmt.Errorf("configure lnbits: %w", err)
+		}
+	} else if !errors.Is(err, payments.ErrLNbitsNotConfigured) {
+		return fmt.Errorf("configure lnbits: %w", err)
 	}
 
 	ordersSvc := orders.New(st, eventsSvc, registry)
+	orgsSvc := orgs.New(st, bankingProvider)
 
 	if cfg.Demo {
-		if err := demo.Seed(ctx, st, eventsSvc, ordersSvc); err != nil {
+		if err := demo.Seed(ctx, st, eventsSvc, ordersSvc, orgsSvc); err != nil {
 			return fmt.Errorf("demo: seed: %w", err)
 		}
 		fmt.Fprintf(stdout, "\ncackle --demo is seeded and ready:\n")
@@ -144,8 +189,10 @@ func run(args []string, stdout, stderr *os.File) error {
 		Auth:     authSvc,
 		Events:   eventsSvc,
 		Orders:   ordersSvc,
+		Orgs:     orgsSvc,
 		Payments: registry,
 		Config:   cfg,
+		MediaDir: cfg.MediaDir,
 		WebFS:    webFS,
 		Logger:   logger,
 	})

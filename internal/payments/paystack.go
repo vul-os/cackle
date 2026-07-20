@@ -1,3 +1,20 @@
+// Package payments: Paystack adapter.
+//
+// Reference: https://paystack.com/docs/api/transaction/ (Initialize,
+// Verify) and https://paystack.com/docs/payments/webhooks/ (webhook
+// signature: HMAC-SHA512 hex over the raw request body, header
+// X-Paystack-Signature). Also https://paystack.com/docs/payments/accept-payments/
+// for the currencies Paystack currently documents support for.
+//
+// Confidence: HIGH. This is the original, hand-built reference adapter for
+// this package (it predates the v2 Provider interface and the rest of the
+// regional-processor set) and has 60+ passing tests exercising its
+// signature verification, reconciliation, and error handling. This
+// refactor moves it onto the v2 Provider interface (Capabilities(), and
+// AmountMinor/int64-minor-units terminology instead of *Cents) WITHOUT
+// changing any of its security-relevant behaviour: the HMAC-SHA512
+// verification, fail-closed error handling, and reconciliation guarantees
+// below are byte-for-byte the same logic as before this refactor.
 package payments
 
 import (
@@ -35,21 +52,23 @@ const (
 	// request indefinitely.
 	defaultHTTPTimeout = 15 * time.Second
 
-	// maxResponseBodyBytes caps how much of any HTTP body (Paystack API
-	// responses, and incoming webhook request bodies) this package will
-	// read. Paystack payloads are small JSON documents; anything larger
-	// is refused rather than read into memory unbounded.
+	// maxResponseBodyBytes caps how much of any HTTP body (any provider's
+	// API responses, and incoming webhook request bodies) this package
+	// will read. This is shared across every adapter in this package, not
+	// just Paystack — provider payloads are small JSON/form documents;
+	// anything larger is refused rather than read into memory unbounded.
 	maxResponseBodyBytes = 1 << 20 // 1 MiB
 
 	// paystackAmountSubunitFactor is the number of subunits per major
 	// currency unit that Paystack expects in its `amount` field, for
-	// every currency Cackle currently supports (ZAR). Since Cackle's own
-	// internal representation is ALSO integer cents (subunits), this
-	// factor is 1:1 — no multiplication needed anywhere in this file.
-	// This constant exists purely as documentation of that assumption; if
-	// Cackle ever adds a currency where Paystack's subunit factor differs
-	// from "cents == subunits" (none exist today), this is the file to
-	// revisit.
+	// every currency Paystack currently documents support for (NGN, GHS,
+	// ZAR, KES, USD — all 2-decimal currencies). Since Cackle's own
+	// AmountMinor is ALSO integer subunits, this factor is 1:1 — no
+	// multiplication needed anywhere in this file. This constant exists
+	// purely as documentation of that assumption: Paystack has no
+	// zero-decimal currency in its documented support today, so
+	// Capabilities().ZeroDecimalOK is false below (untested, not because
+	// it's known broken) rather than blindly true.
 	paystackAmountSubunitFactor = 1
 
 	// defaultRecipientType is the Paystack transfer-recipient "type" for
@@ -58,6 +77,16 @@ const (
 	// market first.
 	defaultRecipientType = "basa"
 )
+
+// paystackCurrencies are the currencies Paystack publicly documents
+// support for as of this writing. See
+// https://paystack.com/docs/payments/accept-payments/ — verify against
+// current docs before relying on this list for a market not listed here.
+var paystackCurrencies = []string{"NGN", "GHS", "ZAR", "KES", "USD"}
+
+// paystackCountries are the ISO-3166-1 alpha-2 codes of the merchant
+// countries Paystack documents support for.
+var paystackCountries = []string{"NG", "GH", "ZA", "KE"}
 
 // Sentinel errors specific to the Paystack provider. Callers should match
 // with errors.Is; error strings never contain the secret key.
@@ -107,14 +136,27 @@ func realPaystackSecretConfigured() bool {
 // Name implements Provider.
 func (p *PaystackProvider) Name() string { return ProviderNamePaystack }
 
+// Capabilities implements Provider.
+func (p *PaystackProvider) Capabilities() Capabilities {
+	return Capabilities{
+		Currencies:    paystackCurrencies,
+		Countries:     paystackCountries,
+		Flow:          FlowRedirect,
+		Refunds:       false, // not wired in this adapter (Paystack supports it; not implemented here)
+		Payouts:       true,  // CreateRecipient/ListBanks below
+		Webhooks:      true,
+		ZeroDecimalOK: false, // untested: Paystack documents no zero-decimal currency today
+	}
+}
+
 // Begin initializes a Paystack transaction and returns its hosted payment
 // page URL.
 func (p *PaystackProvider) Begin(ctx context.Context, o Order) (Charge, error) {
-	if strings.TrimSpace(o.ID) == "" {
-		return Charge{}, errors.New("payments: paystack: order id is required as the provider reference")
+	if strings.TrimSpace(o.Reference) == "" {
+		return Charge{}, errors.New("payments: paystack: order reference is required")
 	}
-	if o.TotalCents <= 0 {
-		return Charge{}, errors.New("payments: paystack: total_cents must be positive")
+	if o.AmountMinor <= 0 {
+		return Charge{}, errors.New("payments: paystack: amount_minor must be positive")
 	}
 	if strings.TrimSpace(o.BuyerEmail) == "" {
 		return Charge{}, errors.New("payments: paystack: buyer email is required")
@@ -126,8 +168,8 @@ func (p *PaystackProvider) Begin(ctx context.Context, o Order) (Charge, error) {
 
 	reqBody := map[string]any{
 		"email":     o.BuyerEmail,
-		"amount":    o.TotalCents * paystackAmountSubunitFactor,
-		"reference": o.ID,
+		"amount":    o.AmountMinor * paystackAmountSubunitFactor,
+		"reference": o.Reference,
 		"currency":  currency,
 	}
 	if o.CallbackURL != "" {
@@ -170,7 +212,7 @@ func (p *PaystackProvider) Begin(ctx context.Context, o Order) (Charge, error) {
 
 	ref := parsed.Data.Reference
 	if ref == "" {
-		ref = o.ID
+		ref = o.Reference
 	}
 	return Charge{
 		Provider:    ProviderNamePaystack,
@@ -223,14 +265,14 @@ func (p *PaystackProvider) Verify(ctx context.Context, reference string) (Result
 		Provider:    ProviderNamePaystack,
 		Reference:   reference,
 		EventID:     strconv.FormatInt(parsed.Data.ID, 10),
-		AmountCents: parsed.Data.Amount / paystackAmountSubunitFactor,
+		AmountMinor: parsed.Data.Amount / paystackAmountSubunitFactor,
 		Currency:    parsed.Data.Currency,
 		Raw:         json.RawMessage(respBody),
 	}
 
 	switch parsed.Data.Status {
 	case "success":
-		if result.AmountCents <= 0 {
+		if result.AmountMinor <= 0 {
 			// Defensive: never call a non-positive amount "paid".
 			return Result{}, fmt.Errorf("%w: success status with non-positive amount", ErrMalformedResponse)
 		}
@@ -266,7 +308,7 @@ func (p *PaystackProvider) Webhook(ctx context.Context, r *http.Request) (Result
 	if r.Body == nil {
 		return Result{}, fmt.Errorf("%w: empty request body", ErrMalformedResponse)
 	}
-	body, err := readLimited(r.Body, maxResponseBodyBytes)
+	body, err := paystackReadLimited(r.Body, maxResponseBodyBytes)
 	if err != nil {
 		return Result{}, fmt.Errorf("payments: paystack: read webhook body: %w", err)
 	}
@@ -324,7 +366,7 @@ func (p *PaystackProvider) Webhook(ctx context.Context, r *http.Request) (Result
 		Reference:   data.Reference,
 		EventID:     strconv.FormatInt(data.ID, 10),
 		Status:      StatusPaid,
-		AmountCents: data.Amount / paystackAmountSubunitFactor,
+		AmountMinor: data.Amount / paystackAmountSubunitFactor,
 		Currency:    data.Currency,
 		Raw:         json.RawMessage(body),
 	}
@@ -491,17 +533,21 @@ func (p *PaystackProvider) do(ctx context.Context, method, path string, body any
 	}
 	defer resp.Body.Close()
 
-	respBody, err := readLimited(resp.Body, maxResponseBodyBytes)
+	respBody, err := paystackReadLimited(resp.Body, maxResponseBodyBytes)
 	if err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("payments: paystack: read response: %w", err)
 	}
 	return respBody, resp.StatusCode, nil
 }
 
-// readLimited reads at most limit bytes from r, returning ErrResponseTooLarge
-// if there was more, so no caller ever does an unbounded read of a
-// provider response or webhook request body.
-func readLimited(r io.Reader, limit int64) ([]byte, error) {
+// paystackReadLimited reads at most limit bytes from r, returning
+// ErrResponseTooLarge if there was more, so no caller ever does an
+// unbounded read of a provider response or webhook request body. This is
+// Paystack's own copy (named to avoid colliding with the shared
+// readLimited helper in provider.go, which a sibling agent owns and may
+// still be wiring up) so this adapter's existing ErrResponseTooLarge
+// sentinel and its tests keep working regardless of that helper's state.
+func paystackReadLimited(r io.Reader, limit int64) ([]byte, error) {
 	b, err := io.ReadAll(io.LimitReader(r, limit+1))
 	if err != nil {
 		return nil, err

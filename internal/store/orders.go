@@ -16,9 +16,9 @@ type Order struct {
 	BuyerEmail    string
 	BuyerName     string
 	Status        string
-	SubtotalCents int64
-	FeeCents      int64
-	TotalCents    int64
+	SubtotalMinor int64
+	FeeMinor      int64
+	TotalMinor    int64
 	Currency      string
 	Provider      string
 	ProviderRef   *string
@@ -27,14 +27,14 @@ type Order struct {
 }
 
 // OrderLine is one requested ticket_type/quantity pair for
-// CreateOrderWithItems. UnitPriceCents MUST already have been read from the
+// CreateOrderWithItems. UnitPriceMinor MUST already have been read from the
 // ticket_types table by the caller — never from anything client-supplied —
 // this is what makes price forgery structurally impossible one layer up in
 // internal/orders.
 type OrderLine struct {
 	TicketTypeID   string
 	Quantity       int
-	UnitPriceCents int64
+	UnitPriceMinor int64
 }
 
 // ErrSoldOut is returned by CreateOrderWithItems when reserving inventory
@@ -104,10 +104,10 @@ func (s *Store) CreateOrderWithItems(ctx context.Context, o *Order, lines []Orde
 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO orders (id, event_id, user_id, buyer_email, buyer_name, status,
-			subtotal_cents, fee_cents, total_cents, currency, provider, provider_ref, created_at, paid_at)
+			subtotal_minor, fee_minor, total_minor, currency, provider, provider_ref, created_at, paid_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		o.ID, o.EventID, nullString(o.UserID), o.BuyerEmail, o.BuyerName, o.Status,
-		o.SubtotalCents, o.FeeCents, o.TotalCents, o.Currency, o.Provider, nullString(o.ProviderRef),
+		o.SubtotalMinor, o.FeeMinor, o.TotalMinor, o.Currency, o.Provider, nullString(o.ProviderRef),
 		timeToText(o.CreatedAt), nullTimeToText(o.PaidAt),
 	); err != nil {
 		return nil, fmt.Errorf("store: create order: %w", err)
@@ -120,12 +120,12 @@ func (s *Store) CreateOrderWithItems(ctx context.Context, o *Order, lines []Orde
 			OrderID:        o.ID,
 			TicketTypeID:   ln.TicketTypeID,
 			Quantity:       ln.Quantity,
-			UnitPriceCents: ln.UnitPriceCents,
+			UnitPriceMinor: ln.UnitPriceMinor,
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO order_items (id, order_id, ticket_type_id, quantity, unit_price_cents)
+			INSERT INTO order_items (id, order_id, ticket_type_id, quantity, unit_price_minor)
 			VALUES (?, ?, ?, ?, ?)`,
-			item.ID, item.OrderID, item.TicketTypeID, item.Quantity, item.UnitPriceCents,
+			item.ID, item.OrderID, item.TicketTypeID, item.Quantity, item.UnitPriceMinor,
 		); err != nil {
 			return nil, fmt.Errorf("store: create order item: %w", err)
 		}
@@ -254,7 +254,7 @@ func (s *Store) SettleOrder(ctx context.Context, orderID string, paidAt time.Tim
 }
 
 const orderSelectColumns = `SELECT id, event_id, user_id, buyer_email, buyer_name, status,
-	subtotal_cents, fee_cents, total_cents, currency, provider, provider_ref, created_at, paid_at`
+	subtotal_minor, fee_minor, total_minor, currency, provider, provider_ref, created_at, paid_at`
 
 // GetOrderByID looks up an order by primary key. Returns ErrNotFound if
 // absent.
@@ -290,7 +290,7 @@ func (s *Store) scanOrder(row *sql.Row) (*Order, error) {
 	var paidAt sql.NullString
 
 	err := row.Scan(&o.ID, &o.EventID, &userID, &o.BuyerEmail, &o.BuyerName, &o.Status,
-		&o.SubtotalCents, &o.FeeCents, &o.TotalCents, &o.Currency, &o.Provider, &providerRef, &createdAt, &paidAt)
+		&o.SubtotalMinor, &o.FeeMinor, &o.TotalMinor, &o.Currency, &o.Provider, &providerRef, &createdAt, &paidAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -310,7 +310,7 @@ func scanOrderRow(row rowScanner) (Order, error) {
 	var paidAt sql.NullString
 
 	if err := row.Scan(&o.ID, &o.EventID, &userID, &o.BuyerEmail, &o.BuyerName, &o.Status,
-		&o.SubtotalCents, &o.FeeCents, &o.TotalCents, &o.Currency, &o.Provider, &providerRef, &createdAt, &paidAt); err != nil {
+		&o.SubtotalMinor, &o.FeeMinor, &o.TotalMinor, &o.Currency, &o.Provider, &providerRef, &createdAt, &paidAt); err != nil {
 		return Order{}, fmt.Errorf("store: scan order row: %w", err)
 	}
 	if err := hydrateOrder(&o, userID, providerRef, createdAt, paidAt); err != nil {

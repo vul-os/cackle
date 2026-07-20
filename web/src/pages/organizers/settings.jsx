@@ -4,7 +4,7 @@ import { useTheme } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Mail, Moon, Sun, Monitor, LogOut } from 'lucide-react';
+import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const THEME_OPTIONS = [
@@ -66,6 +66,43 @@ const SettingsPage = () => {
                             ))}
                         </div>
                     )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Manage your org</CardTitle>
+                    <CardDescription>Team access and where your payouts land.</CardDescription>
+                </CardHeader>
+                <CardContent className="divide-y divide-border rounded-md border border-border p-0">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/admin/team')}
+                        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                        <span className="flex items-center gap-3">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <span>
+                                <span className="block font-medium">Team</span>
+                                <span className="block text-sm text-muted-foreground">Members, roles, and invites</span>
+                            </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/admin/payouts')}
+                        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                        <span className="flex items-center gap-3">
+                            <Banknote className="h-4 w-4 text-muted-foreground" />
+                            <span>
+                                <span className="block font-medium">Payouts</span>
+                                <span className="block text-sm text-muted-foreground">Bank account and per-event payout totals</span>
+                            </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
                 </CardContent>
             </Card>
 

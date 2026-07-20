@@ -128,6 +128,7 @@
   }
   html {
     -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
@@ -136,6 +137,34 @@
   }
   ::selection {
     @apply bg-primary/25;
+  }
+
+  /* Real typographic hierarchy for bare semantic headings. Low-specificity
+     element selectors, so any page reaching for an explicit text-* / font-*
+     utility on a heading (most already do) simply overrides these — this
+     only raises the floor for markup that doesn't opt into the display
+     scale by hand, and keeps heading order meaningful rather than flat. */
+  h1 {
+    @apply font-display text-display-lg font-extrabold tracking-tight text-foreground sm:text-display-xl;
+  }
+  h2 {
+    @apply font-display text-display-sm font-bold tracking-tight text-foreground sm:text-display-md;
+  }
+  h3 {
+    @apply text-xl font-bold tracking-tight text-foreground;
+  }
+  h4 {
+    @apply text-lg font-semibold tracking-tight text-foreground;
+  }
+
+  /* Safety-net focus ring: every component in ui/ already carries its own
+     focus-visible:ring-* treatment, but this keeps any plain <a>/<button>
+     a page reaches for directly from ever rendering with no visible focus
+     state (WCAG AA — focus must always be visible, never just the UA
+     default which some resets suppress). */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 

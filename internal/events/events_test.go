@@ -55,8 +55,13 @@ func TestCreateGeneratesOwnIssuerKey(t *testing.T) {
 	if ev.Status != "draft" {
 		t.Fatalf("status = %q, want draft", ev.Status)
 	}
-	if ev.Timezone != "UTC" || ev.Currency != "ZAR" {
-		t.Fatalf("unexpected defaults: tz=%q currency=%q", ev.Timezone, ev.Currency)
+	// Currency has no privileged hardcoded default (e.g. "ZAR") — an event
+	// with no explicit currency inherits its owning org's default_currency
+	// (mustOrg leaves this unset, so store.CreateOrg's own USD fallback
+	// applies here; TestCreate_CurrencyDefaultsFromOrgNotHardcoded below
+	// proves this with a non-USD org).
+	if ev.Timezone != "UTC" || ev.Currency != org.DefaultCurrency {
+		t.Fatalf("unexpected defaults: tz=%q currency=%q, want currency=%q (org default)", ev.Timezone, ev.Currency, org.DefaultCurrency)
 	}
 
 	ring, err := svc.IssuerPublicKeys(ctx, ev.ID)
@@ -117,6 +122,70 @@ func TestCreateValidation(t *testing.T) {
 		t.Fatalf("nonexistent org: got %v, want ErrNotFound", err)
 	}
 }
+
+// TestCreate_CurrencyDefaultsFromOrgNotHardcoded proves Cackle has no
+// privileged default currency: an event with no explicit currency
+// inherits whatever ISO-4217 code its OWN org picked — including
+// zero-decimal (JPY) and three-decimal (KWD) currencies — and an event
+// can still override that default explicitly. An invalid/unknown code,
+// on either the org or the event, is rejected rather than silently
+// coerced to some fallback.
+func TestCreate_CurrencyDefaultsFromOrgNotHardcoded(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	svc := New(st)
+
+	jpyOrg := &store.Org{Name: "Tokyo Promoters", Slug: "tokyo-promoters-" + store.NewID(), DefaultCurrency: "jpy"}
+	if err := st.CreateOrg(ctx, jpyOrg); err != nil {
+		t.Fatalf("create JPY org: %v", err)
+	}
+	if jpyOrg.DefaultCurrency != "JPY" {
+		t.Fatalf("DefaultCurrency = %q, want normalized to JPY", jpyOrg.DefaultCurrency)
+	}
+
+	// No explicit event currency: inherits the org's own default (JPY,
+	// zero decimal places) — never a hardcoded ZAR/USD/anything.
+	in := validCreateInput("tokyo-fest")
+	ev, err := svc.Create(ctx, jpyOrg.ID, in)
+	if err != nil {
+		t.Fatalf("Create (inherit org default): %v", err)
+	}
+	if ev.Currency != "JPY" {
+		t.Fatalf("Currency = %q, want JPY (inherited from org default_currency)", ev.Currency)
+	}
+
+	// Explicit override to a three-decimal currency works too.
+	kwdIn := validCreateInput("kuwait-fest")
+	kwdIn.Currency = "kwd"
+	ev2, err := svc.Create(ctx, jpyOrg.ID, kwdIn)
+	if err != nil {
+		t.Fatalf("Create (explicit override): %v", err)
+	}
+	if ev2.Currency != "KWD" {
+		t.Fatalf("Currency = %q, want KWD (explicit override, normalized)", ev2.Currency)
+	}
+
+	// An unknown currency code is rejected outright, not coerced.
+	badIn := validCreateInput("bad-currency")
+	badIn.Currency = "XYZ"
+	if _, err := svc.Create(ctx, jpyOrg.ID, badIn); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("unknown currency: got %v, want ErrInvalidInput", err)
+	}
+
+	// Update can change an event's currency, validated the same way.
+	updated, err := svc.Update(ctx, ev.ID, UpdateEventInput{Currency: strPtr("usd")})
+	if err != nil {
+		t.Fatalf("Update currency: %v", err)
+	}
+	if updated.Currency != "USD" {
+		t.Fatalf("Currency after update = %q, want USD", updated.Currency)
+	}
+	if _, err := svc.Update(ctx, ev.ID, UpdateEventInput{Currency: strPtr("not-a-currency")}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("Update with invalid currency: got %v, want ErrInvalidInput", err)
+	}
+}
+
+func strPtr(s string) *string { return &s }
 
 func TestPublishTransitions(t *testing.T) {
 	st := openTestStore(t)
@@ -246,7 +315,7 @@ func TestTicketTypeLifecycleAndInvariants(t *testing.T) {
 
 	tt, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{
 		Name:          "General",
-		PriceCents:    5000,
+		PriceMinor:    5000,
 		QuantityTotal: 10,
 		MaxPerOrder:   4,
 	})
@@ -270,14 +339,14 @@ func TestTicketTypeLifecycleAndInvariants(t *testing.T) {
 
 	updated, err := svc.UpdateTicketType(ctx, tt.ID, TicketTypeInput{
 		Name:          "General Admission",
-		PriceCents:    6000,
+		PriceMinor:    6000,
 		QuantityTotal: 20,
 		MaxPerOrder:   4,
 	})
 	if err != nil {
 		t.Fatalf("UpdateTicketType: %v", err)
 	}
-	if updated.PriceCents != 6000 || updated.QuantityTotal != 20 {
+	if updated.PriceMinor != 6000 || updated.QuantityTotal != 20 {
 		t.Fatalf("update did not apply: %+v", updated)
 	}
 
@@ -285,12 +354,12 @@ func TestTicketTypeLifecycleAndInvariants(t *testing.T) {
 	// sale, then verify UpdateTicketType refuses to shrink below it.
 	if _, err := st.CreateOrderWithItems(ctx, &store.Order{
 		EventID: ev.ID, BuyerEmail: "x@example.com", Status: "pending", Currency: "ZAR",
-	}, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 5, UnitPriceCents: 6000}}); err != nil {
+	}, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 5, UnitPriceMinor: 6000}}); err != nil {
 		t.Fatalf("seed sale: %v", err)
 	}
 
 	if _, err := svc.UpdateTicketType(ctx, tt.ID, TicketTypeInput{
-		Name: "General Admission", PriceCents: 6000, QuantityTotal: 3, MaxPerOrder: 4,
+		Name: "General Admission", PriceMinor: 6000, QuantityTotal: 3, MaxPerOrder: 4,
 	}); !errors.Is(err, ErrQuantityBelowSold) {
 		t.Fatalf("shrink below sold: got %v, want ErrQuantityBelowSold", err)
 	}
@@ -301,7 +370,7 @@ func TestTicketTypeLifecycleAndInvariants(t *testing.T) {
 	}
 
 	// A fresh, untouched ticket type can be deleted.
-	tt2, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{Name: "VIP", PriceCents: 10000, QuantityTotal: 5})
+	tt2, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{Name: "VIP", PriceMinor: 10000, QuantityTotal: 5})
 	if err != nil {
 		t.Fatalf("CreateTicketType #2: %v", err)
 	}
@@ -320,17 +389,17 @@ func TestStatsCorrectness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create event: %v", err)
 	}
-	tt, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{Name: "General", PriceCents: 1000, QuantityTotal: 100})
+	tt, err := svc.CreateTicketType(ctx, ev.ID, TicketTypeInput{Name: "General", PriceMinor: 1000, QuantityTotal: 100})
 	if err != nil {
 		t.Fatalf("CreateTicketType: %v", err)
 	}
 
 	// A pending (unpaid) order reserves inventory but must NOT count
-	// toward Sold/RevenueCents.
+	// toward Sold/RevenueMinor.
 	pendingOrd := &store.Order{
-		EventID: ev.ID, BuyerEmail: "pending@example.com", Status: "pending", Currency: "ZAR", TotalCents: 3000,
+		EventID: ev.ID, BuyerEmail: "pending@example.com", Status: "pending", Currency: "ZAR", TotalMinor: 3000,
 	}
-	if _, err := st.CreateOrderWithItems(ctx, pendingOrd, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 3, UnitPriceCents: 1000}}); err != nil {
+	if _, err := st.CreateOrderWithItems(ctx, pendingOrd, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 3, UnitPriceMinor: 1000}}); err != nil {
 		t.Fatalf("create pending order: %v", err)
 	}
 
@@ -338,14 +407,14 @@ func TestStatsCorrectness(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Stats (pending only): %v", err)
 	}
-	if stats.Sold != 0 || stats.RevenueCents != 0 {
+	if stats.Sold != 0 || stats.RevenueMinor != 0 {
 		t.Fatalf("pending order counted in stats: %+v", stats)
 	}
 
 	// A paid order (created directly via store + marked paid, with a real
 	// signed ticket issued for it) DOES count.
-	ord := &store.Order{EventID: ev.ID, BuyerEmail: "paid@example.com", Status: "pending", Currency: "ZAR", TotalCents: 2000}
-	if _, err := st.CreateOrderWithItems(ctx, ord, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 2, UnitPriceCents: 1000}}); err != nil {
+	ord := &store.Order{EventID: ev.ID, BuyerEmail: "paid@example.com", Status: "pending", Currency: "ZAR", TotalMinor: 2000}
+	if _, err := st.CreateOrderWithItems(ctx, ord, []store.OrderLine{{TicketTypeID: tt.ID, Quantity: 2, UnitPriceMinor: 1000}}); err != nil {
 		t.Fatalf("create paid-to-be order: %v", err)
 	}
 	tid1 := store.NewID()
@@ -380,13 +449,13 @@ func TestStatsCorrectness(t *testing.T) {
 	if stats.Sold != 2 {
 		t.Fatalf("Sold = %d, want 2", stats.Sold)
 	}
-	if stats.RevenueCents != 2000 {
-		t.Fatalf("RevenueCents = %d, want 2000", stats.RevenueCents)
+	if stats.RevenueMinor != 2000 {
+		t.Fatalf("RevenueMinor = %d, want 2000", stats.RevenueMinor)
 	}
 	if stats.Admitted != 1 {
 		t.Fatalf("Admitted = %d, want 1", stats.Admitted)
 	}
-	if len(stats.ByType) != 1 || stats.ByType[0].Sold != 2 || stats.ByType[0].RevenueCents != 2000 {
+	if len(stats.ByType) != 1 || stats.ByType[0].Sold != 2 || stats.ByType[0].RevenueMinor != 2000 {
 		t.Fatalf("ByType = %+v", stats.ByType)
 	}
 }

@@ -3,14 +3,7 @@ import { format } from 'date-fns';
 import { Clock, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
+import { formatMoney } from '@/lib/money';
 
 const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
     return (
@@ -40,7 +33,7 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
                             <span>
                                 {item.quantity}x {item.ticket_type.name}
                             </span>
-                            <span>{formatMoney(item.quantity * item.ticket_type.price_cents, event.currency)}</span>
+                            <span>{formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}</span>
                         </div>
                     ))}
                 </div>

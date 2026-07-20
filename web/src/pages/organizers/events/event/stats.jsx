@@ -4,14 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertCircle, Ticket, Coins, ShieldCheck, BarChart3 } from 'lucide-react';
 import { events as eventsApi } from '@/lib/api';
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
+import { formatMoney } from '@/lib/money';
 
 const StatTile = ({ icon: Icon, label, value }) => (
     <Card>
@@ -30,26 +23,26 @@ const StatTile = ({ icon: Icon, label, value }) => (
 const EventStatsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ stats: null, loading: true, error: null });
+    const [state, setState] = useState({ stats: null, currency: '', loading: true, error: null });
 
     useEffect(() => {
         let cancelled = false;
-        eventsApi
-            .stats(id)
-            .then((data) => {
+        Promise.all([eventsApi.stats(id), eventsApi.get(id)])
+            .then(([statsData, eventData]) => {
                 if (cancelled) return;
-                setState({ stats: data?.stats ?? data, loading: false, error: null });
+                const event = eventData?.event ?? eventData;
+                setState({ stats: statsData?.stats ?? statsData, currency: event?.currency || '', loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ stats: null, loading: false, error: err.message || 'Could not load stats.' });
+                setState({ stats: null, currency: '', loading: false, error: err.message || 'Could not load stats.' });
             });
         return () => {
             cancelled = true;
         };
     }, [id]);
 
-    const { stats, loading, error } = state;
+    const { stats, currency, loading, error } = state;
     const byType = stats?.by_type ?? [];
     const maxSold = Math.max(1, ...byType.map((t) => t.sold ?? 0));
 
@@ -81,7 +74,7 @@ const EventStatsPage = () => {
                 <>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <StatTile icon={Ticket} label="Sold" value={stats.sold ?? 0} />
-                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_cents)} />
+                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_minor, currency)} />
                         <StatTile icon={ShieldCheck} label="Admitted" value={stats.admitted ?? 0} />
                     </div>
 

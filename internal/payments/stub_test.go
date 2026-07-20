@@ -37,25 +37,25 @@ func TestStub_BeginThenVerify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewStub() = %v", err)
 	}
-	order := Order{ID: "ord_1", TotalCents: 12345, Currency: "ZAR", BuyerEmail: "a@b.com"}
+	order := Order{Reference: "ord_1", AmountMinor: 12345, Currency: "ZAR", BuyerEmail: "a@b.com"}
 
 	charge, err := stub.Begin(context.Background(), order)
 	if err != nil {
 		t.Fatalf("Begin() = %v", err)
 	}
-	if charge.Reference != order.ID {
-		t.Fatalf("charge.Reference = %q, want %q", charge.Reference, order.ID)
+	if charge.Reference != order.Reference {
+		t.Fatalf("charge.Reference = %q, want %q", charge.Reference, order.Reference)
 	}
 
-	result, err := stub.Verify(context.Background(), order.ID)
+	result, err := stub.Verify(context.Background(), order.Reference)
 	if err != nil {
 		t.Fatalf("Verify() = %v", err)
 	}
 	if result.Status != StatusPaid {
 		t.Fatalf("result.Status = %q, want paid", result.Status)
 	}
-	if result.AmountCents != order.TotalCents {
-		t.Fatalf("result.AmountCents = %d, want %d", result.AmountCents, order.TotalCents)
+	if result.AmountMinor != order.AmountMinor {
+		t.Fatalf("result.AmountMinor = %d, want %d", result.AmountMinor, order.AmountMinor)
 	}
 	if result.Currency != "ZAR" {
 		t.Fatalf("result.Currency = %q, want ZAR", result.Currency)
@@ -75,7 +75,7 @@ func TestStub_VerifyUnknownReferenceFailsClosed(t *testing.T) {
 
 func TestStub_BeginRejectsMissingID(t *testing.T) {
 	stub, _ := NewStub(true)
-	_, err := stub.Begin(context.Background(), Order{TotalCents: 100})
+	_, err := stub.Begin(context.Background(), Order{AmountMinor: 100})
 	if err == nil {
 		t.Fatal("Begin() with empty order id = nil error, want rejection")
 	}
@@ -83,7 +83,7 @@ func TestStub_BeginRejectsMissingID(t *testing.T) {
 
 func TestStub_BeginRejectsNonPositiveAmount(t *testing.T) {
 	stub, _ := NewStub(true)
-	_, err := stub.Begin(context.Background(), Order{ID: "ord_1", TotalCents: 0})
+	_, err := stub.Begin(context.Background(), Order{Reference: "ord_1", AmountMinor: 0})
 	if err == nil {
 		t.Fatal("Begin() with zero total_cents = nil error, want rejection")
 	}

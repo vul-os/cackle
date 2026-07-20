@@ -37,6 +37,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Payments story is ZAR-first (the platform's South African origin) but no
   longer hardcoded to Paystack — the provider sits behind a seam.
+- **Genuinely country- and currency-agnostic**: removed every remaining ZAR/
+  "cents" assumption. Every `*_cents` column and JSON field is renamed
+  `*_minor` (`internal/store/migrations/0006_currency_minor_units.sql`) and
+  goes through `internal/money`'s ISO-4217 exponent table instead of a
+  hardcoded 100 — JPY/KRW/VND/CLP/ISK (0 decimal places) and KWD/BHD/JOD/
+  OMR/TND (3 decimal places) now render correctly everywhere, frontend
+  included (new shared `web/src/lib/money.js`, `currencyDisplay:
+  'narrowSymbol'` so a mismatched browser locale doesn't render "ZAR 450.00"
+  instead of "R 450.00"). Currency is per-event, defaulting from a new
+  `orgs.default_currency`; a `GET /api/currencies` endpoint replaces every
+  hardcoded currency-picker shortlist. The `manual` payment provider (bank
+  transfer/cash/invoice — zero API keys, zero network calls) is now always
+  registered as Cackle's default, and both `manual` and `lnbits` persist
+  their state (including manual's audit trail) to a new `payment_records`
+  table instead of an in-memory map, so a restart no longer loses in-flight
+  payment state.
 
 ## What came before
 

@@ -17,6 +17,7 @@ import (
 // paystack_test.go.
 type fakeProvider struct {
 	name string
+	caps Capabilities
 
 	webhookResult Result
 	webhookErr    error
@@ -25,7 +26,8 @@ type fakeProvider struct {
 	verifyErr    error
 }
 
-func (f *fakeProvider) Name() string { return f.name }
+func (f *fakeProvider) Name() string               { return f.name }
+func (f *fakeProvider) Capabilities() Capabilities { return f.caps }
 
 func (f *fakeProvider) Begin(ctx context.Context, o Order) (Charge, error) {
 	return Charge{}, errors.New("fakeProvider: Begin not used in these tests")
@@ -88,16 +90,16 @@ func (f *fakeOrderLookup) Lookup(ctx context.Context, reference string) (OrderRe
 // --- Reconcile ----------------------------------------------------------
 
 func TestReconcile_Success(t *testing.T) {
-	result := Result{Reference: "ord_1", Status: StatusPaid, AmountCents: 5000, Currency: "ZAR"}
-	want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+	result := Result{Reference: "ord_1", Status: StatusPaid, AmountMinor: 5000, Currency: "ZAR"}
+	want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 	if err := Reconcile(result, want); err != nil {
 		t.Fatalf("Reconcile() = %v, want nil", err)
 	}
 }
 
 func TestReconcile_AmountMismatchRejected(t *testing.T) {
-	result := Result{Reference: "ord_1", Status: StatusPaid, AmountCents: 100, Currency: "ZAR"}
-	want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+	result := Result{Reference: "ord_1", Status: StatusPaid, AmountMinor: 100, Currency: "ZAR"}
+	want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 	err := Reconcile(result, want)
 	if !errors.Is(err, ErrAmountMismatch) {
 		t.Fatalf("Reconcile() = %v, want ErrAmountMismatch", err)
@@ -105,8 +107,8 @@ func TestReconcile_AmountMismatchRejected(t *testing.T) {
 }
 
 func TestReconcile_CurrencyMismatchRejected(t *testing.T) {
-	result := Result{Reference: "ord_1", Status: StatusPaid, AmountCents: 5000, Currency: "USD"}
-	want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+	result := Result{Reference: "ord_1", Status: StatusPaid, AmountMinor: 5000, Currency: "USD"}
+	want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 	err := Reconcile(result, want)
 	if !errors.Is(err, ErrCurrencyMismatch) {
 		t.Fatalf("Reconcile() = %v, want ErrCurrencyMismatch", err)
@@ -114,8 +116,8 @@ func TestReconcile_CurrencyMismatchRejected(t *testing.T) {
 }
 
 func TestReconcile_ReferenceMismatchRejected(t *testing.T) {
-	result := Result{Reference: "ord_evil", Status: StatusPaid, AmountCents: 5000, Currency: "ZAR"}
-	want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+	result := Result{Reference: "ord_evil", Status: StatusPaid, AmountMinor: 5000, Currency: "ZAR"}
+	want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 	err := Reconcile(result, want)
 	if !errors.Is(err, ErrReferenceMismatch) {
 		t.Fatalf("Reconcile() = %v, want ErrReferenceMismatch", err)
@@ -124,8 +126,8 @@ func TestReconcile_ReferenceMismatchRejected(t *testing.T) {
 
 func TestReconcile_NotPaidRejected(t *testing.T) {
 	for _, status := range []Status{StatusPending, StatusFailed, ""} {
-		result := Result{Reference: "ord_1", Status: status, AmountCents: 5000, Currency: "ZAR"}
-		want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+		result := Result{Reference: "ord_1", Status: status, AmountMinor: 5000, Currency: "ZAR"}
+		want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 		err := Reconcile(result, want)
 		if !errors.Is(err, ErrNotPaid) {
 			t.Fatalf("Reconcile() with status=%q = %v, want ErrNotPaid", status, err)
@@ -134,8 +136,8 @@ func TestReconcile_NotPaidRejected(t *testing.T) {
 }
 
 func TestReconcile_CaseInsensitiveCurrency(t *testing.T) {
-	result := Result{Reference: "ord_1", Status: StatusPaid, AmountCents: 5000, Currency: "zar"}
-	want := OrderRef{ID: "ord_1", TotalCents: 5000, Currency: "ZAR"}
+	result := Result{Reference: "ord_1", Status: StatusPaid, AmountMinor: 5000, Currency: "zar"}
+	want := OrderRef{ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"}
 	if err := Reconcile(result, want); err != nil {
 		t.Fatalf("Reconcile() = %v, want nil (currency should be case-insensitive)", err)
 	}
@@ -157,7 +159,7 @@ func TestHandleWebhook_ReplayRejected(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 5000, Currency: "ZAR",
+			AmountMinor: 5000, Currency: "ZAR",
 		},
 	}
 	seen := newFakeSeenStore()
@@ -177,7 +179,7 @@ func TestHandleWebhook_ReplayCheckFailureFailsClosed(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 5000, Currency: "ZAR",
+			AmountMinor: 5000, Currency: "ZAR",
 		},
 	}
 	req, _ := http.NewRequest(http.MethodPost, "/", nil)
@@ -192,7 +194,7 @@ func TestHandleWebhook_EmptyEventIDRejectedWhenPaid(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "", Status: StatusPaid,
-			AmountCents: 5000, Currency: "ZAR",
+			AmountMinor: 5000, Currency: "ZAR",
 		},
 	}
 	req, _ := http.NewRequest(http.MethodPost, "/", nil)
@@ -207,11 +209,11 @@ func TestHandleWebhook_AmountMismatchRejectedViaLookup(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 100, Currency: "ZAR", // attacker/provider claims R1
+			AmountMinor: 100, Currency: "ZAR", // attacker/provider claims R1
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{
-		"ord_1": {ID: "ord_1", TotalCents: 500000, Currency: "ZAR"}, // real order is R5000
+		"ord_1": {ID: "ord_1", AmountMinor: 500000, Currency: "ZAR"}, // real order is R5000
 	}}
 	req, _ := http.NewRequest(http.MethodPost, "/", nil)
 	_, err := HandleWebhook(context.Background(), p, req, newFakeSeenStore(), lookup)
@@ -225,11 +227,11 @@ func TestHandleWebhook_CurrencyMismatchRejectedViaLookup(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 5000, Currency: "USD",
+			AmountMinor: 5000, Currency: "USD",
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{
-		"ord_1": {ID: "ord_1", TotalCents: 5000, Currency: "ZAR"},
+		"ord_1": {ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"},
 	}}
 	req, _ := http.NewRequest(http.MethodPost, "/", nil)
 	_, err := HandleWebhook(context.Background(), p, req, newFakeSeenStore(), lookup)
@@ -243,7 +245,7 @@ func TestHandleWebhook_OrderLookupFailureFailsClosed(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_missing", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 5000, Currency: "ZAR",
+			AmountMinor: 5000, Currency: "ZAR",
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{}}
@@ -259,11 +261,11 @@ func TestHandleWebhook_SuccessPassesThrough(t *testing.T) {
 		name: "fake",
 		webhookResult: Result{
 			Reference: "ord_1", EventID: "evt_1", Status: StatusPaid,
-			AmountCents: 5000, Currency: "ZAR",
+			AmountMinor: 5000, Currency: "ZAR",
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{
-		"ord_1": {ID: "ord_1", TotalCents: 5000, Currency: "ZAR"},
+		"ord_1": {ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"},
 	}}
 	req, _ := http.NewRequest(http.MethodPost, "/", nil)
 	result, err := HandleWebhook(context.Background(), p, req, newFakeSeenStore(), lookup)
@@ -289,11 +291,11 @@ func TestHandleVerify_AmountMismatchRejected(t *testing.T) {
 	p := &fakeProvider{
 		name: "fake",
 		verifyResult: Result{
-			Reference: "ord_1", Status: StatusPaid, AmountCents: 1, Currency: "ZAR",
+			Reference: "ord_1", Status: StatusPaid, AmountMinor: 1, Currency: "ZAR",
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{
-		"ord_1": {ID: "ord_1", TotalCents: 5000, Currency: "ZAR"},
+		"ord_1": {ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"},
 	}}
 	_, err := HandleVerify(context.Background(), p, "ord_1", lookup)
 	if !errors.Is(err, ErrAmountMismatch) {
@@ -305,12 +307,12 @@ func TestHandleVerify_Success(t *testing.T) {
 	p := &fakeProvider{
 		name: "fake",
 		verifyResult: Result{
-			Reference: "ord_1", Status: StatusPaid, AmountCents: 5000, Currency: "ZAR",
+			Reference: "ord_1", Status: StatusPaid, AmountMinor: 5000, Currency: "ZAR",
 			PaidAt: time.Now(),
 		},
 	}
 	lookup := &fakeOrderLookup{orders: map[string]OrderRef{
-		"ord_1": {ID: "ord_1", TotalCents: 5000, Currency: "ZAR"},
+		"ord_1": {ID: "ord_1", AmountMinor: 5000, Currency: "ZAR"},
 	}}
 	result, err := HandleVerify(context.Background(), p, "ord_1", lookup)
 	if err != nil {

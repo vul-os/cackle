@@ -204,7 +204,7 @@ func TestListValidTicketIDsForEvent(t *testing.T) {
 	}
 
 	order := &Order{EventID: ev.ID, BuyerEmail: "buyer@example.com"}
-	if _, err := st.CreateOrderWithItems(ctx, order, []OrderLine{{TicketTypeID: tt.ID, Quantity: 3, UnitPriceCents: 1000}}); err != nil {
+	if _, err := st.CreateOrderWithItems(ctx, order, []OrderLine{{TicketTypeID: tt.ID, Quantity: 3, UnitPriceMinor: 1000}}); err != nil {
 		t.Fatalf("create order: %v", err)
 	}
 	tickets := []Ticket{
@@ -259,5 +259,75 @@ func TestForeignKeysEnforced(t *testing.T) {
 	sess := &Session{TokenHash: "abc", UserID: "nonexistent", ExpiresAt: time.Now().Add(time.Hour)}
 	if err := st.CreateSession(ctx, sess); err == nil {
 		t.Fatal("expected foreign key violation inserting session for nonexistent user")
+	}
+}
+
+// --- payment_records (durable payment provider state) --------------------
+
+func TestPaymentRecord_PutGetRoundtrip(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	if _, err := st.GetPaymentRecord(ctx, "manual", "ord-1"); err != ErrNotFound {
+		t.Fatalf("GetPaymentRecord before insert: err = %v, want ErrNotFound", err)
+	}
+
+	rec := &PaymentRecord{
+		Provider:     "manual",
+		Reference:    "ord-1",
+		AmountMinor:  123456,
+		Currency:     "KWD", // three-decimal currency — nothing here should assume 2
+		Status:       "pending",
+		Instructions: "pay at the door",
+	}
+	if err := st.PutPaymentRecord(ctx, rec); err != nil {
+		t.Fatalf("PutPaymentRecord: %v", err)
+	}
+
+	got, err := st.GetPaymentRecord(ctx, "manual", "ord-1")
+	if err != nil {
+		t.Fatalf("GetPaymentRecord: %v", err)
+	}
+	if got.AmountMinor != 123456 || got.Currency != "KWD" || got.Status != "pending" || got.Instructions != "pay at the door" {
+		t.Fatalf("roundtrip mismatch: %+v", got)
+	}
+	if got.MarkedAt != nil {
+		t.Fatalf("MarkedAt = %v, want nil (never marked)", got.MarkedAt)
+	}
+
+	// Upsert: mark it paid, with the audit fields manual providers need.
+	markedAt := time.Now().UTC().Truncate(time.Second)
+	rec.Status = "paid"
+	rec.MarkedBy = "owner@example.com"
+	rec.MarkedAt = &markedAt
+	if err := st.PutPaymentRecord(ctx, rec); err != nil {
+		t.Fatalf("PutPaymentRecord (update): %v", err)
+	}
+	got2, err := st.GetPaymentRecord(ctx, "manual", "ord-1")
+	if err != nil {
+		t.Fatalf("GetPaymentRecord after update: %v", err)
+	}
+	if got2.Status != "paid" || got2.MarkedBy != "owner@example.com" {
+		t.Fatalf("update mismatch: %+v", got2)
+	}
+	if got2.MarkedAt == nil || !got2.MarkedAt.Equal(markedAt) {
+		t.Fatalf("MarkedAt = %v, want %v", got2.MarkedAt, markedAt)
+	}
+
+	list, err := st.ListPaymentRecords(ctx, "manual")
+	if err != nil {
+		t.Fatalf("ListPaymentRecords: %v", err)
+	}
+	if len(list) != 1 || list[0].Reference != "ord-1" {
+		t.Fatalf("ListPaymentRecords = %+v, want exactly ord-1", list)
+	}
+
+	// A different provider's records are never mixed in.
+	otherList, err := st.ListPaymentRecords(ctx, "lnbits")
+	if err != nil {
+		t.Fatalf("ListPaymentRecords(lnbits): %v", err)
+	}
+	if len(otherList) != 0 {
+		t.Fatalf("ListPaymentRecords(lnbits) = %+v, want empty", otherList)
 	}
 }

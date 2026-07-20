@@ -112,12 +112,23 @@ export function CartProvider({ children }) {
             return groups;
         }, {});
         const itemCount = state.items.reduce((sum, i) => sum + i.quantity, 0);
-        const total = state.items.reduce((sum, i) => sum + i.quantity * i.ticket_type.price_cents, 0);
-        return { itemsByEvent, itemCount, total };
+        // A cart can (in principle) span multiple events, and different
+        // events can be denominated in DIFFERENT currencies — Cackle has
+        // no privileged currency, so there is no single meaningful "grand
+        // total" to blend them into. totalsByCurrency keeps each
+        // currency's minor-unit sum separate; consumers render one line
+        // per currency (in the common single-event cart, that's exactly
+        // one line, same as before).
+        const totalsByCurrency = state.items.reduce((acc, i) => {
+            const currency = i.event?.currency || '';
+            acc[currency] = (acc[currency] || 0) + i.quantity * i.ticket_type.price_minor;
+            return acc;
+        }, {});
+        return { itemsByEvent, itemCount, totalsByCurrency };
     }, [state.items]);
 
     const eventTotal = useCallback(
-        (eventId) => (derived.itemsByEvent[eventId] || []).reduce((sum, i) => sum + i.quantity * i.ticket_type.price_cents, 0),
+        (eventId) => (derived.itemsByEvent[eventId] || []).reduce((sum, i) => sum + i.quantity * i.ticket_type.price_minor, 0),
         [derived.itemsByEvent],
     );
 
@@ -126,7 +137,7 @@ export function CartProvider({ children }) {
             items: state.items,
             itemsByEvent: derived.itemsByEvent,
             itemCount: derived.itemCount,
-            total: derived.total,
+            totalsByCurrency: derived.totalsByCurrency,
             addItem,
             updateQuantity,
             removeItem,

@@ -6,15 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Minus, Plus, Trash2, ArrowLeft, Clock, MapPin, ShoppingCart } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import { format } from 'date-fns';
+import { EmptyState } from '@/components/ui/empty-state';
 import { REDIRECT_STORAGE_KEY } from '@/pages/auth/auth-redirect';
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
+import { formatMoney } from '@/lib/money';
 
 const CartPage = () => {
     const { itemsByEvent, itemCount, updateQuantity, removeItem, eventTotal } = useCart();
@@ -45,17 +39,19 @@ const CartPage = () => {
         return (
             <>
                 <Header />
-                <div className="min-h-screen bg-background pt-24">
-                    <div className="container mx-auto px-4 py-16">
-                        <div className="mx-auto max-w-md text-center">
-                            <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                            <h1 className="mb-2 text-2xl font-bold">Your cart is empty</h1>
-                            <p className="mb-8 text-muted-foreground">Looks like you haven&apos;t added any tickets yet.</p>
-                            <Button onClick={() => navigate('/')}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Browse Events
-                            </Button>
-                        </div>
+                <div className="min-h-screen bg-background px-4 pt-24">
+                    <div className="mx-auto max-w-md py-16">
+                        <EmptyState
+                            icon={ShoppingCart}
+                            title="Your cart is empty"
+                            description="Looks like you haven't added any tickets yet."
+                            action={
+                                <Button onClick={() => navigate('/')}>
+                                    <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+                                    Browse events
+                                </Button>
+                            }
+                        />
                     </div>
                 </div>
             </>
@@ -100,7 +96,7 @@ const CartPage = () => {
                                                 <div className="flex-1">
                                                     <h3 className="font-medium">{item.ticket_type.name}</h3>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {formatMoney(item.ticket_type.price_cents, event.currency)} each
+                                                        {formatMoney(item.ticket_type.price_minor, event.currency)} each
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-3">
@@ -124,7 +120,7 @@ const CartPage = () => {
                                                         </Button>
                                                     </div>
                                                     <div className="w-24 text-right font-medium">
-                                                        {formatMoney(item.quantity * item.ticket_type.price_cents, event.currency)}
+                                                        {formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}
                                                     </div>
                                                     <Button
                                                         variant="ghost"

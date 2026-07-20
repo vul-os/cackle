@@ -23,6 +23,13 @@ function resolveBaseUrl() {
 
 export const API_BASE_URL = resolveBaseUrl();
 
+// `/media/{id}` is a public, unauthenticated route that sits beside `/api`,
+// not under it (see docs/API.md) — strip a trailing "/api" from whatever
+// base we resolved so media URLs still point at the right origin when
+// VITE_API_URL is an absolute cross-origin URL, and stay root-relative in
+// the common same-origin case.
+const MEDIA_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
+
 const TOKEN_KEY = 'cackle_token';
 
 export function getToken() {
@@ -155,7 +162,54 @@ export async function request(path, options = {}) {
 const get = (path, query) => request(path, { method: 'GET', query });
 const post = (path, body, opts) => request(path, { method: 'POST', body, ...opts });
 const patch = (path, body) => request(path, { method: 'PATCH', body });
+const put = (path, body) => request(path, { method: 'PUT', body });
 const del = (path) => request(path, { method: 'DELETE' });
+
+/**
+ * Multipart upload via XMLHttpRequest — `fetch` has no upload-progress
+ * event, and the image uploader needs one. Mirrors `request()`'s auth +
+ * error-shape handling (bearer token, ApiError, 401 -> onUnauthorized) so
+ * callers get the same contract regardless of transport.
+ */
+function uploadFile(path, file, { onProgress } = {}) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${API_BASE_URL}${path}`, true);
+        xhr.withCredentials = true;
+        xhr.setRequestHeader('Accept', 'application/json');
+        const token = getToken();
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+        if (xhr.upload && typeof onProgress === 'function') {
+            xhr.upload.onprogress = (e) => {
+                if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+            };
+        }
+
+        xhr.onload = () => {
+            let data = null;
+            try {
+                data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+            } catch {
+                // non-JSON body — data stays null, message falls back below
+            }
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(data);
+                return;
+            }
+            const errShape = data && typeof data === 'object' ? data.error : null;
+            const message = errShape?.message || xhr.statusText || 'Upload failed';
+            const code = errShape?.code || `http_${xhr.status}`;
+            if (xhr.status === 401) notifyUnauthorized();
+            reject(new ApiError(message, { code, status: xhr.status }));
+        };
+        xhr.onerror = () => reject(new ApiError('Network error — check your connection.', { code: 'network_error' }));
+
+        const form = new FormData();
+        form.append('file', file);
+        xhr.send(form);
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -176,15 +230,27 @@ export const auth = {
 
 export const events = {
     /**
-     * Public listing (published only) when called anonymously. When called
-     * with org auth, the same endpoint is used by the organizer console to
-     * list events owned by the caller's org (including drafts) — the backend
-     * decides scope from the caller's session, not from any query param here.
+     * GET /api/events — published events only, regardless of caller. As of
+     * this wave the backend does NOT branch on org auth to include the
+     * caller's own drafts (internal/events.Service has a ListByOrg for
+     * that, but nothing in internal/httpapi routes to it yet) — so the
+     * organiser console's own draft events are invisible here. See
+     * pages/organizers/events/pending-draft.js for the frontend-only
+     * stopgap (remembering an in-progress draft's id locally) until a
+     * proper org-scoped listing route exists.
      */
     list: (params) => get('/events', params),
     get: (slug) => get(`/events/${encodeURIComponent(slug)}`),
     create: (data) => post('/events', data),
     update: (id, data) => patch(`/events/${id}`, data),
+    /**
+     * Not part of the documented API as of this wave — no confirmed
+     * DELETE /api/events/{id} route exists yet. Kept as a thin wrapper so
+     * the delete-confirmation UI has one call site to update the moment
+     * the backend lands it; callers must handle the "not implemented"
+     * shape (404/405) rather than assume success.
+     */
+    remove: (id) => del(`/events/${id}`),
     publish: (id) => post(`/events/${id}/publish`),
     stats: (id) => get(`/events/${id}/stats`),
     scanBundle: (id) => get(`/events/${id}/scan-bundle`),
@@ -196,6 +262,47 @@ export const events = {
 };
 
 // ---------------------------------------------------------------------------
+// Event images (cover + gallery)
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /api/events/{id}/images` multipart upload -> {id,url,width,height}.
+ * `DELETE /api/images/{id}` removes a stored image. `url(id)` is the public,
+ * unauthenticated `/media/{id}` byte-serving route — safe to drop straight
+ * into an <img src>.
+ */
+export const images = {
+    upload: (eventId, file, opts) => uploadFile(`/events/${eventId}/images`, file, opts),
+    remove: (id) => del(`/images/${id}`),
+    url: (id) => (id ? `${MEDIA_BASE_URL}/media/${id}` : null),
+};
+
+// ---------------------------------------------------------------------------
+// Categories
+// ---------------------------------------------------------------------------
+
+/**
+ * Event categories, derived server-side from published events:
+ * [{ slug, label, count }]. Used to drive the landing page's category tabs
+ * and the browse page's ?category= filter. Callers should treat a failure
+ * here as "no categories to show" rather than a page-level error — category
+ * tabs are a filter convenience, not critical path.
+ */
+export const categories = {
+    list: () => get('/categories'),
+};
+
+/**
+ * The full ISO-4217 currency table Cackle knows about (internal/money):
+ * [{ code, name, exponent }]. Drives the event-creation/edit currency
+ * picker — Cackle has no privileged currency, so this is deliberately the
+ * whole table, not a hardcoded handful of "common" ones.
+ */
+export const currencies = {
+    list: () => get('/currencies'),
+};
+
+// ---------------------------------------------------------------------------
 // Ticket types
 // ---------------------------------------------------------------------------
 
@@ -204,6 +311,42 @@ export const ticketTypes = {
     create: (eventId, data) => post(`/events/${eventId}/ticket-types`, data),
     update: (id, data) => patch(`/ticket-types/${id}`, data),
     remove: (id) => del(`/ticket-types/${id}`),
+};
+
+// ---------------------------------------------------------------------------
+// Org members & invites
+// ---------------------------------------------------------------------------
+
+export const orgMembers = {
+    list: (orgId) => get(`/orgs/${orgId}/members`),
+    invites: (orgId) => get(`/orgs/${orgId}/invites`),
+    invite: (orgId, data) => post(`/orgs/${orgId}/invites`, data),
+    revokeInvite: (inviteId) => del(`/invites/${inviteId}`),
+    acceptInvite: (token) => post('/invites/accept', { token }),
+    /**
+     * Not part of the documented API as of this wave — only listing members
+     * is confirmed. Kept as a thin wrapper so the role-change control has one
+     * call site to update the moment the backend lands it; callers must
+     * handle the "not implemented" shape (404/405) rather than assume success.
+     */
+    updateRole: (orgId, userId, role) => patch(`/orgs/${orgId}/members/${userId}`, { role }),
+};
+
+// ---------------------------------------------------------------------------
+// Payouts & bank details
+// ---------------------------------------------------------------------------
+
+/**
+ * Bank account numbers are masked on read (see docs/API.md) — a GET here
+ * is for display only, never pre-fill an edit form's account-number field
+ * from it. `banks.list()` is the provider's (Paystack) bank list, used to
+ * populate the bank-code select.
+ */
+export const payoutsApi = {
+    bankAccount: (orgId) => get(`/orgs/${orgId}/bank-account`),
+    setBankAccount: (orgId, data) => put(`/orgs/${orgId}/bank-account`, data),
+    banks: () => get('/banks'),
+    forEvent: (eventId) => get(`/events/${eventId}/payouts`),
 };
 
 // ---------------------------------------------------------------------------
@@ -248,6 +391,10 @@ export default {
     request,
     auth,
     events,
+    categories,
+    images,
+    orgMembers,
+    payoutsApi,
     ticketTypes,
     orders,
     payments,

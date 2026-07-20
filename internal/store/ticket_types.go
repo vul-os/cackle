@@ -17,7 +17,7 @@ type TicketType struct {
 	EventID       string
 	Name          string
 	Description   string
-	PriceCents    int64
+	PriceMinor    int64
 	QuantityTotal int
 	QuantitySold  int
 	SalesStart    *time.Time
@@ -27,7 +27,7 @@ type TicketType struct {
 	SortOrder     int
 }
 
-const ticketTypeSelectColumns = `SELECT id, event_id, name, description, price_cents, quantity_total,
+const ticketTypeSelectColumns = `SELECT id, event_id, name, description, price_minor, quantity_total,
 	quantity_sold, sales_start, sales_end, max_per_order, status, sort_order`
 
 // CreateTicketType inserts a new ticket type. QuantitySold is always
@@ -39,10 +39,10 @@ func (s *Store) CreateTicketType(ctx context.Context, tt *TicketType) error {
 	}
 	tt.QuantitySold = 0
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO ticket_types (id, event_id, name, description, price_cents, quantity_total,
+		INSERT INTO ticket_types (id, event_id, name, description, price_minor, quantity_total,
 			quantity_sold, sales_start, sales_end, max_per_order, status, sort_order)
 		VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-		tt.ID, tt.EventID, tt.Name, tt.Description, tt.PriceCents, tt.QuantityTotal,
+		tt.ID, tt.EventID, tt.Name, tt.Description, tt.PriceMinor, tt.QuantityTotal,
 		nullTimeToText(tt.SalesStart), nullTimeToText(tt.SalesEnd), tt.MaxPerOrder, tt.Status, tt.SortOrder,
 	)
 	if err != nil {
@@ -59,10 +59,10 @@ func (s *Store) CreateTicketType(ctx context.Context, tt *TicketType) error {
 func (s *Store) UpdateTicketType(ctx context.Context, tt *TicketType) error {
 	res, err := s.db.ExecContext(ctx, `
 		UPDATE ticket_types SET
-			name = ?, description = ?, price_cents = ?, quantity_total = ?,
+			name = ?, description = ?, price_minor = ?, quantity_total = ?,
 			sales_start = ?, sales_end = ?, max_per_order = ?, status = ?, sort_order = ?
 		WHERE id = ?`,
-		tt.Name, tt.Description, tt.PriceCents, tt.QuantityTotal,
+		tt.Name, tt.Description, tt.PriceMinor, tt.QuantityTotal,
 		nullTimeToText(tt.SalesStart), nullTimeToText(tt.SalesEnd), tt.MaxPerOrder, tt.Status, tt.SortOrder, tt.ID,
 	)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *Store) ListTicketTypesForEvent(ctx context.Context, eventID string) ([]
 func (s *Store) scanTicketType(row *sql.Row) (*TicketType, error) {
 	var tt TicketType
 	var salesStart, salesEnd sql.NullString
-	err := row.Scan(&tt.ID, &tt.EventID, &tt.Name, &tt.Description, &tt.PriceCents, &tt.QuantityTotal,
+	err := row.Scan(&tt.ID, &tt.EventID, &tt.Name, &tt.Description, &tt.PriceMinor, &tt.QuantityTotal,
 		&tt.QuantitySold, &salesStart, &salesEnd, &tt.MaxPerOrder, &tt.Status, &tt.SortOrder)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -138,7 +138,7 @@ type rowScanner interface {
 func scanTicketTypeRow(row rowScanner) (TicketType, error) {
 	var tt TicketType
 	var salesStart, salesEnd sql.NullString
-	err := row.Scan(&tt.ID, &tt.EventID, &tt.Name, &tt.Description, &tt.PriceCents, &tt.QuantityTotal,
+	err := row.Scan(&tt.ID, &tt.EventID, &tt.Name, &tt.Description, &tt.PriceMinor, &tt.QuantityTotal,
 		&tt.QuantitySold, &salesStart, &salesEnd, &tt.MaxPerOrder, &tt.Status, &tt.SortOrder)
 	if err != nil {
 		return TicketType{}, fmt.Errorf("store: scan ticket type row: %w", err)

@@ -3,10 +3,19 @@ import { cn } from '@/lib/utils';
 /**
  * Base loading-skeleton primitive. Respects prefers-reduced-motion globally
  * (see index.css) — the pulse animation is disabled rather than removed, so
- * the muted block still communicates "loading" without motion.
+ * the muted block still communicates "loading" without motion. The diagonal
+ * sheen is `motion-safe:` only, so reduced-motion users get the plain muted
+ * block with no moving parts at all rather than a near-instant flicker.
  */
 function Skeleton({ className, ...props }) {
-    return <div className={cn('animate-pulse rounded-md bg-muted', className)} {...props} />;
+    return (
+        <div className={cn('relative overflow-hidden rounded-md bg-muted animate-pulse', className)} {...props}>
+            <span
+                aria-hidden="true"
+                className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-foreground/10 to-transparent motion-safe:animate-shimmer"
+            />
+        </div>
+    );
 }
 
 /**

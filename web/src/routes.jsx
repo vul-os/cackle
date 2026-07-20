@@ -30,10 +30,15 @@ import UpdatePassword from './pages/auth/update-password';
 // Organizer console
 import HomePage from './pages/organizers/home';
 import EventsPage from './pages/organizers/events';
+import CreateEventWizard from './pages/organizers/events/create';
 import EventPage from './pages/organizers/events/event';
 import EventStatsPage from './pages/organizers/events/event/stats';
 import EventAttendeesPage from './pages/organizers/events/event/attendees';
 import EventTicketTypesPage from './pages/organizers/events/event/tickets';
+import EventImagesPage from './pages/organizers/events/event/images';
+import TeamPage from './pages/organizers/team';
+import PayoutsPage from './pages/organizers/payouts';
+import AcceptInvitePage from './pages/organizers/invite-accept';
 import ScannerPage from './pages/organizers/scanner';
 import SettingsPage from './pages/organizers/settings';
 import PricingPage from './pages/organizers/pricing';
@@ -105,6 +110,14 @@ const AppRoutes = () => {
                         </ProtectedRoute>
                     }
                 />
+                <Route
+                    path="/accept-invite"
+                    element={
+                        <ProtectedRoute>
+                            <AcceptInvitePage />
+                        </ProtectedRoute>
+                    }
+                />
 
                 <Route path="*" element={<NotFound />} />
             </Route>
@@ -132,6 +145,22 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <EventsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/events/new"
+                    element={
+                        <ProtectedRoute>
+                            <CreateEventWizard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/events/:id/wizard"
+                    element={
+                        <ProtectedRoute>
+                            <CreateEventWizard />
                         </ProtectedRoute>
                     }
                 />
@@ -164,6 +193,30 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <EventTicketTypesPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/events/:id/images"
+                    element={
+                        <ProtectedRoute>
+                            <EventImagesPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/team"
+                    element={
+                        <ProtectedRoute>
+                            <TeamPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/payouts"
+                    element={
+                        <ProtectedRoute>
+                            <PayoutsPage />
                         </ProtectedRoute>
                     }
                 />

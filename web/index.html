@@ -3,11 +3,28 @@
 <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/cackle.svg" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Cackle — events and ticketing that works even when the gate has no internet." />
     <meta name="theme-color" content="#0b0a0d" />
     <title>Cackle</title>
 
+    <!-- Self-hosted Figtree, preloaded so the display type doesn't wait on
+         CSS discovery — no external host involved, so this stays inside the
+         strict script-src/style-src 'self' CSP and works fully offline. -->
+    <link rel="preload" href="/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
+
+    <!-- Matches the light-theme --background token in index.css so the
+         first paint (before the stylesheet + ThemeProvider apply) isn't a
+         flash of stark white against the app's actual background. -->
+    <style>
+        html, body { background-color: #ffffff; }
+        @media (prefers-color-scheme: dark) {
+            html, body { background-color: #0e0e12; }
+        }
+    </style>
 </head>
 <body>
     <div id="root" class="font-sans antialiased"></div>

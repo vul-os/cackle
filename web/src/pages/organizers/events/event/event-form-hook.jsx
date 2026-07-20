@@ -13,7 +13,11 @@ const EMPTY_FORM = {
     ends_at: '',
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     cover_image: '',
-    currency: 'ZAR',
+    cover_image_id: null,
+    category: '',
+    // No hardcoded default currency — Cackle has no privileged currency;
+    // the organiser picks explicitly (see schedule-venue.jsx/details.jsx).
+    currency: '',
     status: 'draft',
 };
 
@@ -41,7 +45,9 @@ export const useEventForm = () => {
             ends_at: data.ends_at ?? '',
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             cover_image: data.cover_image ?? '',
-            currency: data.currency || 'ZAR',
+            cover_image_id: data.cover_image_id ?? null,
+            category: data.category ?? '',
+            currency: data.currency ?? '',
             status: data.status || 'draft',
         });
         if (data.starts_at && data.ends_at) {

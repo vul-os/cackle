@@ -6,7 +6,7 @@ import (
 )
 
 // OrderItem is one ticket_type/quantity line within an order.
-// UnitPriceCents is frozen at the price read from ticket_types at the
+// UnitPriceMinor is frozen at the price read from ticket_types at the
 // moment the order was created (see CreateOrderWithItems in orders.go) —
 // it does not follow later price changes to the ticket type.
 type OrderItem struct {
@@ -14,7 +14,7 @@ type OrderItem struct {
 	OrderID        string
 	TicketTypeID   string
 	Quantity       int
-	UnitPriceCents int64
+	UnitPriceMinor int64
 }
 
 // ListOrderItemsForOrder returns every line item belonging to an order.
@@ -23,7 +23,7 @@ type OrderItem struct {
 // order in the same transaction.
 func (s *Store) ListOrderItemsForOrder(ctx context.Context, orderID string) ([]OrderItem, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, order_id, ticket_type_id, quantity, unit_price_cents
+		SELECT id, order_id, ticket_type_id, quantity, unit_price_minor
 		FROM order_items WHERE order_id = ?`, orderID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list order items: %w", err)
@@ -33,7 +33,7 @@ func (s *Store) ListOrderItemsForOrder(ctx context.Context, orderID string) ([]O
 	var out []OrderItem
 	for rows.Next() {
 		var it OrderItem
-		if err := rows.Scan(&it.ID, &it.OrderID, &it.TicketTypeID, &it.Quantity, &it.UnitPriceCents); err != nil {
+		if err := rows.Scan(&it.ID, &it.OrderID, &it.TicketTypeID, &it.Quantity, &it.UnitPriceMinor); err != nil {
 			return nil, fmt.Errorf("store: scan order item: %w", err)
 		}
 		out = append(out, it)

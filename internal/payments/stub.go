@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/vul-os/cackle/internal/money"
 )
 
 // ProviderNameStub is the stable Name() the stub provider registers under.
@@ -56,38 +58,53 @@ func NewStub(optIn bool) (*StubProvider, error) {
 // Name implements Provider.
 func (s *StubProvider) Name() string { return ProviderNameStub }
 
+// Capabilities implements Provider. The stub accepts any currency (it's
+// only ever used for demos/tests) and settles inline with no redirect and
+// no webhook.
+func (s *StubProvider) Capabilities() Capabilities {
+	return Capabilities{
+		Currencies:    nil,
+		Countries:     nil,
+		Flow:          FlowInline,
+		Refunds:       false,
+		Payouts:       false,
+		Webhooks:      false,
+		ZeroDecimalOK: true,
+	}
+}
+
 // Begin immediately marks the order as paid in the stub's in-memory
 // ledger and returns instructions rather than a redirect URL — there is no
 // real payment page.
 func (s *StubProvider) Begin(ctx context.Context, o Order) (Charge, error) {
-	if strings.TrimSpace(o.ID) == "" {
+	if strings.TrimSpace(o.Reference) == "" {
 		return Charge{}, errors.New("payments: stub: order id is required")
 	}
-	if o.TotalCents <= 0 {
-		return Charge{}, errors.New("payments: stub: total_cents must be positive")
+	if o.AmountMinor <= 0 {
+		return Charge{}, errors.New("payments: stub: amount_minor must be positive")
 	}
-	currency := o.Currency
-	if currency == "" {
-		currency = "ZAR"
+	currency, err := money.Normalize(o.Currency)
+	if err != nil {
+		return Charge{}, fmt.Errorf("payments: stub: %w", err)
 	}
 
 	result := Result{
 		Provider:    ProviderNameStub,
-		Reference:   o.ID,
-		EventID:     "stub-" + o.ID,
+		Reference:   o.Reference,
+		EventID:     "stub-" + o.Reference,
 		Status:      StatusPaid,
-		AmountCents: o.TotalCents,
+		AmountMinor: o.AmountMinor,
 		Currency:    currency,
 		PaidAt:      time.Now().UTC(),
 	}
 
 	s.mu.Lock()
-	s.settled[o.ID] = result
+	s.settled[o.Reference] = result
 	s.mu.Unlock()
 
 	return Charge{
 		Provider:     ProviderNameStub,
-		Reference:    o.ID,
+		Reference:    o.Reference,
 		Instructions: "Demo mode: this order auto-settles instantly. No real payment was taken.",
 	}, nil
 }

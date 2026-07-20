@@ -45,7 +45,7 @@ func (h *testHarness) newPublishedEvent(t *testing.T, emailSuffix string) eventF
 		Event events.Event `json:"event"`
 	}](t, rec)
 
-	ttBody := events.TicketTypeInput{Name: "General", PriceCents: 15000, QuantityTotal: 5, MaxPerOrder: 5, Status: "active"}
+	ttBody := events.TicketTypeInput{Name: "General", PriceMinor: 15000, QuantityTotal: 5, MaxPerOrder: 5, Status: "active"}
 	rec = h.do(http.MethodPost, "/api/events/"+created.Event.ID+"/ticket-types", ownerToken, ttBody)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("create ticket type: status %d body %s", rec.Code, rec.Body.String())
@@ -97,14 +97,14 @@ func TestFullPurchaseSettleTicketScanFlow(t *testing.T) {
 	created := decodeBody[struct {
 		Order struct {
 			ID         string `json:"id"`
-			TotalCents int64  `json:"total_cents"`
+			TotalMinor int64  `json:"total_minor"`
 		} `json:"order"`
 		Payment struct {
 			Reference string `json:"reference"`
 		} `json:"payment"`
 	}](t, rec)
-	if created.Order.TotalCents != 30000 {
-		t.Fatalf("expected total_cents 30000 (2x15000), got %d", created.Order.TotalCents)
+	if created.Order.TotalMinor != 30000 {
+		t.Fatalf("expected total_minor 30000 (2x15000), got %d", created.Order.TotalMinor)
 	}
 
 	// Verify settles the order and issues tickets.

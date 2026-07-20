@@ -4,9 +4,10 @@ import { useCart } from '@/context/use-cart';
 import { useAuth } from '@/context/use-auth';
 import Header from '@/pages/visitor/header';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/components/ui/use-toast';
-import { orders as ordersApi } from '@/lib/api';
+import { orders as ordersApi, payments as paymentsApi } from '@/lib/api';
 import BillingForm from './billing-form';
 import OrderSummary from './order-summary';
 import PaymentRedirectPage from './redirect';
@@ -48,7 +49,23 @@ const CheckoutPage = () => {
             if (result?.payment?.redirect_url) {
                 setRedirectUrl(result.payment.redirect_url);
             } else if (result?.order?.id) {
-                // No redirect (e.g. free order, or a provider that settles inline)
+                // No redirect: either the provider settles inline (e.g.
+                // --demo's stub) or needs out-of-band confirmation (manual,
+                // an invoice-style crypto provider). Either way, an order's
+                // id IS its provider reference (see internal/orders' Order
+                // doc comment) — poll verify once so an inline provider's
+                // settlement is reflected immediately rather than leaving
+                // the order stuck showing "pending" until something else
+                // happens to call verify. A provider that isn't confirmed
+                // yet (manual/invoice) rejects this with "not confirmed",
+                // which is expected, not an error — the order page still
+                // shows its real (pending) status either way.
+                try {
+                    await paymentsApi.verify(result.order.id);
+                } catch {
+                    // Not settled yet — normal for manual/invoice-style
+                    // providers; nothing to do here.
+                }
                 navigate(`/order/${result.order.id}`);
             } else {
                 navigate('/orders');
@@ -68,11 +85,15 @@ const CheckoutPage = () => {
         return (
             <>
                 <Header />
-                <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 pt-16 text-center">
-                    <AlertCircle className="h-10 w-10 text-muted-foreground" />
-                    <h1 className="text-xl font-semibold">Nothing to check out</h1>
-                    <p className="text-muted-foreground">This event isn&apos;t in your cart (anymore).</p>
-                    <Button onClick={() => navigate('/cart')}>Back to cart</Button>
+                <div className="min-h-screen bg-background px-4 pt-24">
+                    <div className="mx-auto max-w-lg">
+                        <EmptyState
+                            icon={ShoppingCart}
+                            title="Nothing to check out"
+                            description="This event isn't in your cart (anymore)."
+                            action={<Button onClick={() => navigate('/cart')}>Back to cart</Button>}
+                        />
+                    </div>
                 </div>
             </>
         );

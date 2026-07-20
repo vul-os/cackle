@@ -92,8 +92,14 @@ Zero-setup demo mode is for evaluation only. To run a real event:
 
 1. Set `CACKLE_BASE_URL` to your real, publicly reachable domain — payment
    provider callbacks need it. See [CONFIGURATION.md](CONFIGURATION.md).
-2. Set `CACKLE_PAYSTACK_SECRET_KEY` (or write and wire up another
-   `payments.Provider` adapter — see [PAYMENTS.md](PAYMENTS.md)).
+2. Decide how you'll take payment. The default, `manual`, needs no setup at
+   all — the organiser records that money arrived (bank transfer, cash at
+   the door, an invoice) and marks the order paid. To take payments through
+   a real processor instead (or alongside it), set
+   `CACKLE_PAYMENT_PROVIDERS` and that provider's `CACKLE_<PROVIDER>_*`
+   secrets — see [PAYMENTS.md](PAYMENTS.md) for the full list of built-in
+   adapters and each one's verification status, or write your own
+   `payments.Provider`.
 3. Point `CACKLE_DB` at a path on a volume you actually back up (the Docker
    image already defaults this to `/srv/data/cackle.db` under the `/srv/data`
    volume — mount it).

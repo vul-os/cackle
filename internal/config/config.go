@@ -35,16 +35,21 @@ type Config struct {
 	// Demo indicates the process should boot fully seeded with demo data
 	// (internal/demo), with no external dependencies required.
 	Demo bool
+	// MediaDir is the directory uploaded event images are stored under (see
+	// internal/media and internal/httpapi's image handlers). Defaults to a
+	// "media" directory beside the SQLite database file.
+	MediaDir string
 }
 
 // Flags carries CLI flag values, mirroring the environment variables below.
 // Zero values mean "not explicitly set on the command line" and fall back to
 // the environment, then to the default.
 type Flags struct {
-	Addr    string
-	DB      string
-	BaseURL string
-	Demo    bool
+	Addr     string
+	DB       string
+	BaseURL  string
+	Demo     bool
+	MediaDir string
 	// DemoSet records whether --demo was explicitly passed, so a false
 	// zero value doesn't shadow CACKLE_DEMO=1.
 	DemoSet bool
@@ -57,6 +62,7 @@ const (
 	envSessionSecret = "CACKLE_SESSION_SECRET"
 	envPaystackKey   = "CACKLE_PAYSTACK_SECRET_KEY"
 	envDemo          = "CACKLE_DEMO"
+	envMediaDir      = "CACKLE_MEDIA_DIR"
 
 	defaultAddr    = ":8080"
 	defaultDB      = "./cackle.db"
@@ -106,6 +112,8 @@ func Load(f Flags) (*Config, error) {
 		cfg.Demo = envBool(envDemo)
 	}
 
+	cfg.MediaDir = firstNonEmpty(f.MediaDir, os.Getenv(envMediaDir), defaultMediaDirFor(cfg.DB))
+
 	secret := os.Getenv(envSessionSecret)
 	if secret == "" {
 		s, err := loadOrCreatePersistedSecret(cfg.DB)
@@ -146,6 +154,18 @@ func envBool(name string) bool {
 		}
 		return false
 	}
+}
+
+// defaultMediaDirFor derives the default uploaded-image storage directory
+// from the database path: a "media" sibling directory next to the DB file,
+// so a self-hoster pointing --db somewhere specific gets their uploads
+// stored alongside it with zero extra configuration. An in-memory or empty
+// DB path (tests, ephemeral runs) falls back to "./media".
+func defaultMediaDirFor(dbPath string) string {
+	if dbPath == "" || dbPath == ":memory:" {
+		return "./media"
+	}
+	return filepath.Join(filepath.Dir(dbPath), "media")
 }
 
 // secretFilePath derives a persisted-secret path from the database path so

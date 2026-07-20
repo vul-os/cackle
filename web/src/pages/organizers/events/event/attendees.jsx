@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ArrowLeft, Users, Ticket, Coins, ShieldCheck, Search, Download } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
+import { formatMoney } from '@/lib/money';
 
 const PAGE_SIZE = 50;
 
@@ -26,14 +27,6 @@ const STATUS_OPTIONS = [
     { value: 'void', label: 'Void' },
     { value: 'refunded', label: 'Refunded' },
 ];
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
 
 /** Hand-rolled CSV — no dependency. Wraps any field containing a comma,
  * quote or newline in quotes and escapes embedded quotes by doubling them. */
@@ -97,7 +90,7 @@ const EventAttendeesPage = () => {
             .then(([eventData, statsData, ticketTypesData]) => {
                 const types = Array.isArray(ticketTypesData) ? ticketTypesData : (ticketTypesData?.ticket_types ?? []);
                 const priceByTypeId = {};
-                for (const t of types) priceByTypeId[t.id] = t.price_cents;
+                for (const t of types) priceByTypeId[t.id] = t.price_minor;
                 setSummary({
                     event: eventData?.event ?? eventData,
                     stats: statsData?.stats ?? statsData,
@@ -148,7 +141,7 @@ const EventAttendeesPage = () => {
     }, [fetchRoster]);
 
     const { event, stats, priceByTypeId, loading: summaryLoading, error: summaryError } = summary;
-    const currency = event?.currency || 'ZAR';
+    const currency = event?.currency || '';
     const byType = useMemo(() => stats?.by_type ?? [], [stats]);
 
     const { attendees, total: rosterTotal, loading: rosterLoading, error: rosterError } = roster;
@@ -164,7 +157,7 @@ const EventAttendeesPage = () => {
                 t.sold ?? 0,
                 t.quantity_total ?? 0,
                 Math.max(0, (t.quantity_total ?? 0) - (t.sold ?? 0)),
-                formatMoney(t.revenue_cents, currency),
+                formatMoney(t.revenue_minor, currency),
             ]),
         ];
         const base = event?.slug || id;
@@ -227,7 +220,7 @@ const EventAttendeesPage = () => {
                     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <StatTile icon={Ticket} label="Tickets sold" value={stats.sold ?? 0} />
                         <StatTile icon={ShieldCheck} label="Admitted at the gate" value={stats.admitted ?? 0} />
-                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_cents, currency)} />
+                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_minor, currency)} />
                     </div>
 
                     <Card className="mb-6">
@@ -267,7 +260,7 @@ const EventAttendeesPage = () => {
                                                     <TableCell className="text-right tabular-nums">{t.sold ?? 0}</TableCell>
                                                     <TableCell className="text-right tabular-nums">{t.quantity_total ?? 0}</TableCell>
                                                     <TableCell className="text-right tabular-nums">{remaining}</TableCell>
-                                                    <TableCell className="text-right tabular-nums">{formatMoney(t.revenue_cents, currency)}</TableCell>
+                                                    <TableCell className="text-right tabular-nums">{formatMoney(t.revenue_minor, currency)}</TableCell>
                                                 </TableRow>
                                             );
                                         })}

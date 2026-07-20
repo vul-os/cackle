@@ -28,6 +28,15 @@ working even if the venue's network, or the server itself, goes down mid-event.
 
 ---
 
+> [!WARNING]
+> **Experimental — work in progress.** Cackle is a ground-up refactor of an earlier
+> ticketing platform onto a single Go binary, and it is **not production-ready**.
+> APIs, the database schema, and the ticket format are all still moving; expect
+> breaking changes without migrations. Payment provider adapters are built against
+> published API documentation and are **unit-tested but not sandbox-verified** unless
+> explicitly marked otherwise in [docs/PAYMENTS.md](docs/PAYMENTS.md) — do not take
+> real money through an unverified adapter. Do not run a real event on this yet.
+
 ## What is Cackle?
 
 Cackle is a **standalone, self-hostable events and ticketing platform** —
@@ -46,11 +55,16 @@ Cackle dies outright, gates that already downloaded the event's scan bundle
 keep admitting people, deduping locally, and reconciling once the network
 comes back.
 
-Cackle was born as a South African ticketing platform built around
-Paystack, PayShap, and EFT payouts — so the payments story is **ZAR-first**,
-but the payment provider sits behind a seam (`internal/payments`) so other
-processors are a matter of writing an adapter, not rearchitecting. **Cackle
-never holds funds** — it hands off to a provider and records the result.
+Cackle is **country and currency agnostic** — there is no privileged
+country, currency, or processor. Currency is set per event. The default
+provider is `manual`: the organiser records that money arrived (bank
+transfer, cash at the door, an invoice, mobile money) with no API key and no
+compliance surface, and it works in every country. Every other
+processor — Stripe, Paystack, BTCPay, 20-odd others — is an optional,
+off-by-default adapter behind one seam (`internal/payments`). **Cackle never
+holds funds** — it hands off to a provider (or the organiser, for `manual`)
+and records the result. See [docs/PAYMENTS.md](docs/PAYMENTS.md) for the
+full adapter list and each one's verification status.
 
 ## Part of VulOS
 
@@ -90,8 +104,8 @@ scoped storage in front of it.
 | 🎟️ **Offline-verifiable tickets** | Every ticket is an Ed25519-signed capability, `cackle.<payload>.<sig>`, verified with a pure function — no database, no network, no clock but the one you hand it. This is what lets a gate keep admitting people with no connection. See [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md). |
 | 🚪 **Offline gate scanning** | A scanner pulls one `scan-bundle` while online (event details, issuer public keys, a ticket index, an allocation) and can then run the whole event unplugged. Admission dedupe is local and append-only — first scan wins, duplicates are recorded, never overwritten. See [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md). |
 | 🏟️ **Events & ticket types** | Organisations own events; events own ticket types with pricing, quantity caps, sales windows, and per-order limits. Draft → published → cancelled lifecycle. |
-| 🛒 **Orders & checkout** | Cart-style checkout against live ticket-type availability, integer-cents accounting (money is never a float), per-order item breakdown. |
-| 💳 **Pluggable payments** | A small `Provider` interface (`Begin` / `Verify` / `Webhook`) behind every charge. Ships with a Paystack adapter and a `stub` provider that auto-settles for `--demo` and tests. Webhooks verify HMAC and fail closed. Cackle never holds funds. See [docs/PAYMENTS.md](docs/PAYMENTS.md). |
+| 🛒 **Orders & checkout** | Cart-style checkout against live ticket-type availability, integer minor-unit accounting in the event's own currency (money is never a float), per-order item breakdown. |
+| 💳 **Pluggable payments** | A small `Provider` interface (`Begin` / `Verify` / `Webhook` / `Capabilities`) behind every charge. `manual` is the always-on default (no API key, works anywhere); 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more) are off by default and enabled per deployment via `CACKLE_PAYMENT_PROVIDERS`. Webhooks verify signatures and fail closed. Cackle never holds funds. See [docs/PAYMENTS.md](docs/PAYMENTS.md). |
 | 👥 **Org roles** | `owner` / `admin` / `scanner` per organisation, checked server-side on every event/org route — including the ones an incumbent platform forgot to guard. |
 | 📈 **Live stats** | Sold, revenue, admitted count, and a per-ticket-type breakdown per event. |
 | 📦 **One binary, one file database** | `modernc.org/sqlite` (pure Go, no cgo) plus the built React app embedded via `embed.FS`. `docker run -p 8080:8080 vulos/cackle` is the whole install. |
@@ -184,8 +198,13 @@ requires a config file.
 | `CACKLE_DB` | `./cackle.db` | SQLite file path |
 | `CACKLE_BASE_URL` | — | Public base URL, used in links and payment callbacks |
 | `CACKLE_SESSION_SECRET` | auto-generated, persisted | Session signing secret |
-| `CACKLE_PAYSTACK_SECRET_KEY` | — | Paystack secret key (required to take real payments) |
+| `CACKLE_PAYMENT_PROVIDERS` | unset (every registered provider enabled) | Comma-separated allowlist of optional payment providers for this deployment, e.g. `manual,stripe,paystack`. `manual` is always enabled regardless. |
 | `CACKLE_DEMO` | `false` | Boot fully seeded with demo data (same as `--demo`) |
+
+Each optional payment provider has its own `CACKLE_<PROVIDER>_*` secrets
+(e.g. `CACKLE_STRIPE_SECRET_KEY`, `CACKLE_PAYSTACK_SECRET_KEY`) — see
+[docs/PAYMENTS.md](docs/PAYMENTS.md) for the full per-adapter list and
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.
 
 Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
@@ -199,7 +218,7 @@ Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 | [docs/API.md](docs/API.md) | The full HTTP API the frontend (and any client) codes against |
 | [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md) | The ticket capability format and why offline verification works — read this first |
 | [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md) | Running a gate with no network: scan-bundle, allocations, sync |
-| [docs/PAYMENTS.md](docs/PAYMENTS.md) | The payment provider seam, Paystack setup, webhooks, why Cackle never holds funds |
+| [docs/PAYMENTS.md](docs/PAYMENTS.md) | The payment provider seam, the full adapter table + verification status, `manual` by default, why Cackle never holds funds |
 | [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | Full screenshot gallery and how to regenerate it |
 | [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | Running Cackle for a real event: Docker, backups, TLS, scaling the gate |
 | [ROADMAP.md](ROADMAP.md) | What v1 ships, and what's deliberately deferred |

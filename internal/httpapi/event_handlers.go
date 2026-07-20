@@ -4,13 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/vul-os/cackle/internal/auth"
 	"github.com/vul-os/cackle/internal/events"
+	"github.com/vul-os/cackle/internal/money"
 	"github.com/vul-os/cackle/internal/scan"
 	"github.com/vul-os/cackle/internal/store"
 )
@@ -40,7 +44,7 @@ func eventToMeta(ev *events.Event) scan.EventMeta {
 // published events only, no auth required.
 func (s *server) handleListPublicEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	filter := events.PublicFilter{Query: q.Get("q")}
+	filter := events.PublicFilter{Query: q.Get("q"), Category: q.Get("category")}
 
 	if from := q.Get("from"); from != "" {
 		t, err := time.Parse(time.RFC3339, from)
@@ -105,11 +109,99 @@ func (s *server) handleGetPublicEvent(w http.ResponseWriter, r *http.Request) {
 		internalError(w, s.log(), "issuer keys for public event", err)
 		return
 	}
+	images, err := s.deps.Store.ListImagesByEvent(r.Context(), ev.ID)
+	if err != nil {
+		internalError(w, s.log(), "gallery for public event", err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"event":        ev,
 		"ticket_types": types,
 		"issuer_keys":  ring,
+		"gallery":      toImageViews(images),
 	})
+}
+
+// imageView is one gallery image over the wire.
+type imageView struct {
+	ID     string `json:"id"`
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+}
+
+func toImageViews(images []store.Image) []imageView {
+	out := make([]imageView, 0, len(images))
+	for _, img := range images {
+		out = append(out, imageView{ID: img.ID, URL: "/media/" + img.ID, Width: img.Width, Height: img.Height})
+	}
+	return out
+}
+
+// handleListCategories serves GET /api/categories — public, derived from
+// currently published events only (a category with zero live events isn't
+// worth a browse-page tab).
+func (s *server) handleListCategories(w http.ResponseWriter, r *http.Request) {
+	counts, err := s.deps.Store.ListCategoryCounts(r.Context())
+	if err != nil {
+		internalError(w, s.log(), "list categories", err)
+		return
+	}
+
+	type categoryView struct {
+		Slug  string `json:"slug"`
+		Label string `json:"label"`
+		Count int    `json:"count"`
+	}
+	out := make([]categoryView, 0, len(counts))
+	for _, c := range counts {
+		out = append(out, categoryView{Slug: c.Slug, Label: categoryLabel(c.Slug), Count: c.Count})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"categories": out})
+}
+
+// handleListCurrencies serves GET /api/currencies — public, static
+// reference data straight from internal/money's ISO-4217 table. This is
+// what an event-creation currency picker should source its options from,
+// instead of a hardcoded handful of currencies: Cackle has no privileged
+// currency, and the frontend shouldn't either.
+func (s *server) handleListCurrencies(w http.ResponseWriter, r *http.Request) {
+	type currencyView struct {
+		Code     string `json:"code"`
+		Name     string `json:"name"`
+		Exponent int    `json:"exponent"`
+	}
+	codes := money.SupportedCurrencies()
+	out := make([]currencyView, 0, len(codes))
+	for _, code := range codes {
+		info, err := money.Lookup(code)
+		if err != nil {
+			// Every code from SupportedCurrencies() is, by construction,
+			// in the same table Lookup reads — this should be
+			// unreachable, but fail loudly rather than silently drop a
+			// currency from the list if that invariant is ever broken.
+			internalError(w, s.log(), "list currencies", err)
+			return
+		}
+		out = append(out, currencyView{Code: info.Code, Name: info.Name, Exponent: info.Exponent})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Code < out[j].Code })
+	writeJSON(w, http.StatusOK, map[string]any{"currencies": out})
+}
+
+// categoryLabel reconstructs a human-friendly label from a normalised
+// slug: "live-music" -> "Live Music".
+func categoryLabel(slug string) string {
+	parts := strings.Split(slug, "-")
+	for i, p := range parts {
+		if p == "" {
+			continue
+		}
+		r := []rune(p)
+		r[0] = unicode.ToUpper(r[0])
+		parts[i] = string(r)
+	}
+	return strings.Join(parts, " ")
 }
 
 // handleCreateEvent serves POST /api/events — requires admin+ on the org
@@ -143,6 +235,14 @@ func (s *server) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 
 	ev, err := s.deps.Events.Create(r.Context(), body.OrgID, body.CreateEventInput)
 	if err != nil {
+		if errors.Is(err, events.ErrInvalidInput) {
+			badRequest(w, err.Error())
+			return
+		}
+		if errors.Is(err, store.ErrNotFound) {
+			badRequest(w, "org_id does not exist")
+			return
+		}
 		internalError(w, s.log(), "create event", err)
 		return
 	}
@@ -178,6 +278,10 @@ func (s *server) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
 			notFound(w, "event not found")
 			return
 		}
+		if errors.Is(err, events.ErrInvalidInput) || errors.Is(err, events.ErrInvalidTransition) {
+			badRequest(w, err.Error())
+			return
+		}
 		internalError(w, s.log(), "update event", err)
 		return
 	}
@@ -203,6 +307,10 @@ func (s *server) handlePublishEvent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			notFound(w, "event not found")
+			return
+		}
+		if errors.Is(err, events.ErrInvalidTransition) {
+			badRequest(w, err.Error())
 			return
 		}
 		internalError(w, s.log(), "publish event", err)

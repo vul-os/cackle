@@ -3,6 +3,22 @@ import { Calculator, Percent, CreditCard as CreditCardIcon, Banknote as Banknote
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatMoney } from '@/lib/money';
+
+// This calculator is inherently South Africa-specific — VAT at 15% and
+// PayShap are both SA-specific — unlike the rest of Cackle, which is
+// country/currency-agnostic. It always illustrates ZAR pricing; the fix
+// here is routing its output through the same shared formatMoney (so the
+// symbol/locale handling is correct) instead of a hand-concatenated "R"
+// prefix, not making the underlying VAT/PayShap model generic.
+const CALCULATOR_CURRENCY = 'ZAR';
+
+/** Renders a ZAR major-unit float (this calculator works in JS floats
+ * throughout, not integer minor units from the backend) via the shared
+ * formatter rather than a hardcoded "R" + toFixed(2). */
+function formatZar(amount) {
+    return formatMoney(Math.round((Number(amount) || 0) * 100), CALCULATOR_CURRENCY);
+}
 
 const VAT_RATE = 0.15;
 const OUR_FEE_RATE = 0.0085;
@@ -132,12 +148,12 @@ const PaymentCalculator = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="rounded-lg bg-primary/10 p-4">
                             <h4 className="mb-1 text-sm font-medium text-muted-foreground">Our Fee (0.85%)</h4>
-                            <p className="text-2xl font-bold text-primary">R{ourFee.toFixed(2)}</p>
+                            <p className="text-2xl font-bold text-primary">{formatZar(ourFee)}</p>
                         </div>
                         {distributionData.map((m) => (
                             <div key={m.id} className="rounded-lg bg-muted p-4">
                                 <h4 className="mb-1 text-sm font-medium text-muted-foreground">{m.name} Fees</h4>
-                                <p className="text-2xl font-bold">R{m.fees.toFixed(2)}</p>
+                                <p className="text-2xl font-bold">{formatZar(m.fees)}</p>
                             </div>
                         ))}
                     </div>
@@ -145,15 +161,15 @@ const PaymentCalculator = () => {
                     <div className="space-y-2 border-t border-border pt-4">
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Subtotal</span>
-                            <span className="font-bold">R{subtotal.toFixed(2)}</span>
+                            <span className="font-bold">{formatZar(subtotal)}</span>
                         </div>
                         <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">VAT (15%)</span>
-                            <span className="font-bold">R{vat.toFixed(2)}</span>
+                            <span className="font-bold">{formatZar(vat)}</span>
                         </div>
                         <div className="flex items-center justify-between border-t border-border pt-2">
                             <span className="text-lg font-bold">Total Fees</span>
-                            <span className="text-lg font-bold text-primary">R{total.toFixed(2)}</span>
+                            <span className="text-lg font-bold text-primary">{formatZar(total)}</span>
                         </div>
                     </div>
                 </CardContent>

@@ -10,11 +10,19 @@ docker run -d \
   --name cackle \
   -p 8080:8080 \
   -e CACKLE_BASE_URL=https://tickets.example.com \
-  -e CACKLE_PAYSTACK_SECRET_KEY=sk_live_xxxxx \
   -v cackle-data:/srv/data \
   --restart unless-stopped \
   vulos/cackle
 ```
+
+This runs with the default `manual` provider only (no payment secrets
+needed). To take payments through a real processor as well, add
+`CACKLE_PAYMENT_PROVIDERS` and that provider's own secrets — e.g.
+`-e CACKLE_PAYMENT_PROVIDERS=manual,stripe -e CACKLE_STRIPE_SECRET_KEY=sk_live_xxxxx
+-e CACKLE_STRIPE_WEBHOOK_SECRET=whsec_xxxxx`. See
+[PAYMENTS.md](PAYMENTS.md) for every built-in adapter and its required
+env vars, and the warning at the top of that document about sandbox-testing
+one before it ever touches real money.
 
 The image already sets `CACKLE_ADDR=:8080` and `CACKLE_DB=/srv/data/cackle.db`
 (its `WORKDIR` and declared `VOLUME` are both `/srv/data`) — you only need to
@@ -34,7 +42,6 @@ make build
 CACKLE_ADDR=:8080 \
 CACKLE_DB=/var/lib/cackle/cackle.db \
 CACKLE_BASE_URL=https://tickets.example.com \
-CACKLE_PAYSTACK_SECRET_KEY=sk_live_xxxxx \
 ./cackle
 ```
 
@@ -51,7 +58,7 @@ ExecStart=/usr/local/bin/cackle
 Environment=CACKLE_ADDR=:8080
 Environment=CACKLE_DB=/var/lib/cackle/cackle.db
 Environment=CACKLE_BASE_URL=https://tickets.example.com
-EnvironmentFile=/etc/cackle/paystack.env
+EnvironmentFile=/etc/cackle/payments.env
 Restart=on-failure
 User=cackle
 
@@ -59,9 +66,12 @@ User=cackle
 WantedBy=multi-user.target
 ```
 
-Keep `CACKLE_PAYSTACK_SECRET_KEY` in the `EnvironmentFile`, not the unit
-file itself, and make sure that file isn't world-readable — it's a
-production secret.
+If you're using `manual` only, `payments.env` can be empty or omitted
+entirely — there's nothing to configure. If you've enabled a real
+provider, keep `CACKLE_PAYMENT_PROVIDERS` and that provider's
+`CACKLE_<PROVIDER>_*` secrets in the `EnvironmentFile`, not the unit file
+itself, and make sure that file isn't world-readable — it's a production
+secret.
 
 ## TLS / reverse proxy
 

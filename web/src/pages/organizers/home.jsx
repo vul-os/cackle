@@ -9,14 +9,8 @@ import { ErrorState } from '@/components/ui/error-state';
 import { Calendar, Plus, QrCode, Ticket, Building2, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi } from '@/lib/api';
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
+import ContinueDraftBanner from './events/continue-draft-banner';
+import { formatMoney } from '@/lib/money';
 
 const statusVariant = {
     draft: 'secondary',
@@ -32,7 +26,11 @@ const StatTile = ({ icon: Icon, label, value }) => (
             </div>
             <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="truncate text-2xl font-bold tabular-nums">{value}</p>
+                {/* break-words (not truncate): revenue can be a per-currency
+                    breakdown ("R 3,894.00 · ¥13,500 · KWD 98.250 · ...") when
+                    an org's events span multiple currencies — wrapping beats
+                    silently cutting a real figure off with an ellipsis. */}
+                <p className="break-words text-2xl font-bold leading-tight tabular-nums">{value}</p>
             </div>
         </CardContent>
     </Card>
@@ -79,19 +77,33 @@ const HomePage = () => {
         };
     }, [orgs]);
 
-    const totals = useMemo(() => {
-        const values = Object.values(statsById);
-        return values.reduce(
-            (acc, s) => ({
-                sold: acc.sold + (s?.sold ?? 0),
-                revenue_cents: acc.revenue_cents + (s?.revenue_cents ?? 0),
-                admitted: acc.admitted + (s?.admitted ?? 0),
-            }),
-            { sold: 0, revenue_cents: 0, admitted: 0 },
-        );
-    }, [statsById]);
+    const eventsById = useMemo(() => Object.fromEntries(state.events.map((e) => [e.id, e])), [state.events]);
 
-    const currency = state.events[0]?.currency || 'ZAR';
+    const totals = useMemo(() => {
+        const entries = Object.entries(statsById);
+        const base = { sold: 0, admitted: 0, revenueByCurrency: {} };
+        return entries.reduce((acc, [eventId, s]) => {
+            const currency = eventsById[eventId]?.currency || '';
+            return {
+                sold: acc.sold + (s?.sold ?? 0),
+                admitted: acc.admitted + (s?.admitted ?? 0),
+                revenueByCurrency: {
+                    ...acc.revenueByCurrency,
+                    [currency]: (acc.revenueByCurrency[currency] ?? 0) + (s?.revenue_minor ?? 0),
+                },
+            };
+        }, base);
+    }, [statsById, eventsById]);
+
+    // An organiser's events can span multiple currencies (Cackle has no
+    // privileged currency) — there is no single meaningful "total revenue"
+    // number to blend them into, so render one figure per currency
+    // instead of silently adding a JPY total to a ZAR total.
+    const revenueDisplay = useMemo(() => {
+        const entries = Object.entries(totals.revenueByCurrency);
+        if (entries.length === 0) return '—';
+        return entries.map(([currency, minor]) => formatMoney(minor, currency)).join(' · ');
+    }, [totals]);
 
     const nextEvent = useMemo(() => {
         const now = Date.now();
@@ -127,6 +139,8 @@ const HomePage = () => {
                 <p className="text-muted-foreground">Manage events, sell tickets, and run the gate — all from here.</p>
             </div>
 
+            <ContinueDraftBanner />
+
             {state.error && (
                 <ErrorState className="mb-8" description={state.error} onRetry={() => window.location.reload()} />
             )}
@@ -137,7 +151,7 @@ const HomePage = () => {
                     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <StatTile icon={Calendar} label="Published events" value={state.loading ? '—' : published} />
                         <StatTile icon={Ticket} label="Tickets sold" value={state.loading ? '—' : totals.sold} />
-                        <StatTile icon={Coins} label="Revenue" value={state.loading ? '—' : formatMoney(totals.revenue_cents, currency)} />
+                        <StatTile icon={Coins} label="Revenue" value={state.loading ? '—' : revenueDisplay} />
                         <StatTile icon={ShieldCheck} label="Admitted" value={state.loading ? '—' : totals.admitted} />
                     </div>
 
@@ -174,7 +188,7 @@ const HomePage = () => {
                                             {statsById[nextEvent.id] && (
                                                 <p className="mt-2 text-sm text-muted-foreground">
                                                     {statsById[nextEvent.id].sold ?? 0} sold ·{' '}
-                                                    {formatMoney(statsById[nextEvent.id].revenue_cents, nextEvent.currency)} revenue
+                                                    {formatMoney(statsById[nextEvent.id].revenue_minor, nextEvent.currency)} revenue
                                                 </p>
                                             )}
                                         </div>
@@ -274,7 +288,7 @@ const HomePage = () => {
                                                 </div>
                                                 {event.venue_name && <p className="mt-1 text-sm text-muted-foreground">{event.venue_name}</p>}
                                                 <p className="mt-2 text-sm text-muted-foreground">
-                                                    {s ? `${s.sold ?? 0} sold · ${formatMoney(s.revenue_cents, event.currency)}` : '—'}
+                                                    {s ? `${s.sold ?? 0} sold · ${formatMoney(s.revenue_minor, event.currency)}` : '—'}
                                                 </p>
                                             </CardContent>
                                         </Card>

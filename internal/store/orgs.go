@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/vul-os/cackle/internal/money"
 )
 
 // Org is a ticket-selling organisation (the tenant boundary for events).
@@ -13,7 +15,13 @@ type Org struct {
 	ID        string
 	Name      string
 	Slug      string
-	CreatedAt time.Time
+	// DefaultCurrency is the ISO-4217 alpha-3 code new events under this
+	// org default to when the event itself doesn't specify one — see
+	// internal/events.Service.Create. Cackle has no privileged global
+	// default currency; this is the org's own choice, always a
+	// money.Normalize-validated code (never empty).
+	DefaultCurrency string
+	CreatedAt       time.Time
 }
 
 // OrgMember is a user's role within an org. Role is one of
@@ -33,7 +41,12 @@ type OrgWithRole struct {
 }
 
 // CreateOrg inserts a new org. If ID or CreatedAt are zero they are
-// populated.
+// populated. DefaultCurrency defaults to "USD" if left empty — a plain,
+// pragmatic fallback for the NOT NULL column, not a privileged currency:
+// every caller that lets an organiser actually choose (once that surface
+// exists) should pass an explicit code instead. Either way it is always
+// validated/normalized via internal/money before being persisted, so a
+// malformed or unknown code is rejected here rather than silently stored.
 func (s *Store) CreateOrg(ctx context.Context, o *Org) error {
 	if o.ID == "" {
 		o.ID = NewID()
@@ -41,9 +54,18 @@ func (s *Store) CreateOrg(ctx context.Context, o *Org) error {
 	if o.CreatedAt.IsZero() {
 		o.CreatedAt = time.Now()
 	}
-	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO orgs (id, name, slug, created_at) VALUES (?, ?, ?, ?)`,
-		o.ID, o.Name, o.Slug, timeToText(o.CreatedAt),
+	if o.DefaultCurrency == "" {
+		o.DefaultCurrency = "USD"
+	}
+	norm, err := money.Normalize(o.DefaultCurrency)
+	if err != nil {
+		return fmt.Errorf("store: create org: default_currency: %w", err)
+	}
+	o.DefaultCurrency = norm
+
+	_, err = s.db.ExecContext(ctx, `
+		INSERT INTO orgs (id, name, slug, default_currency, created_at) VALUES (?, ?, ?, ?, ?)`,
+		o.ID, o.Name, o.Slug, o.DefaultCurrency, timeToText(o.CreatedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("store: create org: %w", err)
@@ -51,21 +73,23 @@ func (s *Store) CreateOrg(ctx context.Context, o *Org) error {
 	return nil
 }
 
+const orgSelectColumns = `SELECT id, name, slug, default_currency, created_at`
+
 // GetOrgByID looks up an org by primary key. Returns ErrNotFound if absent.
 func (s *Store) GetOrgByID(ctx context.Context, id string) (*Org, error) {
-	return s.scanOrg(s.db.QueryRowContext(ctx, `SELECT id, name, slug, created_at FROM orgs WHERE id = ?`, id))
+	return s.scanOrg(s.db.QueryRowContext(ctx, orgSelectColumns+` FROM orgs WHERE id = ?`, id))
 }
 
 // GetOrgBySlug looks up an org by its unique slug. Returns ErrNotFound if
 // absent.
 func (s *Store) GetOrgBySlug(ctx context.Context, slug string) (*Org, error) {
-	return s.scanOrg(s.db.QueryRowContext(ctx, `SELECT id, name, slug, created_at FROM orgs WHERE slug = ?`, slug))
+	return s.scanOrg(s.db.QueryRowContext(ctx, orgSelectColumns+` FROM orgs WHERE slug = ?`, slug))
 }
 
 func (s *Store) scanOrg(row *sql.Row) (*Org, error) {
 	var o Org
 	var createdAt string
-	err := row.Scan(&o.ID, &o.Name, &o.Slug, &createdAt)
+	err := row.Scan(&o.ID, &o.Name, &o.Slug, &o.DefaultCurrency, &createdAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -138,7 +162,7 @@ func (s *Store) RemoveOrgMember(ctx context.Context, orgID, userID string) error
 // each — the shape needed for GET /api/auth/me.
 func (s *Store) ListOrgsForUser(ctx context.Context, userID string) ([]OrgWithRole, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT o.id, o.name, o.slug, o.created_at, m.role
+		SELECT o.id, o.name, o.slug, o.default_currency, o.created_at, m.role
 		FROM org_members m
 		JOIN orgs o ON o.id = m.org_id
 		WHERE m.user_id = ?
@@ -152,13 +176,53 @@ func (s *Store) ListOrgsForUser(ctx context.Context, userID string) ([]OrgWithRo
 	for rows.Next() {
 		var ow OrgWithRole
 		var createdAt string
-		if err := rows.Scan(&ow.ID, &ow.Name, &ow.Slug, &createdAt, &ow.Role); err != nil {
+		if err := rows.Scan(&ow.ID, &ow.Name, &ow.Slug, &ow.DefaultCurrency, &createdAt, &ow.Role); err != nil {
 			return nil, fmt.Errorf("store: scan org for user: %w", err)
 		}
 		if ow.CreatedAt, err = textToTime(createdAt); err != nil {
 			return nil, fmt.Errorf("store: parse org created_at: %w", err)
 		}
 		out = append(out, ow)
+	}
+	return out, rows.Err()
+}
+
+// OrgMemberWithUser is a membership row joined with the member's own
+// name/email — the shape GET /api/orgs/{id}/members needs, so the
+// organiser team screen never has to make N follow-up user lookups.
+type OrgMemberWithUser struct {
+	UserID    string
+	Name      string
+	Email     string
+	Role      string
+	CreatedAt time.Time
+}
+
+// ListOrgMembersWithUser returns every member of an org joined with their
+// name/email, ordered by membership creation time.
+func (s *Store) ListOrgMembersWithUser(ctx context.Context, orgID string) ([]OrgMemberWithUser, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT m.user_id, u.name, u.email, m.role, m.created_at
+		FROM org_members m
+		JOIN users u ON u.id = m.user_id
+		WHERE m.org_id = ?
+		ORDER BY m.created_at ASC`, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list org members with user: %w", err)
+	}
+	defer rows.Close()
+
+	var out []OrgMemberWithUser
+	for rows.Next() {
+		var m OrgMemberWithUser
+		var createdAt string
+		if err := rows.Scan(&m.UserID, &m.Name, &m.Email, &m.Role, &createdAt); err != nil {
+			return nil, fmt.Errorf("store: scan org member with user: %w", err)
+		}
+		if m.CreatedAt, err = textToTime(createdAt); err != nil {
+			return nil, fmt.Errorf("store: parse org member created_at: %w", err)
+		}
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }

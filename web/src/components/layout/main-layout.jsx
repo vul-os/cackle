@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from 'react-responsive';
+import { MotionConfig } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import SideNav from '../nav/side-nav';
 import TopBar from '../nav/top-bar';
+import PageTransition from '../motion/page-transition';
 
 const TOP_BAR_HEIGHT = '4rem';
 // Single source of truth for the expanded sidebar width. Both the desktop
@@ -46,43 +48,58 @@ const MainLayout = () => {
     }, [isMobile]);
 
     return (
-        <div className="flex h-screen flex-col bg-background text-foreground">
-            <a
-                href="#main-content"
-                className="fixed left-2 top-2 z-[100] -translate-y-16 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-transform focus:translate-y-0"
-            >
-                Skip to content
-            </a>
-            <TopBar onMenuClick={handleDrawerToggle} toggleButtonRef={toggleButtonRef} />
+        <MotionConfig reducedMotion="user">
+            <div className="flex h-screen flex-col bg-background text-foreground">
+                <a
+                    href="#main-content"
+                    className="fixed left-2 top-2 z-[100] -translate-y-16 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-elevated transition-transform focus:translate-y-0"
+                >
+                    Skip to content
+                </a>
+                <TopBar onMenuClick={handleDrawerToggle} toggleButtonRef={toggleButtonRef} />
 
-            <div className="flex flex-1 overflow-hidden" style={{ marginTop: TOP_BAR_HEIGHT }}>
-                {!isMobile && (
-                    <aside className={cn('h-full shrink-0 overflow-y-auto overflow-x-hidden shadow-lg', SIDEBAR_WIDTH_CLASS)}>
-                        <SideNav isExpanded={true} isMobile={false} />
-                    </aside>
-                )}
-
-                <main id="main-content" tabIndex={-1} className="relative flex-grow overflow-y-auto bg-muted/30 p-4 outline-none sm:p-6">
-                    <Outlet />
-                    {isMobile && isExpanded && (
-                        <div className="fixed inset-0 z-10 bg-black/50" onClick={() => setIsExpanded(false)} />
+                <div className="flex flex-1 overflow-hidden" style={{ marginTop: TOP_BAR_HEIGHT }}>
+                    {!isMobile && (
+                        <aside
+                            className={cn(
+                                'h-full shrink-0 overflow-y-auto overflow-x-hidden border-r border-sidebar-border shadow-elevated',
+                                SIDEBAR_WIDTH_CLASS,
+                            )}
+                        >
+                            <SideNav isExpanded={true} isMobile={false} />
+                        </aside>
                     )}
-                </main>
 
-                {isMobile && (
-                    <aside
-                        ref={sidenavRef}
-                        className={cn(
-                            'fixed inset-y-0 left-0 z-20 h-full overflow-y-auto overflow-x-hidden shadow-lg transition-all duration-300 ease-in-out',
-                            isExpanded ? SIDEBAR_WIDTH_CLASS : 'w-0',
-                        )}
-                        style={{ top: TOP_BAR_HEIGHT }}
+                    <main
+                        id="main-content"
+                        tabIndex={-1}
+                        className="relative flex-grow overflow-y-auto bg-muted/30 p-4 outline-none sm:p-6 lg:p-8"
                     >
-                        <SideNav isExpanded={isExpanded} isMobile={true} />
-                    </aside>
-                )}
+                        <div className="mx-auto max-w-[1600px]">
+                            <PageTransition>
+                                <Outlet />
+                            </PageTransition>
+                        </div>
+                        {isMobile && isExpanded && (
+                            <div className="fixed inset-0 z-10 animate-fade-in bg-black/50" onClick={() => setIsExpanded(false)} />
+                        )}
+                    </main>
+
+                    {isMobile && (
+                        <aside
+                            ref={sidenavRef}
+                            className={cn(
+                                'fixed inset-y-0 left-0 z-20 h-full overflow-y-auto overflow-x-hidden shadow-floating transition-all duration-300 ease-emphasized',
+                                isExpanded ? SIDEBAR_WIDTH_CLASS : 'w-0',
+                            )}
+                            style={{ top: TOP_BAR_HEIGHT }}
+                        >
+                            <SideNav isExpanded={isExpanded} isMobile={true} />
+                        </aside>
+                    )}
+                </div>
             </div>
-        </div>
+        </MotionConfig>
     );
 };
 

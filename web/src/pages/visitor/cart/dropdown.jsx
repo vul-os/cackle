@@ -5,17 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useCart } from '@/context/use-cart';
 import { format } from 'date-fns';
-
-function formatMoney(cents, currency = 'ZAR') {
-    try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
-    } catch {
-        return `${((cents || 0) / 100).toFixed(2)} ${currency}`;
-    }
-}
+import { formatMoney } from '@/lib/money';
 
 const CartDropdown = ({ isMobile = false }) => {
-    const { itemsByEvent, itemCount, total } = useCart();
+    const { itemsByEvent, itemCount, totalsByCurrency } = useCart();
 
     const groups = useMemo(() => Object.entries(itemsByEvent), [itemsByEvent]);
 
@@ -67,7 +60,7 @@ const CartDropdown = ({ isMobile = false }) => {
                                                         {item.quantity}x {item.ticket_type.name}
                                                     </span>
                                                     <span className="font-medium">
-                                                        {formatMoney(item.quantity * item.ticket_type.price_cents, event.currency)}
+                                                        {formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}
                                                     </span>
                                                 </div>
                                             ))}
@@ -77,9 +70,17 @@ const CartDropdown = ({ isMobile = false }) => {
                             })}
                         </div>
 
-                        <div className="mt-4 flex justify-between border-t border-border pt-4 font-semibold">
-                            <span>Total</span>
-                            <span>{formatMoney(total)}</span>
+                        <div className="mt-4 space-y-1 border-t border-border pt-4 font-semibold">
+                            {/* One line per currency: a cart spanning events in different
+                                currencies has no single meaningful "grand total" to blend
+                                them into (Cackle has no privileged currency). The common
+                                case — one event, one currency — renders exactly one line. */}
+                            {Object.entries(totalsByCurrency).map(([currency, minor]) => (
+                                <div key={currency} className="flex justify-between">
+                                    <span>Total{currency ? ` (${currency})` : ''}</span>
+                                    <span>{formatMoney(minor, currency)}</span>
+                                </div>
+                            ))}
                         </div>
 
                         <Button className="mt-4 w-full" asChild>

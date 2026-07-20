@@ -12,9 +12,9 @@ const navItems = [
 const SideNav = ({ isExpanded, isMobile }) => {
     return (
         <div
-            className={`flex h-full w-full flex-col overflow-hidden bg-sidebar transition-all duration-300 ${isMobile && !isExpanded ? 'invisible opacity-0' : 'visible opacity-100'}`}
+            className={`flex h-full w-full flex-col overflow-hidden bg-sidebar transition-opacity duration-300 ${isMobile && !isExpanded ? 'invisible opacity-0' : 'visible opacity-100'}`}
         >
-            <nav aria-label="Primary" className="mt-4">
+            <nav aria-label="Primary" className="flex-1 px-0 py-4">
                 <ul className="space-y-1">
                     {navItems.map((item) => (
                         <NavItem key={item.to} {...item} isExpanded={isExpanded} />

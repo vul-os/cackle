@@ -13,8 +13,8 @@
 //     unit, exactly one wins.
 //  2. The client never sets a price. CreateOrderInput carries only
 //     ticket_type_id + quantity per line — there is no price field to
-//     forge. Every cent charged is read from ticket_types.price_cents at
-//     order-creation time.
+//     forge. Every minor unit charged is read from ticket_types.price_minor
+//     at order-creation time.
 //
 // Settle is idempotent: calling it twice for the same payment reference
 // must issue tickets exactly once. See Settle's doc comment for how that is
@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/vul-os/cackle/internal/events"
+	"github.com/vul-os/cackle/internal/money"
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 	"github.com/vul-os/cackle/internal/tickets"
@@ -80,9 +81,9 @@ type Order struct {
 	BuyerEmail    string      `json:"buyer_email"`
 	BuyerName     string      `json:"buyer_name"`
 	Status        string      `json:"status"` // "pending", "paid", "failed", "refunded", "cancelled"
-	SubtotalCents int64       `json:"subtotal_cents"`
-	FeeCents      int64       `json:"fee_cents"`
-	TotalCents    int64       `json:"total_cents"`
+	SubtotalMinor int64       `json:"subtotal_minor"`
+	FeeMinor      int64       `json:"fee_minor"`
+	TotalMinor    int64       `json:"total_minor"`
 	Currency      string      `json:"currency"`
 	Provider      string      `json:"provider"`
 	ProviderRef   string      `json:"provider_ref,omitempty"`
@@ -92,13 +93,13 @@ type Order struct {
 }
 
 // OrderItem is one ticket_type/quantity line within an order.
-// UnitPriceCents is the price actually charged, frozen at order-creation
-// time from the ticket type's own price_cents — never client-supplied.
+// UnitPriceMinor is the price actually charged, frozen at order-creation
+// time from the ticket type's own price_minor — never client-supplied.
 type OrderItem struct {
 	ID             string `json:"id"`
 	TicketTypeID   string `json:"ticket_type_id"`
 	Quantity       int    `json:"quantity"`
-	UnitPriceCents int64  `json:"unit_price_cents"`
+	UnitPriceMinor int64  `json:"unit_price_minor"`
 }
 
 // Ticket is one issued, signed capability belonging to a settled order.
@@ -156,7 +157,7 @@ func New(st *store.Store, ev *events.Service, reg *payments.Registry) *Service {
 // creates the order, then begins a charge with the requested (or sole
 // registered) payment provider.
 //
-// Every price in the resulting order comes from ticket_types.price_cents
+// Every price in the resulting order comes from ticket_types.price_minor
 // as read inside this call — in.Items carries only ticket_type_id and
 // quantity, so a forged price in the request has nothing to attach to.
 func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *payments.Charge, error) {
@@ -173,8 +174,21 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 	}
 
 	now := time.Now()
+	// Cackle has no privileged default currency: an event's own currency
+	// is authoritative and always validated at creation time (see
+	// events.Service.Create/Update), so this should always be a known
+	// ISO-4217 code — but re-validate here rather than trust a raw string
+	// read straight out of the database into money arithmetic below.
+	currency, err := money.Normalize(ev.Currency)
+	if err != nil {
+		return nil, nil, fmt.Errorf("orders: create: event has an invalid currency: %w", err)
+	}
+
 	lines := make([]store.OrderLine, 0, len(in.Items))
-	var subtotal int64
+	subtotalAmt, err := money.Zero(currency)
+	if err != nil {
+		return nil, nil, fmt.Errorf("orders: create: %w", err)
+	}
 
 	for _, item := range in.Items {
 		if item.Quantity <= 0 {
@@ -203,15 +217,29 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 			return nil, nil, ErrMaxPerOrderExceeded
 		}
 
-		// The price charged is ALWAYS tt.PriceCents, read from the
+		// The price charged is ALWAYS tt.PriceMinor, read from the
 		// database right here — in.Items has no field a client could use
-		// to smuggle a different amount.
-		unit := tt.PriceCents
-		subtotal += unit * int64(item.Quantity)
+		// to smuggle a different amount. Line/subtotal math goes through
+		// money.Amount so a pathological quantity*price can never
+		// silently overflow into a wrong (smaller!) charge — it fails
+		// closed instead.
+		unit := tt.PriceMinor
+		unitAmt, err := money.New(unit, currency)
+		if err != nil {
+			return nil, nil, fmt.Errorf("orders: create: %w", err)
+		}
+		lineAmt, err := unitAmt.Mul(int64(item.Quantity))
+		if err != nil {
+			return nil, nil, fmt.Errorf("orders: create: line total: %w", err)
+		}
+		subtotalAmt, err = subtotalAmt.Add(lineAmt)
+		if err != nil {
+			return nil, nil, fmt.Errorf("orders: create: subtotal: %w", err)
+		}
 		lines = append(lines, store.OrderLine{
 			TicketTypeID:   tt.ID,
 			Quantity:       item.Quantity,
-			UnitPriceCents: unit,
+			UnitPriceMinor: unit,
 		})
 	}
 
@@ -220,11 +248,7 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 		return nil, nil, err
 	}
 
-	currency := ev.Currency
-	if currency == "" {
-		currency = "ZAR"
-	}
-
+	subtotal := subtotalAmt.Minor
 	orderID := store.NewID()
 	ord := &store.Order{
 		ID:            orderID,
@@ -232,9 +256,9 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 		BuyerEmail:    in.BuyerEmail,
 		BuyerName:     in.BuyerName,
 		Status:        "pending",
-		SubtotalCents: subtotal,
-		FeeCents:      0,
-		TotalCents:    subtotal,
+		SubtotalMinor: subtotal,
+		FeeMinor:      0,
+		TotalMinor:    subtotal,
 		Currency:      currency,
 		Provider:      provider.Name(),
 		ProviderRef:   &orderID, // the order ID is always the provider reference
@@ -257,11 +281,17 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 	}
 
 	charge, err := provider.Begin(ctx, payments.Order{
-		ID:          ord.ID,
+		// payments.Order.Reference/AmountMinor: field names as of the
+		// multi-processor/minor-unit payments refactor (internal/payments
+		// generalised beyond Paystack-only "cents"; Cackle's own
+		// internal/orders.Order type is unaffected — it still speaks
+		// TotalMinor throughout, this is purely the boundary mapping onto
+		// the provider seam's current field names).
+		Reference:   ord.ID,
 		EventID:     ord.EventID,
 		BuyerEmail:  ord.BuyerEmail,
 		BuyerName:   ord.BuyerName,
-		TotalCents:  ord.TotalCents,
+		AmountMinor: ord.TotalMinor,
 		Currency:    ord.Currency,
 		CallbackURL: in.CallbackURL,
 	})
@@ -279,13 +309,38 @@ func (s *Service) Create(ctx context.Context, in CreateOrderInput) (*Order, *pay
 	return &out, &charge, nil
 }
 
+// resolveProvider picks the payment provider to use when the caller
+// (checkout) didn't specify one explicitly. payments.ProviderNameManual is
+// ALWAYS registered (it is Cackle's zero-config default — see
+// internal/payments/manual.go), so "exactly one registered provider" alone
+// is no longer a reliable signal of "the operator only configured one
+// real provider": a self-hoster who has configured nothing gets exactly
+// manual (len==1, unambiguous); one who has configured exactly one real
+// provider alongside the always-present manual gets that one; someone who
+// has configured more than one real provider must specify explicitly —
+// manual is always still reachable by name in that case, it just isn't
+// auto-selected over an ambiguous choice between two configured
+// providers.
 func (s *Service) resolveProvider(name string) (payments.Provider, error) {
 	if name == "" {
 		names := s.payments.Names()
-		if len(names) != 1 {
+		switch len(names) {
+		case 0:
 			return nil, ErrProviderRequired
+		case 1:
+			name = names[0]
+		default:
+			nonManual := make([]string, 0, len(names))
+			for _, n := range names {
+				if n != payments.ProviderNameManual {
+					nonManual = append(nonManual, n)
+				}
+			}
+			if len(nonManual) != 1 {
+				return nil, ErrProviderRequired
+			}
+			name = nonManual[0]
 		}
-		name = names[0]
 	}
 	p, ok := s.payments.Get(name)
 	if !ok {
@@ -350,9 +405,9 @@ func (s *Service) Settle(ctx context.Context, res payments.Result) (*Order, []Ti
 	}
 
 	if err := payments.Reconcile(res, payments.OrderRef{
-		ID:         ord.ID,
-		TotalCents: ord.TotalCents,
-		Currency:   ord.Currency,
+		ID:          ord.ID,
+		AmountMinor: ord.TotalMinor,
+		Currency:    ord.Currency,
 	}); err != nil {
 		return nil, nil, err
 	}
@@ -474,9 +529,9 @@ func toOrder(o *store.Order, items []store.OrderItem) Order {
 		BuyerEmail:    o.BuyerEmail,
 		BuyerName:     o.BuyerName,
 		Status:        o.Status,
-		SubtotalCents: o.SubtotalCents,
-		FeeCents:      o.FeeCents,
-		TotalCents:    o.TotalCents,
+		SubtotalMinor: o.SubtotalMinor,
+		FeeMinor:      o.FeeMinor,
+		TotalMinor:    o.TotalMinor,
 		Currency:      o.Currency,
 		Provider:      o.Provider,
 		ProviderRef:   valueOrEmpty(o.ProviderRef),
@@ -490,7 +545,7 @@ func toOrder(o *store.Order, items []store.OrderItem) Order {
 				ID:             it.ID,
 				TicketTypeID:   it.TicketTypeID,
 				Quantity:       it.Quantity,
-				UnitPriceCents: it.UnitPriceCents,
+				UnitPriceMinor: it.UnitPriceMinor,
 			}
 		}
 	}

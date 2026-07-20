@@ -51,7 +51,7 @@ type fixture struct {
 	ticketTy *events.TicketType
 }
 
-func newFixture(t *testing.T, quantityTotal int, priceCents int64) *fixture {
+func newFixture(t *testing.T, quantityTotal int, priceMinor int64) *fixture {
 	t.Helper()
 	st := openTestStore(t)
 	ctx := context.Background()
@@ -78,7 +78,7 @@ func newFixture(t *testing.T, quantityTotal int, priceCents int64) *fixture {
 
 	tt, err := evSvc.CreateTicketType(ctx, ev.ID, events.TicketTypeInput{
 		Name:          "General",
-		PriceCents:    priceCents,
+		PriceMinor:    priceMinor,
 		QuantityTotal: quantityTotal,
 	})
 	if err != nil {
@@ -112,10 +112,10 @@ func TestCreateIgnoresClientPrice_UsesDatabasePrice(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 	wantTotal := int64(12345 * 3)
-	if order.TotalCents != wantTotal {
-		t.Fatalf("TotalCents = %d, want %d (price must come from DB, never the client)", order.TotalCents, wantTotal)
+	if order.TotalMinor != wantTotal {
+		t.Fatalf("TotalMinor = %d, want %d (price must come from DB, never the client)", order.TotalMinor, wantTotal)
 	}
-	if len(order.Items) != 1 || order.Items[0].UnitPriceCents != 12345 {
+	if len(order.Items) != 1 || order.Items[0].UnitPriceMinor != 12345 {
 		t.Fatalf("order item unit price = %+v, want 12345", order.Items)
 	}
 	if charge == nil || charge.Reference != order.ID {
@@ -124,9 +124,9 @@ func TestCreateIgnoresClientPrice_UsesDatabasePrice(t *testing.T) {
 
 	// Now change the ticket type's price. A NEW order must use the new
 	// price; the order created above must be untouched (its
-	// order_items.unit_price_cents is frozen at purchase time).
+	// order_items.unit_price_minor is frozen at purchase time).
 	if _, err := fx.events.UpdateTicketType(ctx, fx.ticketTy.ID, events.TicketTypeInput{
-		Name: "General", PriceCents: 99999, QuantityTotal: 10,
+		Name: "General", PriceMinor: 99999, QuantityTotal: 10,
 	}); err != nil {
 		t.Fatalf("update price: %v", err)
 	}
@@ -135,8 +135,8 @@ func TestCreateIgnoresClientPrice_UsesDatabasePrice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if reloaded.TotalCents != wantTotal {
-		t.Fatalf("existing order total changed after price update: got %d, want %d", reloaded.TotalCents, wantTotal)
+	if reloaded.TotalMinor != wantTotal {
+		t.Fatalf("existing order total changed after price update: got %d, want %d", reloaded.TotalMinor, wantTotal)
 	}
 
 	order2, _, err := fx.orders.Create(ctx, CreateOrderInput{
@@ -147,8 +147,8 @@ func TestCreateIgnoresClientPrice_UsesDatabasePrice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create #2: %v", err)
 	}
-	if order2.TotalCents != 99999 {
-		t.Fatalf("new order total = %d, want 99999 (new DB price)", order2.TotalCents)
+	if order2.TotalMinor != 99999 {
+		t.Fatalf("new order total = %d, want 99999 (new DB price)", order2.TotalMinor)
 	}
 }
 
@@ -296,7 +296,7 @@ func TestCreate_ValidationErrors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create draft event: %v", err)
 	}
-	draftTT, err := otherEvSvc.CreateTicketType(ctx, draftEv.ID, events.TicketTypeInput{Name: "GA", PriceCents: 100, QuantityTotal: 5})
+	draftTT, err := otherEvSvc.CreateTicketType(ctx, draftEv.ID, events.TicketTypeInput{Name: "GA", PriceMinor: 100, QuantityTotal: 5})
 	if err != nil {
 		t.Fatalf("create ticket type for draft event: %v", err)
 	}
@@ -309,7 +309,7 @@ func TestCreate_ValidationErrors(t *testing.T) {
 
 	// max_per_order enforcement.
 	cappedTT, err := fx.events.CreateTicketType(ctx, fx.event.ID, events.TicketTypeInput{
-		Name: "Capped", PriceCents: 100, QuantityTotal: 10, MaxPerOrder: 2,
+		Name: "Capped", PriceMinor: 100, QuantityTotal: 10, MaxPerOrder: 2,
 	})
 	if err != nil {
 		t.Fatalf("create capped ticket type: %v", err)
@@ -477,7 +477,7 @@ func TestSettle_RejectsAmountMismatch(t *testing.T) {
 		Reference:   charge.Reference,
 		EventID:     "forged-event-id",
 		Status:      payments.StatusPaid,
-		AmountCents: 1, // forged: order total is 1000
+		AmountMinor: 1, // forged: order total is 1000
 		Currency:    "ZAR",
 		PaidAt:      time.Now(),
 	}
@@ -676,6 +676,52 @@ func TestCreate_ProviderRequiredWhenAmbiguous(t *testing.T) {
 		Items: []OrderItemInput{{TicketTypeID: fx.ticketTy.ID, Quantity: 1}},
 	}); !errors.Is(err, ErrUnknownProvider) {
 		t.Fatalf("unknown provider: got %v, want ErrUnknownProvider", err)
+	}
+}
+
+// TestCreate_ManualPlusOneOtherAutoSelectsTheOther mirrors cmd/cackle's real
+// wiring: payments.ProviderNameManual is ALWAYS registered (see manual.go),
+// so a deployment with exactly one OTHER configured provider (e.g. --demo's
+// stub, or a self-hoster's single configured Paystack/Stripe) must still
+// auto-select that provider with no explicit Provider field in the
+// request — checkout never asks the buyer to pick a provider when there is
+// only one real choice. This is exactly the scenario that regressed when
+// manual.go went from "not actually wired up anywhere" to "always
+// registered": before, --demo had exactly one provider (stub) and this
+// auto-selection worked by accident; now manual is also always present, so
+// the "exactly one registered provider" rule alone would wrongly demand an
+// explicit choice.
+func TestCreate_ManualPlusOneOtherAutoSelectsTheOther(t *testing.T) {
+	fx := newFixture(t, 5, 1000)
+	ctx := context.Background()
+
+	manual := payments.NewManual(nil)
+	if err := fx.orders.payments.Register(manual); err != nil {
+		t.Fatalf("register manual: %v", err)
+	}
+
+	order, _, err := fx.orders.Create(ctx, CreateOrderInput{
+		EventID: fx.event.ID, BuyerEmail: "x@example.com",
+		Items: []OrderItemInput{{TicketTypeID: fx.ticketTy.ID, Quantity: 1}},
+	})
+	if err != nil {
+		t.Fatalf("Create with manual+stub registered, no explicit provider: %v", err)
+	}
+	if order.Provider != payments.ProviderNameStub {
+		t.Fatalf("order.Provider = %q, want %q (the one non-manual provider)", order.Provider, payments.ProviderNameStub)
+	}
+
+	// manual is still explicitly reachable even though it wasn't
+	// auto-selected.
+	order2, _, err := fx.orders.Create(ctx, CreateOrderInput{
+		EventID: fx.event.ID, BuyerEmail: "x@example.com", Provider: payments.ProviderNameManual,
+		Items: []OrderItemInput{{TicketTypeID: fx.ticketTy.ID, Quantity: 1}},
+	})
+	if err != nil {
+		t.Fatalf("Create with explicit manual provider: %v", err)
+	}
+	if order2.Provider != payments.ProviderNameManual {
+		t.Fatalf("order2.Provider = %q, want manual", order2.Provider)
 	}
 }
 

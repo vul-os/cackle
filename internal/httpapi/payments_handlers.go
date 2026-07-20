@@ -27,7 +27,7 @@ func (a orderLookupAdapter) Lookup(ctx context.Context, reference string) (payme
 	if err != nil {
 		return payments.OrderRef{}, err
 	}
-	return payments.OrderRef{ID: o.ID, TotalCents: o.TotalCents, Currency: o.Currency}, nil
+	return payments.OrderRef{ID: o.ID, AmountMinor: o.TotalMinor, Currency: o.Currency}, nil
 }
 
 // memorySeenStore is a process-lifetime payments.SeenStore for webhook

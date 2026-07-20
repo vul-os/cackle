@@ -1,11 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { Spinner } from '@/components/ui/spinner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { ErrorState } from '@/components/ui/error-state';
 import TicketTypeForm from './type-form';
 import TicketTypeList from './type-list';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
@@ -16,6 +27,8 @@ const EventTicketTypesPage = () => {
     const [state, setState] = useState({ event: null, ticketTypes: [], loading: true, error: null });
     const [dialog, setDialog] = useState({ open: false, editing: null });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchAll = useCallback(async () => {
         setState((s) => ({ ...s, loading: true, error: null }));
@@ -36,11 +49,15 @@ const EventTicketTypesPage = () => {
     const handleSubmit = async (data) => {
         setIsSubmitting(true);
         try {
+            // Update is a full replace of every editable field (see
+            // internal/events.TicketTypeInput's doc comment) — sort_order isn't
+            // exposed in the form, so it must be carried through explicitly or
+            // every edit would silently reset display order to 0.
             if (dialog.editing?.id) {
-                await ticketTypesApi.update(dialog.editing.id, data);
+                await ticketTypesApi.update(dialog.editing.id, { ...data, sort_order: dialog.editing.sort_order ?? 0 });
                 toast({ title: 'Updated', description: 'Ticket type updated.' });
             } else {
-                await ticketTypesApi.create(eventId, data);
+                await ticketTypesApi.create(eventId, { ...data, sort_order: state.ticketTypes.length });
                 toast({ title: 'Created', description: 'Ticket type created.' });
             }
             setDialog({ open: false, editing: null });
@@ -52,27 +69,33 @@ const EventTicketTypesPage = () => {
         }
     };
 
-    const handleDelete = async (ticketTypeId) => {
-        if (!window.confirm('Delete this ticket type?')) return;
+    const handleDelete = async () => {
+        if (!deleteTarget) return;
+        setIsDeleting(true);
         try {
-            await ticketTypesApi.remove(ticketTypeId);
+            await ticketTypesApi.remove(deleteTarget.id);
             toast({ title: 'Deleted', description: 'Ticket type removed.' });
+            setDeleteTarget(null);
             fetchAll();
         } catch (err) {
             toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+        } finally {
+            setIsDeleting(false);
         }
     };
 
-    if (state.loading) return <Spinner />;
+    if (state.loading) {
+        return (
+            <div className="mx-auto max-w-4xl">
+                <SkeletonList rows={4} />
+            </div>
+        );
+    }
 
     if (state.error) {
         return (
-            <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 py-16 text-center">
-                <AlertCircle className="h-8 w-8 text-destructive" />
-                <p className="font-medium">{state.error}</p>
-                <Button variant="outline" onClick={fetchAll}>
-                    Try again
-                </Button>
+            <div className="mx-auto max-w-2xl py-8">
+                <ErrorState description={state.error} onRetry={fetchAll} />
             </div>
         );
     }
@@ -97,7 +120,7 @@ const EventTicketTypesPage = () => {
                         ticketTypes={state.ticketTypes}
                         currency={state.event?.currency}
                         onEdit={(tt) => setDialog({ open: true, editing: tt })}
-                        onDelete={handleDelete}
+                        onDelete={(id) => setDeleteTarget(state.ticketTypes.find((t) => t.id === id) ?? { id })}
                     />
                 </CardContent>
             </Card>
@@ -107,9 +130,40 @@ const EventTicketTypesPage = () => {
                     <DialogHeader>
                         <DialogTitle>{dialog.editing?.id ? 'Edit Ticket Type' : 'New Ticket Type'}</DialogTitle>
                     </DialogHeader>
-                    <TicketTypeForm initialData={dialog.editing} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+                    <TicketTypeForm
+                        initialData={dialog.editing}
+                        currency={state.event?.currency}
+                        onSubmit={handleSubmit}
+                        isSubmitting={isSubmitting}
+                    />
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !isDeleting && !open && setDeleteTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete “{deleteTarget?.name || 'this ticket type'}”?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deleteTarget?.quantity_sold > 0
+                                ? `${deleteTarget.quantity_sold} of these have already been sold — those tickets remain valid, but no more can be issued.`
+                                : 'This cannot be undone.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleDelete();
+                            }}
+                            disabled={isDeleting}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 };

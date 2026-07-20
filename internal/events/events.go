@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vul-os/cackle/internal/money"
 	"github.com/vul-os/cackle/internal/store"
 	"github.com/vul-os/cackle/internal/tickets"
 )
@@ -63,8 +64,14 @@ type Event struct {
 	CoverImage  string    `json:"cover_image"`
 	Status      string    `json:"status"` // "draft", "published", "cancelled"
 	Currency    string    `json:"currency"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// Category is a normalised slug ("live-music", "sports", ...); see
+	// normalizeCategory. Empty means uncategorised.
+	Category string `json:"category"`
+	// CoverImageID is the id of an image in this event's own gallery
+	// chosen as its cover, or nil if none has been chosen.
+	CoverImageID *string   `json:"cover_image_id,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // CreateEventInput is the input to Create. Status always starts "draft";
@@ -83,6 +90,7 @@ type CreateEventInput struct {
 	Timezone    string    `json:"timezone"`
 	CoverImage  string    `json:"cover_image"`
 	Currency    string    `json:"currency"`
+	Category    string    `json:"category"`
 }
 
 // UpdateEventInput is the input to Update. Every field is a pointer;
@@ -104,6 +112,14 @@ type UpdateEventInput struct {
 	CoverImage  *string    `json:"cover_image,omitempty"`
 	Currency    *string    `json:"currency,omitempty"`
 	Status      *string    `json:"status,omitempty"`
+	Category    *string    `json:"category,omitempty"`
+	// CoverImageID sets the event's chosen gallery cover image. A non-nil
+	// pointer to an empty string clears the cover (sets it to nil); a
+	// non-nil pointer to a non-empty id sets it, after verifying that
+	// image belongs to THIS event (ErrInvalidInput otherwise — an org
+	// cannot point an event's cover at another event's, or another org's,
+	// image).
+	CoverImageID *string `json:"cover_image_id,omitempty"`
 }
 
 // PublicFilter narrows ListPublic's results. From/To use the zero
@@ -111,10 +127,11 @@ type UpdateEventInput struct {
 // handler parsing optional ?from=&to= query params can assign straight
 // into these fields.
 type PublicFilter struct {
-	Query string    `json:"q"`
-	From  time.Time `json:"from"`
-	To    time.Time `json:"to"`
-	Limit int       `json:"limit"`
+	Query    string    `json:"q"`
+	Category string    `json:"category"`
+	From     time.Time `json:"from"`
+	To       time.Time `json:"to"`
+	Limit    int       `json:"limit"`
 }
 
 // TicketTypeStats is one ticket type's paid-sales figures within Stats.
@@ -123,13 +140,13 @@ type TicketTypeStats struct {
 	Name          string `json:"name"`
 	QuantityTotal int    `json:"quantity_total"`
 	Sold          int    `json:"sold"`
-	RevenueCents  int64  `json:"revenue_cents"`
+	RevenueMinor  int64  `json:"revenue_minor"`
 }
 
 // Stats is an event's sales/attendance summary.
 type Stats struct {
 	Sold         int               `json:"sold"`
-	RevenueCents int64             `json:"revenue_cents"`
+	RevenueMinor int64             `json:"revenue_minor"`
 	Admitted     int               `json:"admitted"`
 	ByType       []TicketTypeStats `json:"by_type"`
 }
@@ -165,11 +182,25 @@ func (s *Service) Create(ctx context.Context, orgID string, in CreateEventInput)
 		return nil, fmt.Errorf("%w: ends_at must be after starts_at", ErrInvalidInput)
 	}
 
-	if _, err := s.store.GetOrgByID(ctx, orgID); err != nil {
+	org, err := s.store.GetOrgByID(ctx, orgID)
+	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return nil, fmt.Errorf("%w: org %s", store.ErrNotFound, orgID)
 		}
 		return nil, fmt.Errorf("events: create: look up org: %w", err)
+	}
+
+	// Currency is per-event, defaulting from the org (never a hardcoded
+	// literal — Cackle has no privileged currency). Either way it is
+	// validated/normalized via internal/money at this edge, so an event
+	// can never be created with an empty or unrecognised currency code.
+	currency := strings.TrimSpace(in.Currency)
+	if currency == "" {
+		currency = org.DefaultCurrency
+	}
+	currency, err = money.Normalize(currency)
+	if err != nil {
+		return nil, fmt.Errorf("%w: currency: %v", ErrInvalidInput, err)
 	}
 
 	now := time.Now()
@@ -189,7 +220,8 @@ func (s *Service) Create(ctx context.Context, orgID string, in CreateEventInput)
 		Timezone:    defaultStr(in.Timezone, "UTC"),
 		CoverImage:  in.CoverImage,
 		Status:      "draft",
-		Currency:    defaultStr(in.Currency, "ZAR"),
+		Currency:    currency,
+		Category:    normalizeCategory(in.Category),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -266,7 +298,32 @@ func (s *Service) Update(ctx context.Context, eventID string, in UpdateEventInpu
 		e.CoverImage = *in.CoverImage
 	}
 	if in.Currency != nil {
-		e.Currency = *in.Currency
+		norm, err := money.Normalize(*in.Currency)
+		if err != nil {
+			return nil, fmt.Errorf("%w: currency: %v", ErrInvalidInput, err)
+		}
+		e.Currency = norm
+	}
+	if in.Category != nil {
+		e.Category = normalizeCategory(*in.Category)
+	}
+	if in.CoverImageID != nil {
+		if *in.CoverImageID == "" {
+			e.CoverImageID = nil
+		} else {
+			imgEventID, err := s.store.ImageEventID(ctx, *in.CoverImageID)
+			if errors.Is(err, store.ErrNotFound) {
+				return nil, fmt.Errorf("%w: cover_image_id does not exist", ErrInvalidInput)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("events: update: look up cover image: %w", err)
+			}
+			if imgEventID != eventID {
+				return nil, fmt.Errorf("%w: cover_image_id must belong to this event", ErrInvalidInput)
+			}
+			id := *in.CoverImageID
+			e.CoverImageID = &id
+		}
 	}
 	if in.Status != nil {
 		if *in.Status != "cancelled" {
@@ -345,7 +402,7 @@ func (s *Service) ListPublic(ctx context.Context, f PublicFilter) ([]Event, erro
 	if !f.To.IsZero() {
 		to = &f.To
 	}
-	rows, err := s.store.ListPublishedEvents(ctx, f.Query, from, to, f.Limit)
+	rows, err := s.store.ListPublishedEvents(ctx, f.Query, normalizeCategory(f.Category), from, to, f.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +419,7 @@ func (s *Service) ListByOrg(ctx context.Context, orgID string) ([]Event, error) 
 	return toEvents(rows), nil
 }
 
-// Stats computes an event's sales/attendance summary. Sold and RevenueCents
+// Stats computes an event's sales/attendance summary. Sold and RevenueMinor
 // are derived from order_items on PAID orders only (never from the
 // quantity_sold reservation counter, which also includes still-pending
 // unpaid reservations and exists purely to prevent oversell, not to report
@@ -384,13 +441,13 @@ func (s *Service) Stats(ctx context.Context, eventID string) (*Stats, error) {
 	stats := &Stats{Admitted: admitted, ByType: make([]TicketTypeStats, 0, len(rows))}
 	for _, r := range rows {
 		stats.Sold += r.Sold
-		stats.RevenueCents += r.RevenueCents
+		stats.RevenueMinor += r.RevenueMinor
 		stats.ByType = append(stats.ByType, TicketTypeStats{
 			TicketTypeID:  r.TicketTypeID,
 			Name:          r.Name,
 			QuantityTotal: r.QuantityTotal,
 			Sold:          r.Sold,
-			RevenueCents:  r.RevenueCents,
+			RevenueMinor:  r.RevenueMinor,
 		})
 	}
 	return stats, nil
@@ -450,26 +507,54 @@ func defaultStr(v, def string) string {
 	return v
 }
 
+// normalizeCategory folds free-text category input down to a stable,
+// URL/query-string-safe slug: lower-cased, non-alphanumeric runs collapsed
+// to a single hyphen, leading/trailing hyphens trimmed. "Live Music!" and
+// "  live-music  " both normalise to "live-music", so GET
+// /api/events?category=live-music matches events however their category
+// was originally typed. Empty input normalises to "".
+func normalizeCategory(c string) string {
+	c = strings.ToLower(strings.TrimSpace(c))
+	var b strings.Builder
+	b.Grow(len(c))
+	prevHyphen := false
+	for _, r := range c {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+			prevHyphen = false
+		default:
+			if !prevHyphen && b.Len() > 0 {
+				b.WriteByte('-')
+				prevHyphen = true
+			}
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
+}
+
 func toEvent(e *store.Event) Event {
 	return Event{
-		ID:          e.ID,
-		OrgID:       e.OrgID,
-		Slug:        e.Slug,
-		Title:       e.Title,
-		Summary:     e.Summary,
-		Description: e.Description,
-		VenueName:   e.VenueName,
-		Address:     e.Address,
-		Lat:         e.Lat,
-		Lng:         e.Lng,
-		StartsAt:    e.StartsAt,
-		EndsAt:      e.EndsAt,
-		Timezone:    e.Timezone,
-		CoverImage:  e.CoverImage,
-		Status:      e.Status,
-		Currency:    e.Currency,
-		CreatedAt:   e.CreatedAt,
-		UpdatedAt:   e.UpdatedAt,
+		ID:           e.ID,
+		OrgID:        e.OrgID,
+		Slug:         e.Slug,
+		Title:        e.Title,
+		Summary:      e.Summary,
+		Description:  e.Description,
+		VenueName:    e.VenueName,
+		Address:      e.Address,
+		Lat:          e.Lat,
+		Lng:          e.Lng,
+		StartsAt:     e.StartsAt,
+		EndsAt:       e.EndsAt,
+		Timezone:     e.Timezone,
+		CoverImage:   e.CoverImage,
+		Status:       e.Status,
+		Currency:     e.Currency,
+		Category:     e.Category,
+		CoverImageID: e.CoverImageID,
+		CreatedAt:    e.CreatedAt,
+		UpdatedAt:    e.UpdatedAt,
 	}
 }
 

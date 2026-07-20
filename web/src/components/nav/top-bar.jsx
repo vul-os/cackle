@@ -19,10 +19,10 @@ const TopBar = ({ onMenuClick }) => {
     const { theme, setTheme } = useTheme();
 
     return (
-        <nav className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground sm:px-6">
+        <nav className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-elevated sm:px-6">
             <div className="flex items-center gap-3">
                 <button
-                    className="rounded-md text-sidebar-foreground/80 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
+                    className="rounded-md text-sidebar-foreground/80 transition-colors hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
                     onClick={onMenuClick}
                     aria-label="Open navigation menu"
                 >
@@ -30,10 +30,13 @@ const TopBar = ({ onMenuClick }) => {
                 </button>
                 <Link
                     to="/"
-                    className="flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
+                    className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
                 >
-                    <img src={Logo} alt="Cackle" className="h-8 w-8" />
-                    <span className="hidden font-display text-2xl font-black tracking-tight text-sidebar-foreground sm:block">cackle</span>
+                    <img src={Logo} alt="" className="h-8 w-8" />
+                    <span className="font-display text-2xl font-black tracking-tight text-sidebar-foreground">
+                        <span className="sr-only sm:not-sr-only">cackle</span>
+                        <span className="text-primary">.</span>
+                    </span>
                 </Link>
             </div>
 

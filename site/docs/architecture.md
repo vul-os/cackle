@@ -20,7 +20,10 @@ Everything else in this document exists to protect that property.
   CP, or DMTAP. Cackle runs standalone, full stop.
 - Go 1.25. Frontend is JSX, not TSX — a house-wide VulOS invariant.
 - MIT licence. Module path `github.com/vul-os/cackle`.
-- Money is **integer cents**, never a float. Currency defaults to `ZAR`.
+- Money is **integer minor units** plus an ISO-4217 currency, never a float.
+  The minor-unit exponent varies by currency (JPY/KRW/VND have 0 decimals,
+  KWD/BHD/JOD have 3, most have 2) — never assume 100. Currency is per event,
+  defaulting from the org.
 - IDs are ULIDs (sortable, so `ORDER BY id` is `ORDER BY created_at` for
   free). Timestamps are RFC3339 text, the SQLite convention.
 
@@ -115,7 +118,7 @@ sequenceDiagram
   implicit clock. That purity is the entire reason offline scanning works,
   and it is a contract violation to add any of those three things to it.
 - **`internal/orders`** — cart-shaped checkout, orders, order items,
-  integer-cents totals.
+  integer minor-unit totals in the event's currency.
 - **`internal/payments`** — the `Provider` interface (`Begin` / `Verify` /
   `Webhook`) plus concrete adapters. See [PAYMENTS.md](PAYMENTS.md).
 - **`internal/scan`** — gate admission: verifies a capability purely

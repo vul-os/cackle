@@ -24,6 +24,7 @@ import (
 	"github.com/vul-os/cackle/internal/config"
 	"github.com/vul-os/cackle/internal/events"
 	"github.com/vul-os/cackle/internal/orders"
+	"github.com/vul-os/cackle/internal/orgs"
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 )
@@ -38,10 +39,29 @@ type Deps struct {
 	Auth     *auth.Service
 	Events   *events.Service
 	Orders   *orders.Service
+	Orgs     *orgs.Service
 	Payments *payments.Registry
 	Config   *config.Config
 	WebFS    fs.FS // embedded web/dist build; nil is handled (see spa.go)
 	Logger   *slog.Logger
+	// MediaDir is where uploaded event images are stored on disk (see
+	// internal/media). Falls back to cfg.MediaDir via mediaDir() if unset,
+	// so existing callers that only set Config still work.
+	MediaDir string
+}
+
+// mediaDir resolves the effective media storage directory: the explicit
+// Deps.MediaDir if set, otherwise cfg.MediaDir, otherwise "./media" — the
+// same default config.Load itself falls back to, so a Deps built by hand
+// (tests) without going through config.Load still gets a sane directory.
+func (d Deps) mediaDir() string {
+	if d.MediaDir != "" {
+		return d.MediaDir
+	}
+	if d.Config != nil && d.Config.MediaDir != "" {
+		return d.Config.MediaDir
+	}
+	return "./media"
 }
 
 type server struct {
@@ -108,12 +128,30 @@ func New(deps Deps) http.Handler {
 			r.Post("/{id}/ticket-types", s.requireUser(s.handleCreateTicketType))
 			r.Get("/{id}/scan-bundle", s.requireUser(s.handleScanBundle))
 			r.Get("/{id}/attendees", s.requireUser(s.handleListEventAttendees))
+			r.Post("/{id}/images", s.requireUser(s.handleUploadImage))
+			r.Get("/{id}/payouts", s.requireUser(s.handleEventPayouts))
 		})
+
+		r.Get("/categories", s.handleListCategories)
+		r.Get("/currencies", s.handleListCurrencies)
 
 		r.Route("/ticket-types", func(r chi.Router) {
 			r.Patch("/{id}", s.requireUser(s.handleUpdateTicketType))
 			r.Delete("/{id}", s.requireUser(s.handleDeleteTicketType))
 		})
+
+		r.Delete("/images/{id}", s.requireUser(s.handleDeleteImage))
+
+		r.Route("/orgs/{id}", func(r chi.Router) {
+			r.Get("/members", s.requireUser(s.handleListOrgMembers))
+			r.Get("/invites", s.requireUser(s.handleListOrgInvites))
+			r.Post("/invites", s.requireUser(s.handleCreateOrgInvite))
+			r.Get("/bank-account", s.requireUser(s.handleGetBankAccount))
+			r.Put("/bank-account", s.requireUser(s.handleSetBankAccount))
+		})
+		r.Delete("/invites/{id}", s.requireUser(s.handleDeleteOrgInvite))
+		r.Post("/invites/accept", s.requireUser(s.handleAcceptOrgInvite))
+		r.Get("/banks", s.requireUser(s.handleListBanks))
 
 		r.Route("/orders", func(r chi.Router) {
 			r.Post("/", s.handleCreateOrder) // buyer auth optional — see handler doc
@@ -135,6 +173,14 @@ func New(deps Deps) http.Handler {
 		r.With(rateLimit(scanLimiter)).Post("/scan", s.requireUser(s.handleScan))
 		r.Post("/scan/sync", s.requireUser(s.handleScanSync))
 	})
+
+	// GET /media/{id} is public (uploaded event images are not secrets) and
+	// deliberately outside /api and /healthz's exemptions but still behind
+	// the shared middleware chain (security headers, rate-agnostic —
+	// there's no auth to rate-limit around here). Registered directly on
+	// the root router, so chi's longest-static-prefix-first resolution
+	// means it can never be shadowed by the SPA catch-all below.
+	r.Get("/media/{id}", s.handleServeMedia)
 
 	// Everything else falls through to the embedded SPA (or a "not built"
 	// notice), never shadowing /api/* — chi resolves the longest matching

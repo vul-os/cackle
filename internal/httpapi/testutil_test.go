@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/vul-os/cackle/internal/config"
 	"github.com/vul-os/cackle/internal/events"
 	"github.com/vul-os/cackle/internal/orders"
+	"github.com/vul-os/cackle/internal/orgs"
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 )
@@ -27,8 +29,10 @@ type testHarness struct {
 	auth     *auth.Service
 	events   *events.Service
 	orders   *orders.Service
+	orgs     *orgs.Service
 	payments *payments.Registry
 	cfg      *config.Config
+	mediaDir string
 }
 
 func newTestHarness(t *testing.T) *testHarness {
@@ -53,12 +57,20 @@ func newTestHarness(t *testing.T) *testHarness {
 	}
 
 	ordersSvc := orders.New(st, eventsSvc, reg)
+	// No live BankingProvider in tests (nil): internal/orgs falls back to
+	// its built-in bank list and stores bank account details locally,
+	// which is exactly the "no Paystack secret configured" path every
+	// self-host/demo also exercises — see orgs.BankingProvider's doc.
+	orgsSvc := orgs.New(st, nil)
+
+	mediaDir := t.TempDir()
 
 	cfg := &config.Config{
 		Addr:          ":0",
 		DB:            ":memory:",
 		BaseURL:       "http://localhost:8080",
 		SessionSecret: "test-only-session-secret-not-for-prod",
+		MediaDir:      mediaDir,
 	}
 
 	h := New(Deps{
@@ -66,14 +78,16 @@ func newTestHarness(t *testing.T) *testHarness {
 		Auth:     authSvc,
 		Events:   eventsSvc,
 		Orders:   ordersSvc,
+		Orgs:     orgsSvc,
 		Payments: reg,
 		Config:   cfg,
+		MediaDir: mediaDir,
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
 	return &testHarness{
 		t: t, handler: h, store: st, auth: authSvc, events: eventsSvc,
-		orders: ordersSvc, payments: reg, cfg: cfg,
+		orders: ordersSvc, orgs: orgsSvc, payments: reg, cfg: cfg, mediaDir: mediaDir,
 	}
 }
 
@@ -94,6 +108,34 @@ func (h *testHarness) do(method, path, token string, body any) *httptest.Respons
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	rec := httptest.NewRecorder()
+	h.handler.ServeHTTP(rec, req)
+	return rec
+}
+
+// doMultipartFile issues a multipart/form-data request with a single file
+// field (default form field name "file", matching every image upload
+// route in this package) and returns the recorder.
+func (h *testHarness) doMultipartFile(method, path, token, filename string, fileBytes []byte) *httptest.ResponseRecorder {
+	h.t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		h.t.Fatalf("create form file: %v", err)
+	}
+	if _, err := part.Write(fileBytes); err != nil {
+		h.t.Fatalf("write form file: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		h.t.Fatalf("close multipart writer: %v", err)
+	}
+
+	req := httptest.NewRequest(method, path, &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}

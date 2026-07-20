@@ -16,7 +16,7 @@ type TicketType struct {
 	EventID       string     `json:"event_id"`
 	Name          string     `json:"name"`
 	Description   string     `json:"description"`
-	PriceCents    int64      `json:"price_cents"`
+	PriceMinor    int64      `json:"price_minor"`
 	QuantityTotal int        `json:"quantity_total"`
 	QuantitySold  int        `json:"quantity_sold"`
 	SalesStart    *time.Time `json:"sales_start,omitempty"`
@@ -33,7 +33,7 @@ type TicketType struct {
 type TicketTypeInput struct {
 	Name          string     `json:"name"`
 	Description   string     `json:"description"`
-	PriceCents    int64      `json:"price_cents"`
+	PriceMinor    int64      `json:"price_minor"`
 	QuantityTotal int        `json:"quantity_total"`
 	SalesStart    *time.Time `json:"sales_start,omitempty"`
 	SalesEnd      *time.Time `json:"sales_end,omitempty"`
@@ -46,8 +46,8 @@ func (in TicketTypeInput) validate() error {
 	if strings.TrimSpace(in.Name) == "" {
 		return fmt.Errorf("%w: name is required", ErrInvalidInput)
 	}
-	if in.PriceCents < 0 {
-		return fmt.Errorf("%w: price_cents cannot be negative", ErrInvalidInput)
+	if in.PriceMinor < 0 {
+		return fmt.Errorf("%w: price_minor cannot be negative", ErrInvalidInput)
 	}
 	if in.QuantityTotal < 0 {
 		return fmt.Errorf("%w: quantity_total cannot be negative", ErrInvalidInput)
@@ -76,7 +76,7 @@ func (s *Service) CreateTicketType(ctx context.Context, eventID string, in Ticke
 		EventID:       eventID,
 		Name:          in.Name,
 		Description:   in.Description,
-		PriceCents:    in.PriceCents,
+		PriceMinor:    in.PriceMinor,
 		QuantityTotal: in.QuantityTotal,
 		SalesStart:    in.SalesStart,
 		SalesEnd:      in.SalesEnd,
@@ -112,7 +112,7 @@ func (s *Service) UpdateTicketType(ctx context.Context, id string, in TicketType
 		EventID:       existing.EventID,
 		Name:          in.Name,
 		Description:   in.Description,
-		PriceCents:    in.PriceCents,
+		PriceMinor:    in.PriceMinor,
 		QuantityTotal: in.QuantityTotal,
 		QuantitySold:  existing.QuantitySold,
 		SalesStart:    in.SalesStart,
@@ -171,7 +171,7 @@ func toTicketType(tt *store.TicketType) TicketType {
 		EventID:       tt.EventID,
 		Name:          tt.Name,
 		Description:   tt.Description,
-		PriceCents:    tt.PriceCents,
+		PriceMinor:    tt.PriceMinor,
 		QuantityTotal: tt.QuantityTotal,
 		QuantitySold:  tt.QuantitySold,
 		SalesStart:    tt.SalesStart,
