@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -208,10 +209,25 @@ func TestEndToEnd_GenerateIssueVerifyViaRing(t *testing.T) {
 		t.Fatalf("unexpected tid %s", got.TID)
 	}
 
-	// A tampered token must still be rejected after the round trip.
-	tamperedToken := token[:len(token)-1] + "x"
+	// A tampered token must still be rejected after the round trip. Tamper
+	// the FIRST character of the signature segment, not the last: the last
+	// base64url char of a 64-byte signature encodes only the final byte's
+	// low bits (partly redundant padding bits), so flipping it can decode to
+	// the SAME signature bytes and then — correctly — still verify. That made
+	// a last-char tamper an unreliable test (~1-in-4 flake). The first
+	// signature char always carries six meaningful bits, so changing it
+	// always changes the decoded signature and ed25519 always rejects it.
+	sigStart := strings.LastIndexByte(token, '.') + 1
+	if sigStart <= 0 || sigStart >= len(token) {
+		t.Fatalf("unexpected token shape, no signature segment: %q", token)
+	}
+	repl := byte('A')
+	if token[sigStart] == 'A' {
+		repl = 'B'
+	}
+	tamperedToken := token[:sigStart] + string(repl) + token[sigStart+1:]
 	if tamperedToken == token {
-		t.Skip("could not construct a distinct tampered token")
+		t.Fatalf("failed to construct a distinct tampered token")
 	}
 	if _, err := VerifyWithRing(tamperedToken, scannerRing, time.Unix(p.IAT, 0)); err == nil {
 		t.Fatalf("expected tampered token to be rejected")
