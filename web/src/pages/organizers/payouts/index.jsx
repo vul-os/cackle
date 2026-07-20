@@ -18,6 +18,23 @@ import { events as eventsApi, payoutsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import BankSelect from './bank-list';
 
+// Payout status arrives as a backend enum (e.g. "no_sales", "unpaid",
+// "paid"). Render human prose, never the raw snake_case token — a
+// `capitalize` class alone leaves "No_sales" showing through.
+const PAYOUT_STATUS_LABELS = {
+    no_sales: 'No sales yet',
+    unpaid: 'Unpaid',
+    pending: 'Pending',
+    processing: 'Processing',
+    paid: 'Paid',
+    failed: 'Failed',
+};
+
+function payoutStatusLabel(status) {
+    if (!status) return 'Pending';
+    return PAYOUT_STATUS_LABELS[status] ?? status.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
 const bankAccountSchema = z.object({
     bank_code: z.string().trim().min(1, 'Choose your bank.'),
     account_number: z
@@ -116,8 +133,8 @@ const PayoutsOverview = () => {
                                                 </TableCell>
                                                 <TableCell className="text-right tabular-nums font-medium">{formatMoney(payout.net_minor, event.currency)}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Badge variant="outline" className="capitalize">
-                                                        {payout.status || 'pending'}
+                                                    <Badge variant="outline">
+                                                        {payoutStatusLabel(payout.status)}
                                                     </Badge>
                                                 </TableCell>
                                             </>
