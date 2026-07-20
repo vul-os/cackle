@@ -104,8 +104,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
+      # The gitleaks GitHub Action (gitleaks/gitleaks-action@v2) now requires a
+      # paid GITLEAKS_LICENSE for organisation-owned repos. The gitleaks CLI
+      # itself stays free and open source, so we install and run the binary
+      # directly — same scan, no license wall.
+      - name: Install gitleaks
+        run: |
+          VERSION=8.30.1
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Run gitleaks (full history, blocking)
+        run: gitleaks detect --source . --config .gitleaks.toml --redact --verbose --exit-code 1

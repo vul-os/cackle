@@ -8,10 +8,19 @@ title = "cackle gitleaks config"
 useDefault = true
 
 [allowlist]
-description = "Paths that legitimately contain non-secret, high-entropy-looking strings"
+description = "Paths and fixtures that legitimately contain non-secret, high-entropy-looking strings"
 paths = [
   '''(^|/)go\.sum$''',
   '''(^|/)package-lock\.json$''',
   '''(^|/)THIRD-PARTY-NOTICES\.txt$''',
   '''(^|/)docs/screenshots/.*''',
+]
+# Deliberately fake payment-provider keys used in unit-test fixtures. These are
+# English placeholder words, not the base62 blobs real keys are, and several
+# exist specifically to prove an adapter REFUSES a real-looking secret. Matched
+# by value so a genuinely leaked key in the same file is still caught.
+regexes = [
+  '''sk_test_definitelyreal''',
+  '''sk_test_shouldnotmatter''',
+  '''sk_(test|live)_(fake|example|placeholder|dummy|notreal|xxx+)[a-z_]*''',
 ]
