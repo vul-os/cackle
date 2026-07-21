@@ -18,43 +18,75 @@ point.
 - Orders and checkout against live ticket-type availability, money as integer minor units in the event's currency
 - Ed25519-signed ticket capabilities (`internal/tickets`) — the offline-verifiable format, see [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md)
 - **Offline gate scan** — `scan-bundle` endpoint, pure offline `Verify()`, local append-only admission dedupe, batch sync back once online (`internal/scan`), see [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md)
-- Payment provider seam (`internal/payments`), `manual` as the always-on default, 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more), and a `stub` provider for `--demo` and tests — Cackle is country/currency agnostic and never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md). **These adapters are migrating out** — see the next section.
+- Payment provider seam (`internal/payments`), `manual` as the always-on native default, `paystack` native (its banking/payout methods have no patala equivalent — see docs/PAYMENTS.md), `stablecoin` native (not ported into patala), a `stub` provider for `--demo` and tests, and every other real processor (Stripe, Adyen, BTCPay, lnbits, and 16 more) reached through the **patala** substrate's Go binding on an opt-in `-tags patala` cgo build — Cackle is country/currency agnostic and never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md). **This migration is complete** — see the next section for how it was staged.
 - Per-event sales/admission stats
 - `--demo` mode: fully seeded, zero setup
 
 Everything below this line is **not yet built** — each is marked with what it
 would take and why it isn't v1.
 
-## Next — migrate payments to the `patala` substrate (Cackle becomes just ticketing)
+## Done — payments migrated to the `patala` substrate (Cackle is just ticketing again)
 
 Payment processing is not ticketing, and it had grown to nearly half of
 Cackle's code. Those 20+ adapters are a general-purpose asset other VulOS
-projects want too, so they are moving out into **[patala](https://github.com/vul-os/patala)** —
+projects want too, so they moved out into **[patala](https://github.com/vul-os/patala)** —
 a sovereign, centerless payment-rail substrate (non-custodial, no token, one
-honest interface over fiat and crypto rails). Cackle then consumes patala
+honest interface over fiat and crypto rails). Cackle now consumes patala
 through its Go binding and keeps only what it owns: events, tickets, and the
-offline gate.
+offline gate, plus the three native exceptions below.
 
-The migration, in order:
+The migration, as it actually landed:
 
-1. **Port the adapters into patala** (Rust core, faithful ports of Cackle's
-   tested Go logic — same minor-unit/currency rules, same fail-closed verify,
-   same "never holds funds" invariant). In progress.
-2. **Cackle consumes patala's Go binding** in place of `internal/payments`,
-   keeping the `manual` default no-network path native so a zero-key event
-   still runs with no dependency at all.
-3. **`internal/payments` is removed from Cackle** once the substrate covers it.
+1. **Ported the adapters into patala** (Rust core, faithful ports of
+   Cackle's tested Go logic — same minor-unit/currency rules, same
+   fail-closed verify, same "never holds funds" invariant) — 20 processors
+   now live in `patala-fiat`, documented per-adapter in that repo's
+   `PORTING.md`.
+2. **Cackle consumes patala's Go binding** (`internal/payments/patala.go`,
+   `//go:build patala`) in place of the removed native adapters, via ONE
+   generic `PatalaFiatProvider` type driven by `patala.PatalaRailNewFiat`
+   (provider name + a `map[string]string` config built from this
+   deployment's existing `CACKLE_<PROVIDER>_*` env vars — see
+   docs/PAYMENTS.md's "The patala path").
+3. **`manual` stays native**, deliberately, on both counts the plan called
+   for: no network/config/cgo needed, AND patala's generic FFI surface
+   can't drive `ManualRail`'s `mark_paid`/`mark_failed` operator actions in
+   the first place (those are Rust-only inherent methods, not part of the
+   exported `PaymentRail` trait). **Two more adapters stay native for
+   reasons not anticipated in the original plan**: `paystack.go` (its
+   `orgs.BankingProvider` payout/banking methods have no patala
+   equivalent — payouts are explicitly out of scope for patala-fiat's
+   port) and `stablecoin.go` (patala-fiat's crypto strategy is
+   Ed25519-native rails, not EVM stablecoin-watching, so it was never
+   ported). The other **19** provider files (and their tests) were
+   removed from `internal/payments`.
+4. **The default build is unaffected.** `make build`/`make test` (no
+   `-tags patala`) never import patala-go, need no cgo, and produce the
+   same pure-Go `CGO_ENABLED=0` static binary as before — verified: the
+   offline gate/scanner and every other test package still pass with zero
+   tags, and `otool -L` on a default-built binary shows no
+   `libpatala_py` link. `make build-patala`/`make test-patala`/
+   `make run-patala` opt into the cgo path.
+
+**A real, honest gap, not glossed over**: patala's generic FFI surface
+(`PatalaRailNewFiat` → `quote`/`charge`/`verify`) has **no webhook
+method** — provider webhook verification is Rust-only, not exported over
+UniFFI yet. A patala-backed processor today can only be confirmed by
+polling `Verify`, never by a provider's push webhook. See
+docs/PAYMENTS.md's "What's different from the native adapters this
+replaces" for this and the other disclosed deltas (best-effort redirect
+URL, `Flow` always reported as redirect, replay-protection keyed on the
+order reference instead of a provider event id).
 
 The honest sandbox-verification gap moves with the adapters: they were
-written against published API docs and unit-tested (`httptest` / wiremock),
-but **not one has been run against a real merchant sandbox** — that
-end-to-end verification (a live `Begin` → provider → `Verify`/`Webhook` round
-trip, webhook signatures confirmed against genuine signed payloads, subunit
-conversion confirmed for zero- and three-decimal currencies) is now patala's
-top payment priority, per adapter, and it still needs real merchant sandbox
-access this project can't self-provide. `manual`/`stub` need no sandbox and
-stay proven end-to-end. **In progress — the substrate exists; the port and
-the cutover are underway.**
+written against published API docs and unit-tested (`httptest` /
+`wiremock`), but **not one has been run against a real merchant
+sandbox**. That end-to-end verification (a live `Begin` → provider →
+`Verify` round trip, subunit conversion confirmed for zero- and
+three-decimal currencies against a live account) is patala's top payment
+priority, per adapter, and still needs real merchant sandbox access this
+project can't self-provide. `manual`/`stub` need no sandbox and stay
+proven end-to-end.
 
 ## Later — signed transfers & resale
 

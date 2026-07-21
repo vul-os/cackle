@@ -152,18 +152,20 @@ func run(args []string, stdout, stderr *os.File) error {
 		}
 		bankingProvider = ps
 	}
-	// lnbits is entirely optional: NewLNbitsWithStore returns
-	// ErrLNbitsNotConfigured (not registered, not an error for the
-	// process as a whole) unless an operator has actually set
-	// CACKLE_LNBITS_BASE_URL/API_KEY/WEBHOOK_SECRET. Any OTHER error
-	// (e.g. a malformed quote-TTL value) is a real misconfiguration and
-	// does fail startup.
-	if ln, err := payments.NewLNbitsWithStore(recordStore); err == nil {
-		if err := registry.Register(ln); err != nil {
-			return fmt.Errorf("configure lnbits: %w", err)
-		}
-	} else if !errors.Is(err, payments.ErrLNbitsNotConfigured) {
-		return fmt.Errorf("configure lnbits: %w", err)
+	// Every other real processor (Stripe, Paystack's own charge/verify
+	// path, Adyen, BTCPay, lnbits, ...) is served through the patala
+	// substrate rather than a hand-rolled Cackle adapter — see
+	// docs/PAYMENTS.md "The patala path" and internal/payments/patala.go.
+	// registerPatalaProviders is a real implementation ONLY in a binary
+	// built with `-tags patala` (requires CGO_ENABLED=1 and the sibling
+	// patala repo's Go bindings generated); the default, pure-Go build
+	// wires in a no-op stub (cmd/cackle/patala_register_stub.go) so the
+	// offline gate / scanner and every other pure-Go build stay completely
+	// unaffected. A provider with no CACKLE_<NAME>_* environment variables
+	// set at all is silently skipped (not configured); once at least one
+	// is set, any error is a real misconfiguration and fails startup.
+	if err := registerPatalaProviders(registry, recordStore); err != nil {
+		return fmt.Errorf("configure patala payment providers: %w", err)
 	}
 	ordersSvc := orders.New(st, eventsSvc, registry)
 	orgsSvc := orgs.New(st, bankingProvider)

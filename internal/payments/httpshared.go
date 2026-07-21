@@ -3,18 +3,34 @@ package payments
 import (
 	"errors"
 	"io"
+	"time"
 )
 
-// This file is small shared HTTP-safety infrastructure used by the
-// regional-processor adapters in this package (flutterwave.go, xendit.go,
-// midtrans.go, razorpay.go, payu.go, mercadopago.go, dlocal.go,
-// yoco.go, payfast.go, iyzico.go). It intentionally does NOT reuse
-// paystack.go's private paystackReadLimited (kept scoped to Paystack so
-// that adapter's existing tests/sentinel error are untouched) nor
-// provider.go's readLimited (owned by a sibling agent building the v2
-// Provider seam, whose readLimitedReader dependency may still be
-// in-flight) — this is an independent, self-contained copy so this file's
-// adapters do not take on a build-order dependency on either.
+// This file is small shared HTTP-safety infrastructure. It used to back a
+// whole family of regional-processor adapters (flutterwave.go, xendit.go,
+// midtrans.go, razorpay.go, payu.go, mercadopago.go, yoco.go, payfast.go,
+// iyzico.go, and the crypto adapters btcpay.go/lnbits.go/opennode.go/
+// coinbasecommerce.go) that have since moved out to the patala substrate
+// (see docs/PAYMENTS.md "The patala path" and internal/payments/patala.go)
+// — stablecoin.go (never ported to patala; see its own doc comment) and
+// paystack.go (stays native for its orgs.BankingProvider payout methods —
+// see paystack.go's doc comment) are this file's only remaining consumers.
+// It intentionally does NOT reuse paystack.go's private
+// paystackReadLimited (kept scoped to Paystack so that adapter's existing
+// tests/sentinel error are untouched) nor provider.go's own read-limiting
+// — this is an independent, self-contained copy so callers of this file
+// don't take on a build-order dependency on either.
+
+// cryptoDefaultHTTPTimeout bounds every outbound call the crypto adapter
+// still in this package (stablecoin.go) makes, regardless of the caller's
+// own context deadline. Moved here from btcpay.go (removed — see above)
+// since stablecoin.go is now its only user.
+const cryptoDefaultHTTPTimeout = 20 * time.Second
+
+// cryptoMaxBodyBytes caps every HTTP body (API responses and incoming
+// webhook bodies alike) stablecoin.go reads, via boundedRead below. Moved
+// here from btcpay.go for the same reason as cryptoDefaultHTTPTimeout.
+const cryptoMaxBodyBytes int64 = 1 << 20 // 1 MiB
 
 // errBoundedReadTooLarge is returned by boundedRead when the input
 // exceeds the given limit. Every adapter that calls boundedRead should
