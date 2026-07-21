@@ -25,6 +25,33 @@ point.
 Everything below this line is **not yet built** — each is marked with what it
 would take and why it isn't v1.
 
+## Next — sandbox-verify the payment adapters (prerequisite for real money)
+
+This is the highest-priority near-term item, listed first on purpose: it is
+not a feature, it is what stands between "the code compiles" and "you can take
+real money." All 23 payment adapters were written against each provider's
+published API documentation and are covered by `httptest` unit tests, but
+**not one has been run against a real merchant sandbox.** Until an adapter is
+verified end-to-end against its provider's test environment, it must be
+treated as unproven — see the per-adapter status table in
+[docs/PAYMENTS.md](docs/PAYMENTS.md), and the warning at the top of the README.
+
+What each adapter needs before it can be trusted with real money: a real
+sandbox/merchant account for that provider, a live `Begin` → provider
+checkout → `Verify`/`Webhook` round trip driven against the sandbox, the
+webhook signature scheme confirmed against a genuine provider-signed payload
+(several are only doc-derived — Adyen's non-ISO currency multipliers,
+iyzico's outbound signing, PayPal, Coinbase Commerce's under/overpayment
+states), and the subunit conversion confirmed for at least one zero- and one
+three-decimal currency the provider supports. Each verified adapter should
+have its `docs/PAYMENTS.md` row moved from `unit-tested — NOT sandbox-verified`
+to `sandbox-verified`, with the date.
+
+Verifying **one** adapter properly is worth more than adding five more.
+`manual` (the default) and `stub` need no provider sandbox and are already
+proven end-to-end. **Not yet done — needs merchant sandbox access this
+project can't self-provide.**
+
 ## Later — signed transfers & resale
 
 Ticket transfer (attendee-to-attendee) done honestly, without turning Cackle
@@ -47,6 +74,23 @@ the fix. This is exactly the kind of problem the VulOS **Sync** substrate
 capability (CRDT op algebra + version vectors, one Rust core) exists for — if
 Cackle adopts it, it adopts the spec as-is rather than hand-rolling a second
 merge engine. **Not yet built; design not yet started.**
+
+**Design note, recorded now so it isn't discovered the hard way later.**
+`internal/scan.ReconcileTicket` resolves a cross-device duplicate by earliest
+`scanned_at`, breaking an exact tie on `device_id`. That is deterministic and
+correct on its own. But `VULOS-PRODUCT-STANDARD.md` records that two engines
+can both converge and still disagree: flowstock breaks an exact tie on node
+id, the substrate breaks it on author public key. Cackle's `device_id` is a
+third convention, and today that is harmless — v1 gates never merge with each
+other, only with the server.
+
+It stops being harmless the moment venue mesh sync lands. The standard's
+stated clean fix is to make a node's id *be* its public key, and Cackle is
+unusually well placed to do that cheaply: scanner devices will need keypairs
+anyway to sign their own admission records. **If `device_id` is minted as the
+device's public key when device identity is built, this whole class of
+divergence disappears before it can occur** — and adopting the Sync capability
+becomes a drop-in rather than a migration. Do it then, not after.
 
 ## Later — on-site closed-loop payments
 

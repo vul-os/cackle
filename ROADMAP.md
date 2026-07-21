@@ -25,6 +25,33 @@ point.
 Everything below this line is **not yet built** — each is marked with what it
 would take and why it isn't v1.
 
+## Next — sandbox-verify the payment adapters (prerequisite for real money)
+
+This is the highest-priority near-term item, listed first on purpose: it is
+not a feature, it is what stands between "the code compiles" and "you can take
+real money." All 23 payment adapters were written against each provider's
+published API documentation and are covered by `httptest` unit tests, but
+**not one has been run against a real merchant sandbox.** Until an adapter is
+verified end-to-end against its provider's test environment, it must be
+treated as unproven — see the per-adapter status table in
+[docs/PAYMENTS.md](docs/PAYMENTS.md), and the warning at the top of the README.
+
+What each adapter needs before it can be trusted with real money: a real
+sandbox/merchant account for that provider, a live `Begin` → provider
+checkout → `Verify`/`Webhook` round trip driven against the sandbox, the
+webhook signature scheme confirmed against a genuine provider-signed payload
+(several are only doc-derived — Adyen's non-ISO currency multipliers,
+iyzico's outbound signing, PayPal, Coinbase Commerce's under/overpayment
+states), and the subunit conversion confirmed for at least one zero- and one
+three-decimal currency the provider supports. Each verified adapter should
+have its `docs/PAYMENTS.md` row moved from `unit-tested — NOT sandbox-verified`
+to `sandbox-verified`, with the date.
+
+Verifying **one** adapter properly is worth more than adding five more.
+`manual` (the default) and `stub` need no provider sandbox and are already
+proven end-to-end. **Not yet done — needs merchant sandbox access this
+project can't self-provide.**
+
 ## Later — signed transfers & resale
 
 Ticket transfer (attendee-to-attendee) done honestly, without turning Cackle
