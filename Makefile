@@ -102,6 +102,16 @@ clean:
 # patala-fiat processor compiled in. Delegates entirely to patala-go's own
 # Makefile — this target exists so `make build-patala`/`test-patala` don't
 # silently build against stale bindings.
+# go.work (gitignored) wires the sibling patala-go module into the build for
+# `-tags patala` ONLY. It deliberately lives here and NOT as a local-path
+# `replace` in go.mod: a `replace => ../patala/patala-go` in go.mod breaks
+# `go mod download` in Docker/CI, where no sibling patala checkout exists.
+# go.mod stays patala-free so the default pure-Go build and CI never touch it.
+go.work:
+	go work init
+	go work use .
+	go work use $(PATALA_GO_DIR)
+
 patala-generate:
 	$(MAKE) -C $(PATALA_GO_DIR) FEATURES=fiat-all generate
 
@@ -109,7 +119,7 @@ patala-generate:
 # with `build-frontend`/`cmd/cackle/dist` by hand if you want both; see
 # `build`'s own recipe for that dance). Requires CGO_ENABLED=1 and a C
 # toolchain — see internal/payments/patala.go's build comment.
-build-patala: patala-generate
+build-patala: go.work patala-generate
 	CGO_ENABLED=1 CGO_LDFLAGS="-lpatala_py -L$(PATALA_BINDINGS)" \
 		go build -tags patala -o $(BIN) ./cmd/cackle
 
@@ -117,7 +127,7 @@ build-patala: patala-generate
 # every other package's own tests, unaffected). DYLD/LD_LIBRARY_PATH point
 # the dynamic linker at the freshly generated cdylib at RUN time (macOS/
 # Linux — same reasoning as patala-go's own Makefile).
-test-patala: patala-generate
+test-patala: go.work patala-generate
 	CGO_ENABLED=1 CGO_LDFLAGS="-lpatala_py -L$(PATALA_BINDINGS)" \
 		DYLD_LIBRARY_PATH="$(PATALA_BINDINGS):$$DYLD_LIBRARY_PATH" \
 		LD_LIBRARY_PATH="$(PATALA_BINDINGS):$$LD_LIBRARY_PATH" \

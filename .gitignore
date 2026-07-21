@@ -19,3 +19,7 @@ node_modules
 # screenshots are committed; scratch is not
 /tmp
 .DS_Store
+
+# Local workspace for the -tags patala build (see Makefile go.work target)
+go.work
+go.work.sum
