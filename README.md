@@ -10,8 +10,6 @@ Events and ticketing in a single Go binary. Organisers create events, attendees
 buy tickets and get a signed QR, staff scan at the gate — and the gate keeps
 working even if the venue's network, or the server itself, goes down mid-event.
 
-<sub><img src="docs/assets/cackle-logo.svg" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
-
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-F5A623.svg)](LICENSE-MIT)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
@@ -65,37 +63,6 @@ off-by-default adapter behind one seam (`internal/payments`). **Cackle never
 holds funds** — it hands off to a provider (or the organiser, for `manual`)
 and records the result. See [docs/PAYMENTS.md](docs/PAYMENTS.md) for the
 full adapter list and each one's verification status.
-
-## Part of VulOS
-
-**Vulos = free, open-source software + two paid services.** The Vulos OS, all
-its apps (Cackle included), and the app store are **OSS and free — you
-self-host them**. You self-provision and self-pay your own box (Fly / Hetzner
-/ any VPS / home server); Vulos does **not** host or provision boxes. Vulos
-bills for only two things: **Vulos Relay** (reachability) and **backup
-storage** (buckets). There is no compute/box billing, no mail billing, and no
-app-store subscription.
-
-VulOS is an open, self-hostable web OS + app suite. The **Vulos OS** is the
-shell (launcher, windows, dock, assistant) that hosts the apps; each product
-also runs independently on its own:
-
-- **Vulos OS** — the web-native desktop shell that hosts the apps
-- **Vulos Office** — documents: docs, sheets, slides, PDF, and **whiteboards**
-  (the Excalidraw-based whiteboard is an Office **document type** — there is
-  **no separate Board product**)
-- **Vulos Files** — file storage + P2P sharing, built into the OS
-- **Vulos Relay** — sovereign connectivity / reachability fabric
-  (`@vulos/relay-client`) — one of the two paid services
-- **llmux** — sovereign AI gateway
-
-PIM is **bring-your-own** (Mail / Calendar / Contacts via lilmail + the OS's
-Calendar/Contacts widgets); chat and video are **third-party** (Matrix/Element;
-Element Call / Jitsi) — not Vulos products.
-
-**Cackle's role:** events and ticketing. It runs standalone **and** is hosted
-as an app by the Vulos OS — the same binary, with the OS wiring identity and
-scoped storage in front of it.
 
 ## Features
 
@@ -266,3 +233,10 @@ VulOS project; source and issues at
 <div align="center">
 <sub><img src="docs/assets/cackle-logo.svg" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite.</sub>
 </div>
+
+---
+
+<p align="center">
+  <a href="https://vulos.org"><img src="site/assets/vulos-logo.png" alt="vulos" height="20"></a><br>
+  <sub><a href="https://vulos.org"><b>vulos</b></a> — open by design</sub>
+</p>
