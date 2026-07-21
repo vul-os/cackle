@@ -102,6 +102,7 @@ const SURFACES = [
     name: 'checkout',
     path: '/checkout',
     auth: true,
+    seedCart: true,
     description: 'Checkout',
     discover: async (ctx) => (ctx.eventId ? `/checkout/${ctx.eventId}` : null),
   },
@@ -266,7 +267,7 @@ async function startLocalServer() {
 
 /** Discover real demo IDs from the running API so routes aren't hardcoded. */
 async function discoverContext() {
-  const ctx = { eventSlug: null, eventId: null, ticketId: null };
+  const ctx = { eventSlug: null, eventId: null, ticketId: null, cartSeed: null };
   try {
     const res = await fetch(`${BASE}/api/events`);
     if (res.ok) {
@@ -275,6 +276,27 @@ async function discoverContext() {
       if (list.length > 0) {
         ctx.eventSlug = list[0].slug || list[0].id || null;
         ctx.eventId = list[0].id || null;
+      }
+    }
+    // Seed a realistic single-ticket cart so the checkout surface renders the
+    // actual checkout (billing form + order summary) instead of the
+    // empty-cart state. Cackle's cart is pure client state in localStorage
+    // (cackle_cart_v1) — a list of {ticket_type_id, ticket_type, event,
+    // quantity}, exactly what use-cart's ADD_ITEM stores. The PUBLIC storefront
+    // response GET /api/events/{slug} carries {event, ticket_types, ...}
+    // together (the per-event ticket-types endpoint is auth-gated); read it
+    // the same way the storefront event page does, so the seed matches a real
+    // add-to-cart and survives seed-data changes.
+    if (ctx.eventSlug) {
+      const evRes = await fetch(`${BASE}/api/events/${encodeURIComponent(ctx.eventSlug)}`);
+      if (evRes.ok) {
+        const data = await evRes.json();
+        const event = data?.event || data;
+        const tts = data?.ticket_types || event?.ticket_types || [];
+        const tt = tts.find((t) => t?.status === 'active') || tts[0];
+        if (event?.id && tt?.id) {
+          ctx.cartSeed = [{ ticket_type_id: tt.id, ticket_type: tt, event, quantity: 1 }];
+        }
       }
     }
   } catch {
@@ -376,6 +398,16 @@ async function capture(page, surface, theme, discoveryCtx) {
   }
 
   try {
+    // Seed the client-side cart just for this surface (the page persists
+    // across surfaces on the same origin, so a previous surface already put
+    // us on the cackle origin where localStorage is writable). Cleared in
+    // `finally` so no later surface renders a stray cart-count badge.
+    if (surface.seedCart && discoveryCtx.cartSeed) {
+      await page
+        .evaluate((seed) => localStorage.setItem('cackle_cart_v1', JSON.stringify(seed)), discoveryCtx.cartSeed)
+        .catch(() => {});
+    }
+
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     if (surface.waitFor) {
       await page.waitForSelector(surface.waitFor, { timeout: 8_000 }).catch(() => {});
@@ -391,6 +423,10 @@ async function capture(page, surface, theme, discoveryCtx) {
   } catch (err) {
     console.warn(`     FAILED: ${err.message}`);
     return { name: surface.name, theme, status: 'failed', error: err.message, url };
+  } finally {
+    if (surface.seedCart) {
+      await page.evaluate(() => localStorage.removeItem('cackle_cart_v1')).catch(() => {});
+    }
   }
 }
 
