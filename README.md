@@ -231,7 +231,6 @@ VulOS project; source and issues at
 ---
 
 <div align="center">
-<sub><img src="docs/assets/cackle-logo.svg" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite.</sub>
 </div>
 
 ---
