@@ -6,22 +6,29 @@ buyer and the *organiser's own account*, and records what happened. There is
 no escrow, no platform wallet, no "hold and release" step anywhere in this
 codebase.
 
-> [!WARNING]
-> **None of the adapters below have been run against a real merchant
-> account or sandbox.** Every one was built by reading a provider's public
-> API documentation and is covered by `httptest`-based unit tests — a fake
-> HTTP server standing in for the real API. That proves the code handles
-> the *documented* shape of a request/response and fails closed on a bad
+> [!NOTE]
+> **This migration is complete.** The ~20 processor adapters that used to
+> live in `internal/payments/<provider>.go` (Stripe, Adyen, BTCPay, lnbits,
+> and the rest) have moved out to **[patala](https://github.com/vul-os/patala)**,
+> a sovereign, centerless payment-rail substrate other VulOS projects share.
+> Cackle now consumes them through patala's Go binding — see
+> ["The patala path"](#the-patala-path-real-processors) below for what that
+> means for you as an operator, and [ROADMAP.md](../ROADMAP.md) for how this
+> migration was staged. `manual` (see below) is untouched and still needs no
+> patala, no cgo, and no network call at all.
+>
+> **None of the processors reachable through patala have been run against a
+> real merchant account or sandbox from this repo.** Every adapter was
+> ported from Cackle's own (previously unverified) Go implementation and is
+> covered by `wiremock`-based unit tests on the patala side — see that
+> repo's `patala-fiat/PORTING.md`. That proves the code handles the
+> *documented* shape of a request/response and fails closed on a bad
 > signature, a mismatched amount, a timeout, or a malformed payload. It does
 > **not** prove the adapter actually talks correctly to the live provider.
-> **Do not take real money through any adapter here until you have run it
+> **Do not take real money through any processor here until you have run it
 > against that provider's own sandbox/test-mode credentials and watched a
-> real test transaction go through Begin → provider → Verify/Webhook.**
-> Most providers in this list offer one for free (Stripe test mode, Paystack
-> test keys, PayPal Sandbox, a personal BTCPay/LNbits regtest instance,
-> etc.) — point `CACKLE_<PROVIDER>_*` at the sandbox credentials, run a
-> checkout end to end, and only then switch to live keys. `manual` needs no
-> such verification: it makes no network call at all.
+> real test transaction go through Begin → provider → Verify.** `manual`
+> needs no such verification: it makes no network call at all.
 
 ## Cackle is country and currency agnostic
 
@@ -34,9 +41,11 @@ has been removed.** There is no privileged country, currency, or processor:
   (`orgs.default_currency` → `events.currency`). An organiser running events
   in EUR, INR, and JPY concurrently sets each event's currency independently.
 - **`manual` is the default provider for every deployment**, and cannot be
-  disabled. Every other provider — Stripe, Paystack, BTCPay, all of them —
-  is optional and off by default. See [`CACKLE_PAYMENT_PROVIDERS`](#enabling-providers)
-  below.
+  disabled. Every real processor — Stripe, Adyen, BTCPay, and the rest —
+  is optional, off by default, and (as of this migration) reached through
+  patala rather than a native Cackle adapter — see
+  [The patala path](#the-patala-path-real-processors). See
+  [`CACKLE_PAYMENT_PROVIDERS`](#enabling-providers) below for enablement.
 - **Cackle never holds funds**, regardless of which provider is in use.
 
 ## Money: minor units, not "cents"
@@ -157,49 +166,130 @@ picking a provider that can't handle an event's currency fails immediately
 with `ErrCurrencyNotSupported` — never a confusing failure deep inside
 `Begin`, and never a silently wrong charge.
 
-## Adapter reference
+## Native providers (still in `internal/payments/`)
 
-Every adapter lives in its own file (`internal/payments/<name>.go`) with a
-doc comment citing where it was built from and how confident that adapter's
-author was in each part of it — **read the file before trusting a row
-below**; this table summarises, it doesn't replace, that comment.
+Only four providers are still native Go code in this package — everything
+else moved to patala (see below).
 
-**Verification status** for every row below is `unit-tested (httptest) — NOT
-sandbox-verified` unless stated otherwise. That is not a hedge; as of this
-writing, not one adapter has been run against a real or sandbox merchant
-account.
+| Provider | `Name()` | Why it stays native |
+|---|---|---|
+| **Manual** | `manual` | Cackle's always-on default. No network call, no config, no cgo — see [The patala path](#the-patala-path-real-processors) for why this is *never* routed through patala even though patala also has its own `ManualRail`. State (which orders are marked paid, by whom, when) is durable via `RecordStore`/`internal/store` — see [Known limitations](#known-limitations) for the one remaining in-memory-only edge case. |
+| **Paystack** | `paystack` | Kept native ONLY because `*PaystackProvider` also implements `orgs.BankingProvider` (`ListBanks`/`CreateRecipient` — listing supported banks and registering an organiser's payout recipient). Payout/banking management is explicitly **out of scope** for patala-fiat's port (`patala-fiat/PORTING.md`: *"Payouts... is out of scope — `PaymentRail` is about moving money INTO a merchant account, not paying organisers out of one"*), so there is no patala equivalent to switch to for this responsibility. Splitting `paystack.go` into "charge/verify via patala" + "banking natively" is a legitimate follow-up, not done here — see `paystack.go`'s own doc comment. Its `Begin`/`Verify`/`Webhook` (the actual charge path) are unchanged native Go, exactly as before this migration. |
+| **Stablecoin (watch-only)** | `stablecoin` | Kept native because patala-fiat's 20-provider port does **not** include it — patala's own crypto strategy (`PATALA.md` §4/§6) is Ed25519-native rails (Solana/Stellar) rather than EVM stablecoin-watching, so this adapter had nowhere to move to. Unchanged by this migration. |
+| **Demo stub** | `stub` | Unchanged — `--demo`/test-only, auto-settles instantly, refuses to register outside those contexts. |
 
-| Provider | `Name()` | Regions / currencies | Flow | Required env vars | Verification status & notes |
-|---|---|---|---|---|---|
-| **Manual** | `manual` | Every currency, every country — no merchant account | Manual (buyer sees instructions; organiser calls `MarkPaid`) | *(none)* | No network calls, nothing to verify. **Default provider, always enabled.** State (which orders are marked paid, by whom, when) is **in-memory only** — see [Known limitations](#known-limitations). |
-| Stripe | `stripe` | Broad (Checkout Sessions, any Stripe-supported currency) | Redirect | `CACKLE_STRIPE_SECRET_KEY`, `CACKLE_STRIPE_WEBHOOK_SECRET` | unit-tested — NOT sandbox-verified. `Verify`'s reference identity (Stripe session id vs. Cackle's own order reference) is flagged in the file as a one-line reconciliation to double check once wired to real `Order`/`Charge` persistence. |
-| Adyen | `adyen` | Broad (Pay by Link) | Redirect | `CACKLE_ADYEN_API_KEY`, `CACKLE_ADYEN_MERCHANT_ACCOUNT`, `CACKLE_ADYEN_HMAC_KEY`, `CACKLE_ADYEN_API_BASE_URL` | unit-tested — NOT sandbox-verified. **HMAC key encoding** (hex-decode vs. raw UTF-8 bytes) was not re-confirmed against a live doc page — if wrong, it only makes genuine webhooks fail closed, never lets a forged one through. **Refuses CLP/CVE/IDR/ISK** outright (Adyen's non-ISO minor-unit bucket — see above) rather than guess a multiplier. |
-| Checkout.com | `checkoutcom` | Broad (Hosted Payments Page) | Redirect | `CACKLE_CHECKOUTCOM_SECRET_KEY`, `CACKLE_CHECKOUTCOM_WEBHOOK_SECRET`, `CACKLE_CHECKOUTCOM_API_BASE_URL` | unit-tested — NOT sandbox-verified. The Hosted Payments Page **request** field list (`Begin`) was corroborated from Checkout.com's general Payments API conventions, not the JS-rendered Hosted Payments Page schema page itself — `Verify`/`Webhook` were confirmed directly against documented examples and are higher confidence than `Begin`. |
-| PayPal | `paypal` | Broad (Orders v2) | Redirect | `CACKLE_PAYPAL_CLIENT_ID`, `CACKLE_PAYPAL_CLIENT_SECRET`, `CACKLE_PAYPAL_WEBHOOK_ID`, `CACKLE_PAYPAL_ENV` (`live` or `sandbox`, required explicitly) | unit-tested — NOT sandbox-verified. The full Get-Order status enum and the exact webhook event envelope were corroborated via secondary sources rather than a freshly fetched schema — an incomplete enum can only make this adapter too conservative, never wrongly permissive. **Refuses three-decimal currencies** (KWD, BHD, JOD, OMR, TND) — not documented in PayPal's fetched currency reference. |
-| Square | `square` | Broad (Payment Links) | Redirect | `CACKLE_SQUARE_ACCESS_TOKEN`, `CACKLE_SQUARE_WEBHOOK_SIGNATURE_KEY`, `CACKLE_SQUARE_LOCATION_ID`, `CACKLE_SQUARE_NOTIFICATION_URL`, `CACKLE_SQUARE_API_BASE_URL` | unit-tested — NOT sandbox-verified. Webhook HMAC is confirmed to cover "signature key + notification URL + raw body", but the exact concatenation/encoding was corroborated via known SDK behaviour, not quoted verbatim from Square's prose — wrong would fail closed. **Refuses three-decimal currencies.** |
-| Mollie | `mollie` | Broad, 2-decimal currencies only | Redirect | `CACKLE_MOLLIE_API_KEY`, `CACKLE_MOLLIE_WEBHOOK_URL` | unit-tested — NOT sandbox-verified. Webhook has **no signature at all** by Mollie's own design (the callback carries only an `id`; verification *is* the authenticated re-fetch) — that's Mollie's documented model, not a gap in this adapter. **Refuses zero- and three-decimal currencies** — could not confirm word-for-word whether Mollie wants `"1000"` or `"1000.00"` for JPY. |
-| Paystack | `paystack` | Africa-oriented, see `paystackCurrencies` | Redirect | `CACKLE_PAYSTACK_SECRET_KEY` | unit-tested — NOT sandbox-verified, but this is the **oldest and most heavily tested adapter in the package** (60+ tests; predates the v2 `Provider` interface and was refactored onto it without changing any security-relevant logic). No longer the default — see above. |
-| Flutterwave | `flutterwave` | NG/GH/KE/UG/TZ/ZA/RW/CI/CM; NGN/GHS/KES/UGX/TZS/ZAR/USD/XOF/XAF/RWF | Redirect | `CACKLE_FLUTTERWAVE_SECRET_KEY`, `CACKLE_FLUTTERWAVE_WEBHOOK_HASH` | unit-tested — NOT sandbox-verified. Confidence MEDIUM. Webhook verification is a **static shared secret**, not an HMAC (Flutterwave's own design) — still compared in constant time to avoid a timing side-channel. |
-| Xendit | `xendit` | ID/PH/VN/TH/MY; IDR/PHP/VND/THB/MYR | Redirect | `CACKLE_XENDIT_SECRET_KEY`, `CACKLE_XENDIT_WEBHOOK_TOKEN` | unit-tested — NOT sandbox-verified. Confidence MEDIUM. Webhook check is a static per-account **callback token**, not an HMAC. IDR/VND handling (Xendit's primary markets) is implemented with confidence; PHP/THB/MYR are not independently verified. |
-| Midtrans | `midtrans` | ID; IDR only | Redirect | `CACKLE_MIDTRANS_SERVER_KEY` | unit-tested — NOT sandbox-verified. Confidence MEDIUM-HIGH. Rejects any non-IDR currency outright. |
-| Mercado Pago | `mercadopago` | LatAm, see `mercadoPagoCurrencies` | Redirect | `CACKLE_MERCADOPAGO_ACCESS_TOKEN`, `CACKLE_MERCADOPAGO_WEBHOOK_SECRET` | unit-tested — NOT sandbox-verified. Webhook signature manifest (MEDIUM-HIGH confidence) is a specific three-field semicolon-terminated template confirmed from Mercado Pago's own docs; the Preferences API request/response shape is MEDIUM confidence. The webhook push carries no amount — `Webhook` always re-fetches the payment server-to-server before returning a `Result`. |
-| Razorpay | `razorpay` | IN; INR only | Inline (Checkout.js widget) | `CACKLE_RAZORPAY_KEY_ID`, `CACKLE_RAZORPAY_KEY_SECRET`, `CACKLE_RAZORPAY_WEBHOOK_SECRET` | unit-tested — NOT sandbox-verified. Confidence HIGH on order creation + webhook signature (Razorpay's most heavily used, most consistently documented endpoints). |
-| PayU (India) | `payu` | IN; INR only — this is **PayU India / "PayU Biz" specifically**, not PayU LatAm or PayU Global, which are different products this adapter does not cover | Redirect (HTML form auto-POST, not a bare link) | `CACKLE_PAYU_MERCHANT_KEY`, `CACKLE_PAYU_SALT` | unit-tested — NOT sandbox-verified. Confidence MEDIUM. The SHA-512 request/response hash sequence is corroborated across PayU's own docs and every third-party integration guide (real confidence); the Verify Payment API's exact field names are less certain. |
-| iyzico | `iyzico` | TR; TRY/USD/EUR/GBP | Redirect | `CACKLE_IYZICO_API_KEY`, `CACKLE_IYZICO_SECRET_KEY`, `CACKLE_IYZICO_BASE_URL` | unit-tested — NOT sandbox-verified. **Confidence is explicitly split** — see the file header. MEDIUM-HIGH on the security-critical shape (the checkout callback carries no signature; the adapter always re-verifies server-to-server). **LOW-MEDIUM, explicitly flagged**, on the outbound IYZWS request-signing byte sequence — iyzico has since introduced a newer HMAC-SHA256 scheme ("IYZWSv2") for some merchants and this file has not been checked against either scheme with a real account. Also does not populate iyzico's extensive mandatory buyer/address/basket fields (Cackle's `Order` doesn't carry most of them) — a functional gap, not a security one. |
-| PayFast | `payfast` | ZA; ZAR only | Redirect (HTML form auto-POST) | `CACKLE_PAYFAST_MERCHANT_ID`, `CACKLE_PAYFAST_MERCHANT_KEY`, `CACKLE_PAYFAST_PASSPHRASE` (optional but recommended) | unit-tested — NOT sandbox-verified. Confidence HIGH on ITN (webhook) verification — signature check + the mandatory validate-callback round-trip. Does **not** implement PayFast's third recommended check (source-IP allowlisting) — add that at your ingress/load balancer. |
-| Yoco | `yoco` | ZA; ZAR only | Redirect | `CACKLE_YOCO_SECRET_KEY`, `CACKLE_YOCO_WEBHOOK_SECRET` (`whsec_...`) | unit-tested — NOT sandbox-verified. Confidence MEDIUM-HIGH. Implements the Svix webhook standard (Yoco's documented choice) faithfully, including the timestamp-tolerance replay guard. |
-| BTCPay Server | `btcpay` | Self-hosted, non-custodial; any fiat currency your BTCPay instance prices in | Invoice | `CACKLE_BTCPAY_BASE_URL`, `CACKLE_BTCPAY_API_KEY`, `CACKLE_BTCPAY_STORE_ID`, `CACKLE_BTCPAY_WEBHOOK_SECRET` | unit-tested — NOT sandbox-verified (no BTCPay instance was available to test against). **The flagship crypto adapter** — see [Crypto adapters](#crypto-adapters-underpayment-overpayment-confirmations-quote-expiry) below. HIGH confidence on invoice shape + webhook HMAC scheme; MODERATE on the exact `additionalStatus` enum (Marked/Invalid/PaidPartial/PaidOver) used to detect under/overpayment — verify against your BTCPay version. |
-| LNbits (Lightning) | `lnbits` | Self-hosted, non-custodial; whatever fiat your LNbits instance's rate source supports | Invoice | `CACKLE_LNBITS_BASE_URL`, `CACKLE_LNBITS_API_KEY` (an invoice/read key, never an admin key), `CACKLE_LNBITS_WEBHOOK_SECRET`, `CACKLE_LNBITS_WEBHOOK_URL` (optional), `CACKLE_LNBITS_QUOTE_TTL_SECONDS` (optional, default 900) | unit-tested — NOT sandbox-verified. HIGH confidence on invoice creation/polling (LNbits' oldest, most stable API). MODERATE on the fiat-denominated amount fields, which have shifted across LNbits versions. LNbits' native webhook has **no signature at all** — this adapter requires its own shared secret on the registered webhook URL and never trusts the push body for settlement data, only as a hint to re-check. **In-memory state — see [Known limitations](#known-limitations).** |
-| OpenNode | `opennode` | Hosted, custodial Bitcoin/Lightning checkout | Invoice | `CACKLE_OPENNODE_API_KEY`, `CACKLE_OPENNODE_BASE_URL` (optional) | unit-tested — NOT sandbox-verified. HIGH confidence on charge create/fetch and the documented status enum. MODERATE confidence on the exact webhook signing scheme (`hashed_order`) — compensated for by always re-fetching the charge from OpenNode's authenticated API before trusting a webhook, so a subtly-wrong signature construction can't fabricate a settlement. |
-| Coinbase Commerce | `coinbasecommerce` | Hosted, custodial crypto checkout | Invoice | `CACKLE_COINBASECOMMERCE_API_KEY`, `CACKLE_COINBASECOMMERCE_WEBHOOK_SECRET`, `CACKLE_COINBASECOMMERCE_BASE_URL` (optional) | unit-tested — NOT sandbox-verified. HIGH confidence on auth, create/fetch charge shape, and webhook HMAC scheme. MODERATE confidence on the status enum beyond NEW/PENDING/COMPLETED/EXPIRED — **this is exactly where under/overpayment surfaces** (see below). Confirm before depending on it that Coinbase Commerce is still onboarding new merchants — it has stopped at points in its history. |
-| Stablecoin (watch-only) | `stablecoin` | Any EVM chain with an Etherscan-family explorer API; one configured quote currency, no FX | Invoice | `CACKLE_STABLECOIN_INDEXER_BASE_URL`, `CACKLE_STABLECOIN_INDEXER_API_KEY`, `CACKLE_STABLECOIN_TOKEN_CONTRACT`, `CACKLE_STABLECOIN_TOKEN_DECIMALS`, `CACKLE_STABLECOIN_QUOTE_CURRENCY` (optional, default USD), `CACKLE_STABLECOIN_MIN_CONFIRMATIONS` (required, no default) | unit-tested — NOT sandbox-verified (tested only against `httptest` fakes of the documented Etherscan-family shape, never a real indexer account). **Never holds a private key** — hands out a pre-generated address from an operator-supplied pool and only watches the chain. **Address-reuse hazard**: reconciliation assumes each pool address is used for exactly one order; reissuing an address to a second order while the first is open will conflate their transfers. This is a correctness requirement on whoever implements the address allocator, not something this file can detect. |
-| Demo stub | `stub` | Any (accepts everything) | Inline | *(none — refuses to run unless explicitly opted in via `--demo`/`CACKLE_DEMO`, and refuses to register at all if a real Paystack secret is configured)* | Not a real provider. Auto-settles every order instantly for `--demo` and the test suite. Cannot be reached in a real deployment by construction. |
+## The patala path (real processors)
 
-### Deliberately not built
+Every other processor Cackle used to implement natively — Stripe, Adyen,
+Checkout.com, PayPal, Square, Mollie, Flutterwave, Xendit, Midtrans, Mercado
+Pago, Razorpay, PayU, iyzico, PayFast, Yoco, BTCPay Server, lnbits,
+OpenNode, and Coinbase Commerce (19 processors; Paystack's *charge* path
+also ported, even though the Go file stays for banking — see above) — is
+now reached through **[patala](https://github.com/vul-os/patala)**'s Go
+binding (`patala-go`), via `internal/payments/patala.go`.
 
-Four providers named in the original build plan were **not** implemented,
-on purpose, because their APIs could not be verified confidently enough from
-available documentation to write an honest adapter:
+### Building it in
+
+This is opt-in and requires more than `go build`:
+
+1. Clone patala next to this repo, so `../patala` exists (matching
+   `go.mod`'s `replace github.com/vul-os/patala/patala-go =>
+   ../patala/patala-go`).
+2. Install `uniffi-bindgen-go`, pinned to the version this workspace's
+   `uniffi` crate needs — see `../patala/patala-go/README.md`'s exact
+   `cargo install` command.
+3. A Rust toolchain (`cargo`/`rustc`) and a C toolchain (`cc`/`clang`/`gcc`
+   — cgo needs one).
+4. `make build-patala` / `make test-patala` / `make run-patala` (see the
+   Makefile) run the whole `patala-go`'s bindings-generation →
+   `CGO_ENABLED=1` build/test/run pipeline as one command. By hand: `go
+   build -tags patala ./cmd/... ./internal/...` with `CGO_LDFLAGS`/
+   `DYLD_LIBRARY_PATH`/`LD_LIBRARY_PATH` pointed at
+   `../patala/patala-go/bindings/patala/` — see `internal/payments/patala.go`'s
+   own build comment for the full recipe.
+
+**The DEFAULT `make build`/`make test` (no `-tags patala`) are completely
+unaffected** — they never import patala-go, never need cgo, and produce
+the exact same pure-Go, `CGO_ENABLED=0` static binary as before this
+migration. This is deliberate: `internal/tickets`' offline gate and
+`internal/scan`'s scanner (Cackle's whole thesis) must never depend on cgo
+— see [docs/OFFLINE-GATES.md](OFFLINE-GATES.md). If you don't want cgo at
+all but still want real processors, **[`patala-sidecar`](https://github.com/vul-os/patala/tree/main/patala-sidecar)**
+(a loopback-only HTTP server over the same patala-core surface) is the
+documented alternative — Cackle does not integrate it today; only the cgo
+binding path (`patala-go`) is wired up.
+
+### Enabling a processor
+
+Once built with `-tags patala`, every processor patala-fiat ships is
+reachable through the exact same `CACKLE_<PROVIDER>_*` environment
+variables the old native adapters used — `cmd/cackle/patala_register.go`
+registers a processor iff at least one such variable is set, and fails
+startup loudly (not silently) if what's set is incomplete or malformed.
+`internal/payments.PatalaConfigFromEnv` does the translation from Cackle's
+own variable names to patala-fiat's config map keys; almost every key is a
+literal lower-case of Cackle's own suffix (`CACKLE_STRIPE_SECRET_KEY` →
+`secret_key`), with two documented exceptions:
+
+| Cackle env var | patala-fiat config key |
+|---|---|
+| `CACKLE_ADYEN_HMAC_KEY` | `hmac_key_hex` |
+| `CACKLE_LNBITS_QUOTE_TTL_SECONDS` | `quote_ttl_secs` |
+
+Every other provider's `CACKLE_<PROVIDER>_*` variables are unchanged from
+this document's previous adapter table (Stripe's `SECRET_KEY`/
+`WEBHOOK_SECRET`, Paystack's `SECRET_KEY`, BTCPay's `BASE_URL`/`API_KEY`/
+`STORE_ID`/`WEBHOOK_SECRET`, and so on) — see patala's own
+`patala-py/src/fiat.rs` (`build_<provider>` functions) for the
+authoritative key list per provider, and `patala-fiat/PORTING.md` for how
+each one was ported from this repo's original Go adapter.
+
+### What's different from the native adapters this replaces
+
+Read this before relying on the patala path for anything beyond `manual`:
+
+- **No webhook support yet.** `patala_core::PaymentRail` (the trait
+  `PatalaRailNewFiat` hands back) has exactly `quote`/`charge`/`verify` —
+  no webhook concept at all; provider-specific webhook verification exists
+  as free Rust functions in patala-fiat that are **not** part of the
+  UniFFI-exported surface. `PatalaFiatProvider.Webhook` always returns
+  `ErrPatalaNoWebhook`. Settlement can only be confirmed by **polling
+  `Verify`** — an operator or a periodic job, not an instant provider push.
+  This is a real, current limitation of the binding, not a Cackle
+  shortcut; it will improve if/when patala exposes a webhook surface.
+- **Anti-fraud reconciliation happens INSIDE `Verify`, not after it.**
+  `patala_core::verify` returns only a `bool`, never the amount/currency it
+  observed — so `PatalaFiatProvider.Verify` reconstructs the `Receipt` it
+  asks patala to check using the ORDER's real expected total (persisted at
+  `Begin` time), which makes patala's own `>=`-amount / exact-currency
+  check into exactly Cackle's `Reconcile` guarantee. See that method's own
+  doc comment for the full reasoning.
+- **Redirect URLs are best-effort.** `patala_core::Receipt` has no
+  redirect-URL field; hosted-checkout rails carry it inside the opaque
+  `proof` bytes by convention (`{"redirect_url": "..."}`, per
+  `patala-fiat/PORTING.md` §5). `PatalaFiatProvider.Begin` does a
+  best-effort JSON read of that convention; a provider whose proof doesn't
+  follow it leaves `RedirectURL` empty (buyers still get `Instructions`).
+- **`Flow` is always reported as `FlowRedirect`.** `RailCapabilities` has
+  no `Flow` field, so this generic adapter can't distinguish Razorpay's
+  old `FlowInline` (Checkout.js widget) from everyone else's hosted
+  redirect page — a disclosed approximation, not a silent one.
+- **`Countries`, `Refunds`, `Payouts` are always empty/`false`.**
+  `RailCapabilities` has no equivalent fields (see
+  `patala-fiat/PORTING.md` §4's own gap list); Cackle's `Capabilities`
+  struct reports the honest default rather than fabricating a value.
+- **Replay protection keys on the order reference**, not a provider
+  transaction id — there is no per-event id available through this
+  generic `bool`-only surface. Reusing the reference is still correct
+  (don't re-process an already-settled order twice), just coarser than
+  the true per-event id the old native webhooks used.
+
+### Deliberately not built (patala side)
+
+Four providers named in Cackle's original build plan were never
+implemented natively, and remain unported into patala, on purpose: their
+APIs could not be verified confidently enough from available documentation
+to write an honest adapter.
 
 - **Braintree**
 - **dLocal**
@@ -207,78 +297,58 @@ available documentation to write an honest adapter:
 - **Przelewy24**
 
 A missing adapter beats a wrong one. If you need one of these, write it
-against that provider's current documentation, cite the doc source in the
-file header the same way every other adapter here does, and be explicit
+against that provider's current documentation in patala-fiat (see its own
+`PORTING.md`), cite the doc source the same way every other adapter there
+does, and be explicit
 about which parts you're confident in and which you're not.
 
 ## Crypto adapters: underpayment, overpayment, confirmations, quote expiry
 
-The crypto adapters do not share a single mechanism for these — each
-provider's own model differs, and every adapter is honest in its file header
-about exactly how it detects each case:
+BTCPay Server, lnbits, OpenNode, and Coinbase Commerce — Cackle's former
+native crypto adapters — moved to patala along with everything else (see
+[The patala path](#the-patala-path-real-processors)); their
+underpayment/overpayment/confirmation/quote-expiry handling now lives in
+`patala-fiat`'s own source (`patala-fiat/src/btcpay/`,
+`patala-fiat/src/lnbits/`, etc.) and `patala-fiat/PORTING.md`, not here.
 
-- **Underpayment** never settles an order through any crypto adapter here.
-  BTCPay reports `additionalStatus` values (`PaidPartial`) that this package
-  maps to "not yet paid," never paid; OpenNode has an explicit `underpaid`
-  status mapped to `StatusFailed`; the stablecoin adapter sums qualifying
-  on-chain transfers and compares the total **exactly** against the order's
-  fiat total.
-- **Overpayment** is treated as a condition requiring a human, not something
-  to silently accept or silently discard. BTCPay's `PaidOver` and Coinbase
-  Commerce's `UNRESOLVED` state both return a distinct sentinel error
-  (`ErrBTCPayOverpaid`, `ErrCoinbaseCommerceRequiresManualReview`) instead of
-  a `Result` — flagged for the organiser to check the provider's own
-  dashboard and refund/credit the difference. OpenNode has no documented
-  `overpaid` status; if OpenNode itself settles a modest overpayment
-  silently, the generic `Reconcile` check in `provider.go` still catches it,
-  since the settled amount won't exactly equal the stored order total.
-- **Confirmations** are not independently configurable by Cackle for
-  BTCPay, LNbits, OpenNode, or Coinbase Commerce — each trusts that
-  provider's own settlement status (BTCPay's per-store `SpeedPolicy`,
-  Lightning's instant HTLC settlement with no block wait at all) rather than
-  re-deriving a confirmation count Cackle has no reliable way to see. The
-  stablecoin adapter is the exception: `CACKLE_STABLECOIN_MIN_CONFIRMATIONS`
-  is required with no default, since there is no provider-side policy to
-  lean on there.
-- **Quote expiry / FX drift**: every crypto adapter prices in the event's own
-  fiat currency and lets the provider (or, for stablecoin, the 1:1 peg
-  assumption) lock that rate at charge-creation time. Coinbase Commerce
-  expires a charge that isn't paid in time rather than settling it late at a
-  stale rate (`EXPIRED` → `StatusFailed`). LNbits invoices are always
-  fixed-amount BOLT11 with a configurable TTL
-  (`CACKLE_LNBITS_QUOTE_TTL_SECONDS`) — a Lightning HTLC settles for exactly
-  the invoiced amount or not at all, so there is no partial-settlement case
-  to handle there at all.
+**Stablecoin (watch-only)** — `stablecoin` — is the one crypto adapter
+still native to this package (patala-fiat did not port it; see
+[Native providers](#native-providers-still-in-internalpayments) above).
+Its own behaviour is unchanged by this migration:
 
-### Why BTCPay/LNbits are preferred over hosted custodial crypto services
+- **Underpayment** never settles an order: it sums qualifying on-chain
+  transfers and compares the total **exactly** against the order's fiat
+  total.
+- **Confirmations**: `CACKLE_STABLECOIN_MIN_CONFIRMATIONS` is required
+  with no default, since there is no provider-side settlement policy to
+  lean on the way a hosted processor has.
+- **Quote expiry / FX drift**: prices 1:1 against its configured quote
+  currency; there is no separate FX rate to go stale.
 
-BTCPay Server and LNbits are **self-hosted and non-custodial**: the
-organiser runs their own instance against their own on-chain wallet or
-Lightning node, and Cackle only ever talks to that instance's API — funds
-move directly from buyer to organiser wallet with no third party ever
-touching them. That is the same never-hold-funds property Cackle has for
-itself, applied one layer further down, which is why BTCPay is called out in
-its own file header as "the flagship crypto provider." OpenNode and
-Coinbase Commerce are **hosted and custodial** — a real convenience (no
-server to run), but the provider briefly holds the funds before paying the
-organiser out, same as any card processor. Prefer BTCPay/LNbits where an
-organiser is willing to run the self-hosted piece; treat OpenNode/Coinbase
-Commerce as the easier on-ramp for organisers who aren't.
+### Why BTCPay/lnbits were preferred over hosted custodial crypto services
+
+This framing (recorded here for context, not as current Cackle-native
+behaviour) still holds on the patala side: BTCPay Server and lnbits are
+**self-hosted and non-custodial** — the organiser runs their own instance
+against their own on-chain wallet or Lightning node, and funds move
+directly from buyer to organiser wallet with no third party ever touching
+them, the same never-hold-funds property extended one layer further down.
+OpenNode and Coinbase Commerce are **hosted and custodial** — a real
+convenience (no server to run), but the provider briefly holds funds
+before paying the organiser out, same as any card processor.
 
 ## Known limitations
 
-- **`manual` and `lnbits` hold their settlement state in memory only.** A
-  process restart between an order being created and being marked/settled
-  loses that state — `manual`'s marked-paid records and `lnbits`'s
-  `payment_hash` → invoice map both live in an in-memory map guarded by a
-  mutex, not a database row. This is called out explicitly in both files'
-  doc comments. **A fix is pending**: the intent is for callers to persist
-  the audit trail (`internal/store`) alongside these in-memory records, not
-  to replace the in-memory fast path outright. Don't run either provider
-  across a planned restart boundary until that lands, and don't run
-  `lnbits` behind multiple replicas of the Cackle process today.
-- No adapter here is sandbox-verified — see the warning at the top of this
-  document.
+- **`manual` state persistence**: `manual`'s settlement records (which
+  orders are marked paid, by whom, when) are durable via `RecordStore`
+  when `cmd/cackle` wires one up (see `NewManualWithStore` in
+  `cmd/cackle/main.go`) — the one gap is a nil-store construction (used in
+  tests / narrower embeddings), which is in-memory-only by design there.
+- No processor reached through patala is sandbox-verified — see the note
+  at the top of this document, and
+  [What's different from the native adapters this replaces](#whats-different-from-the-native-adapters-this-replaces)
+  for the webhook/reconciliation/redirect-URL gaps specific to the patala
+  path.
 
 ## Security rules every adapter follows
 
@@ -320,17 +390,32 @@ path (`Verify` or `Webhook`) gets there first.
 
 ## Testing
 
-Every adapter above has its own `_test.go` file exercising it against an
-`httptest` fake server: success, tampered signature, missing signature,
-amount mismatch, currency mismatch, replay, timeout, a 500, and malformed
-JSON, asserting fail-closed behaviour on every one of those. The `stub`
-provider (`internal/payments/stub.go`) exists separately, for `--demo` and
-for exercising the full checkout-to-ticket-issuance path in tests without
-any of the above adapters or a real payment processor involved. It
-auto-settles instantly and deterministically, and refuses to register at
-all if a real Paystack secret is configured in the environment, so it can
-never end up live by accident.
+`manual.go`, `paystack.go`, and `stablecoin.go` each still have their own
+`_test.go` file exercising them against an `httptest` fake server (where
+applicable): success, tampered signature, missing signature, amount
+mismatch, currency mismatch, replay, timeout, a 500, and malformed JSON,
+asserting fail-closed behaviour on every one of those. The `stub` provider
+(`internal/payments/stub.go`) exists separately, for `--demo` and for
+exercising the full checkout-to-ticket-issuance path in tests without any
+real payment processor involved. It auto-settles instantly and
+deterministically, and refuses to register at all if a real Paystack
+secret is configured in the environment, so it can never end up live by
+accident.
 
 ```bash
 go test ./internal/payments/...
 ```
+
+`internal/payments/patala.go` and its own `_test.go` only compile with
+`-tags patala` (see [The patala path](#the-patala-path-real-processors)):
+
+```bash
+make test-patala
+```
+
+Every processor patala-fiat ports from Cackle's original adapters keeps
+its own `httptest`/`wiremock`-based coverage — now in the patala repo
+(`patala-fiat/src/<provider>/`), asserting the identical fail-closed
+contract (tampered/missing signature, amount/currency mismatch, replay,
+timeout, malformed JSON) this document's [security rules](#security-rules-every-adapter-follows)
+require.

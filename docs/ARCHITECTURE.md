@@ -11,9 +11,15 @@ Everything else in this document exists to protect that property.
 
 ## Non-negotiables
 
-- **One static Go binary.** `modernc.org/sqlite` (pure Go, no cgo) for
-  storage, the built React frontend embedded via `embed.FS`. `docker run -p
-  8080:8080 vulos/cackle` is the entire install story.
+- **One static Go binary, by default.** `modernc.org/sqlite` (pure Go, no
+  cgo) for storage, the built React frontend embedded via `embed.FS`.
+  `docker run -p 8080:8080 vulos/cackle` is the entire install story. The
+  ONE opt-in exception: building with `-tags patala` (see
+  `internal/payments/patala.go`, docs/PAYMENTS.md "The patala path") links
+  in patala-go's cgo binding for real payment processors — that build is
+  never the default, never CI's `make build`/`make test`, and the offline
+  gate/scanner (this document's whole reason to exist) does not depend on
+  it either way.
 - **`./cackle --demo` boots fully seeded with zero setup.** The screenshotter
   and anyone kicking the tyres for the first time depend on this.
 - **No hard runtime dependency** on Supabase, Firebase, Vulos Relay, Vulos
@@ -36,7 +42,7 @@ internal/auth/       users, sessions, password, OAuth seam
 internal/events/     orgs, events, ticket types
 internal/tickets/    ISSUANCE + Ed25519 capability sign/verify  ← the differentiator
 internal/orders/     cart, orders, order items
-internal/payments/   Provider seam + paystack + stub
+internal/payments/   Provider seam + manual/paystack/stablecoin/stub (native) + patala.go (patala-backed, -tags patala)
 internal/scan/       gate admission, offline dedupe, allocations
 internal/httpapi/    chi router, handlers, middleware
 internal/demo/       seed data for --demo

@@ -16,6 +16,12 @@ import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 
 const FEATURED_COUNT = 3;
+// The homepage is a preview, but the preview has to actually be wide enough
+// to show what's on — a handful of events isn't a preview, it's the whole
+// catalogue looking sparse. 12 comfortably covers a new/small deployment
+// (--demo seeds 10) while still being a real cap for a large one; "Browse
+// all events" below always covers the rest either way.
+const HOMEPAGE_EVENT_LIMIT = 12;
 
 const HOW_IT_WORKS = [
     {
@@ -45,7 +51,7 @@ const LandingPage = () => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
-            .list({ limit: 8 })
+            .list({ limit: HOMEPAGE_EVENT_LIMIT })
             .then((data) => {
                 if (cancelled) return;
                 setState({ events: Array.isArray(data) ? data : (data?.events ?? []), loading: false, error: null });

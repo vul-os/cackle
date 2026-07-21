@@ -2,10 +2,13 @@
 /**
  * Cackle — Playwright screenshotter
  *
- * Captures every major surface at 1440×900 @2x (retina) into
- * docs/screenshots/<surface>-<theme>.png, in BOTH light and dark, then copies
- * the flagship shot to docs/screenshots/hero.png and writes a generated
- * docs/screenshots/README.md index.
+ * Captures every major surface at 1440×900 @2x (retina, viewport-only)
+ * into docs/screenshots/<surface>-<theme>.png, in BOTH light and dark, then
+ * copies the flagship shot to docs/screenshots/hero.png and writes a
+ * generated docs/screenshots/README.md index. The one exception is
+ * `landing` (see SURFACES below): it captures the FULL scrollable page, not
+ * just the viewport, so the flagship hero.png shot actually shows the
+ * demo events listed beneath the marketing hero, not just the hero alone.
  *
  * Pipeline:
  *   1. Build web/ (vite build -> web/dist), unless already built.
@@ -72,7 +75,18 @@ const HERO_THEME = 'light';
 // means "log in as the demo organiser first"; `discover` resolves a real
 // dynamic path from the running API before falling back to `path`.
 const SURFACES = [
-  { name: 'landing', path: '/', description: 'Landing page' },
+  {
+    name: 'landing',
+    path: '/',
+    description: 'Landing page',
+    // This is the flagship shot (copied to hero.png below) — a visitor's
+    // very first view of the product. A viewport-only capture only ever
+    // showed the marketing hero above the fold; fullPage captures the hero
+    // AND the real featured/upcoming events listing beneath it (sourced
+    // live from GET /api/events), so the one screenshot most people will
+    // ever see actually shows what's on, not just a tagline.
+    fullPage: true,
+  },
   {
     name: 'event-browse',
     path: '/events',
@@ -371,7 +385,7 @@ async function capture(page, surface, theme, discoveryCtx) {
     await page.waitForTimeout(surface.settleMs || 800);
 
     const outPath = path.join(OUT, `${surface.name}-${theme}.png`);
-    await page.screenshot({ path: outPath, fullPage: false });
+    await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
     console.log(`     saved ${path.relative(ROOT, outPath)}`);
     return { name: surface.name, theme, status: 'ok', url };
   } catch (err) {

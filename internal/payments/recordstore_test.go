@@ -142,70 +142,12 @@ func TestManualWithStore_MarkPaidFailsClosedAndRollsBack(t *testing.T) {
 	}
 }
 
-func TestLNbitsWithStore_SurvivesRestart(t *testing.T) {
-	ctx := context.Background()
-	rs := newFakeRecordStore()
-
-	base := &LNbitsProvider{
-		baseURL:       "http://unused.invalid",
-		apiKey:        "key",
-		webhookSecret: "secret",
-		invoices:      make(map[string]lnbitsInvoiceRecord),
-		store:         rs,
-	}
-	// Simulate what Begin would have persisted, without needing a live
-	// LNbits server in this test: exercise the store fallback path
-	// directly (lookupInvoice), which is exactly what Verify/Webhook use.
-	if err := rs.PutPaymentRecord(ctx, PaymentRecord{
-		Provider:    ProviderNameLNbits,
-		Reference:   "hash-after-restart",
-		AmountMinor: 5000,
-		Currency:    "KWD",
-		Status:      StatusPending,
-	}); err != nil {
-		t.Fatalf("seed store: %v", err)
-	}
-
-	// A brand-new provider instance (empty in-memory cache) must recover
-	// the invoice's fiat amount/currency from the store instead of
-	// failing closed with ErrLNbitsUnknownReference.
-	restarted := &LNbitsProvider{
-		baseURL:       base.baseURL,
-		apiKey:        base.apiKey,
-		webhookSecret: base.webhookSecret,
-		invoices:      make(map[string]lnbitsInvoiceRecord),
-		store:         rs,
-	}
-	rec, ok, err := restarted.lookupInvoice(ctx, "hash-after-restart")
-	if err != nil {
-		t.Fatalf("lookupInvoice: %v", err)
-	}
-	if !ok {
-		t.Fatal("lookupInvoice after restart: not found, want recovered from store")
-	}
-	if rec.amountMinor != 5000 || rec.currency != "KWD" {
-		t.Fatalf("recovered record = %+v, want amountMinor=5000 currency=KWD", rec)
-	}
-
-	// And it should now be warm in the in-memory cache too.
-	restarted.mu.Lock()
-	_, cached := restarted.invoices["hash-after-restart"]
-	restarted.mu.Unlock()
-	if !cached {
-		t.Fatal("lookupInvoice should repopulate the in-memory cache on a store hit")
-	}
-}
-
-func TestLNbitsWithStore_UnknownReferenceStillFailsClosed(t *testing.T) {
-	ctx := context.Background()
-	rs := newFakeRecordStore()
-	p := &LNbitsProvider{invoices: make(map[string]lnbitsInvoiceRecord), store: rs}
-
-	_, ok, err := p.lookupInvoice(ctx, "never-seen")
-	if err != nil {
-		t.Fatalf("lookupInvoice: %v", err)
-	}
-	if ok {
-		t.Fatal("lookupInvoice for a reference nobody ever created: want not found")
-	}
-}
+// Note: this file used to also cover LNbitsProvider's use of the same
+// RecordStore seam (TestLNbitsWithStore_SurvivesRestart /
+// TestLNbitsWithStore_UnknownReferenceStillFailsClosed). lnbits.go was
+// removed when payment processing migrated onto the patala substrate (see
+// docs/PAYMENTS.md "The patala path") — lnbits is now one of the 20
+// processors reachable via the patala-tagged build
+// (internal/payments/patala.go), which persists through the very same
+// RecordStore/PaymentRecord shape exercised above via ManualProvider, so
+// the seam itself is still fully covered by this file's remaining tests.
