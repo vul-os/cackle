@@ -59,4 +59,8 @@ notices:
 	npm run notices
 
 clean:
-	rm -rf $(BIN) cmd/cackle/dist web/dist web/node_modules node_modules docs/screenshots
+	rm -rf $(BIN) cmd/cackle/dist web/dist web/node_modules node_modules
+	@# NOTE: docs/screenshots/ is deliberately NOT removed. Those PNGs are
+	@# committed deliverables the README renders on GitHub, not build
+	@# artifacts — `make clean` once deleted them. Regenerate deliberately
+	@# with `make screenshots`, never as a side effect of cleaning.
