@@ -1,7 +1,23 @@
--- 0001_init.sql — Cackle core schema.
--- Money is always integer cents. IDs are ULIDs (TEXT). Timestamps are
--- RFC3339 TEXT. This migration is applied inside a transaction by the
--- migration runner in internal/store/store.go.
+-- Cackle — baseline schema (folded).
+--
+-- This is the whole schema in one clean, forward-only file: every table with
+-- its final columns inline, no ALTER/DROP, no intermediate states. Cackle has
+-- never shipped a production database, so the historical 0001–0006 migration
+-- series (init + password-reset tokens + images/categories + org invites +
+-- org bank accounts + currency minor-unit rework) was collapsed into this
+-- single baseline. New databases apply exactly this file; nothing is lost —
+-- this reproduces the same schema those six migrations produced.
+--
+-- Conventions:
+--   * IDs are ULID strings (TEXT). Timestamps are RFC-3339 TEXT (see
+--     store.timeToText). Money is always an INTEGER count of minor units in
+--     the row's own currency (never a float) — column suffix `_minor`.
+--   * Foreign keys are declared inline; SQLite permits forward references, so
+--     the events↔images cover-image cycle needs no follow-up ALTER.
+--   * `schema_migrations` is created and maintained by the Go runner
+--     (internal/store.Migrate), never here.
+
+-- ── Identity & auth ─────────────────────────────────────────────────────────
 
 CREATE TABLE users (
     id                TEXT PRIMARY KEY,
@@ -30,11 +46,23 @@ CREATE TABLE oauth_identities (
 );
 CREATE INDEX idx_oauth_identities_user_id ON oauth_identities(user_id);
 
+CREATE TABLE password_reset_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at    TEXT
+);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+
+-- ── Orgs & membership ───────────────────────────────────────────────────────
+
 CREATE TABLE orgs (
-    id         TEXT PRIMARY KEY,
-    name       TEXT NOT NULL,
-    slug       TEXT NOT NULL UNIQUE,
-    created_at TEXT NOT NULL
+    id               TEXT PRIMARY KEY,
+    name             TEXT NOT NULL,
+    slug             TEXT NOT NULL UNIQUE,
+    created_at       TEXT NOT NULL,
+    default_currency TEXT NOT NULL DEFAULT 'USD'
 );
 
 CREATE TABLE org_members (
@@ -46,28 +74,73 @@ CREATE TABLE org_members (
 );
 CREATE INDEX idx_org_members_user_id ON org_members(user_id);
 
-CREATE TABLE events (
+CREATE TABLE org_invites (
     id          TEXT PRIMARY KEY,
     org_id      TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    slug        TEXT NOT NULL UNIQUE,
-    title       TEXT NOT NULL,
-    summary     TEXT NOT NULL DEFAULT '',
-    description TEXT NOT NULL DEFAULT '',
-    venue_name  TEXT NOT NULL DEFAULT '',
-    address     TEXT NOT NULL DEFAULT '',
-    lat         REAL,
-    lng         REAL,
-    starts_at   TEXT NOT NULL,
-    ends_at     TEXT NOT NULL,
-    timezone    TEXT NOT NULL DEFAULT 'UTC',
-    cover_image TEXT NOT NULL DEFAULT '',
-    status      TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'cancelled')),
-    currency    TEXT NOT NULL DEFAULT 'ZAR',
-    created_at  TEXT NOT NULL,
-    updated_at  TEXT NOT NULL
+    email       TEXT NOT NULL,
+    role        TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'scanner')),
+    token_hash  TEXT NOT NULL UNIQUE,
+    invited_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+    expires_at  TEXT NOT NULL,
+    accepted_at TEXT,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX idx_org_invites_org_id ON org_invites(org_id);
+CREATE INDEX idx_org_invites_email ON org_invites(email);
+
+CREATE TABLE org_bank_accounts (
+    org_id         TEXT PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,
+    bank_code      TEXT NOT NULL,
+    bank_name      TEXT NOT NULL DEFAULT '',
+    account_number TEXT NOT NULL,
+    account_name   TEXT NOT NULL,
+    recipient_code TEXT NOT NULL DEFAULT '',
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL
+);
+
+-- ── Events ──────────────────────────────────────────────────────────────────
+-- events.cover_image_id references images(id); images.event_id references
+-- events(id). SQLite resolves these forward references at CREATE time, so the
+-- cycle is declared inline with no ALTER.
+
+CREATE TABLE events (
+    id             TEXT PRIMARY KEY,
+    org_id         TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+    slug           TEXT NOT NULL UNIQUE,
+    title          TEXT NOT NULL,
+    summary        TEXT NOT NULL DEFAULT '',
+    description    TEXT NOT NULL DEFAULT '',
+    venue_name     TEXT NOT NULL DEFAULT '',
+    address        TEXT NOT NULL DEFAULT '',
+    lat            REAL,
+    lng            REAL,
+    starts_at      TEXT NOT NULL,
+    ends_at        TEXT NOT NULL,
+    timezone       TEXT NOT NULL DEFAULT 'UTC',
+    cover_image    TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'cancelled')),
+    currency       TEXT NOT NULL DEFAULT 'ZAR',
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    category       TEXT NOT NULL DEFAULT '',
+    cover_image_id TEXT REFERENCES images(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_events_org_id ON events(org_id);
 CREATE INDEX idx_events_status ON events(status);
+CREATE INDEX idx_events_category ON events(category);
+
+CREATE TABLE images (
+    id          TEXT PRIMARY KEY,
+    event_id    TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    format      TEXT NOT NULL CHECK (format IN ('png', 'jpeg', 'webp')),
+    width       INTEGER NOT NULL,
+    height      INTEGER NOT NULL,
+    size_bytes  INTEGER NOT NULL,
+    uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX idx_images_event_id ON images(event_id);
 
 CREATE TABLE event_keys (
     id          TEXT PRIMARY KEY,
@@ -84,7 +157,7 @@ CREATE TABLE ticket_types (
     event_id       TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     name           TEXT NOT NULL,
     description    TEXT NOT NULL DEFAULT '',
-    price_cents    INTEGER NOT NULL DEFAULT 0,
+    price_minor    INTEGER NOT NULL DEFAULT 0,
     quantity_total INTEGER NOT NULL DEFAULT 0,
     quantity_sold  INTEGER NOT NULL DEFAULT 0,
     sales_start    TEXT,
@@ -95,6 +168,8 @@ CREATE TABLE ticket_types (
 );
 CREATE INDEX idx_ticket_types_event_id ON ticket_types(event_id);
 
+-- ── Orders & tickets ────────────────────────────────────────────────────────
+
 CREATE TABLE orders (
     id             TEXT PRIMARY KEY,
     event_id       TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -102,9 +177,9 @@ CREATE TABLE orders (
     buyer_email    TEXT NOT NULL,
     buyer_name     TEXT NOT NULL DEFAULT '',
     status         TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'failed', 'refunded', 'cancelled')),
-    subtotal_cents INTEGER NOT NULL DEFAULT 0,
-    fee_cents      INTEGER NOT NULL DEFAULT 0,
-    total_cents    INTEGER NOT NULL DEFAULT 0,
+    subtotal_minor INTEGER NOT NULL DEFAULT 0,
+    fee_minor      INTEGER NOT NULL DEFAULT 0,
+    total_minor    INTEGER NOT NULL DEFAULT 0,
     currency       TEXT NOT NULL DEFAULT 'ZAR',
     provider       TEXT NOT NULL DEFAULT '',
     provider_ref   TEXT,
@@ -120,7 +195,7 @@ CREATE TABLE order_items (
     order_id         TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     ticket_type_id   TEXT NOT NULL REFERENCES ticket_types(id),
     quantity         INTEGER NOT NULL,
-    unit_price_cents INTEGER NOT NULL
+    unit_price_minor INTEGER NOT NULL
 );
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 
@@ -141,11 +216,8 @@ CREATE INDEX idx_tickets_order_id ON tickets(order_id);
 CREATE INDEX idx_tickets_event_id ON tickets(event_id);
 CREATE INDEX idx_tickets_holder_user_id ON tickets(holder_user_id);
 
--- Admission dedupe is LOCAL and append-only: every scan attempt gets its own
--- row (result may be admitted/duplicate/invalid/wrong_event). The partial
--- unique index below is the actual dedupe guarantee — it allows at most one
--- 'admitted' row per ticket ("first scan wins") while letting duplicate scan
--- attempts insert freely as their own 'duplicate' rows, never overwriting.
+-- ── Admission (the offline gate) ────────────────────────────────────────────
+
 CREATE TABLE admissions (
     id         TEXT PRIMARY KEY,
     ticket_id  TEXT NOT NULL REFERENCES tickets(id),
@@ -157,11 +229,10 @@ CREATE TABLE admissions (
     result     TEXT NOT NULL CHECK (result IN ('admitted', 'duplicate', 'invalid', 'wrong_event')),
     note       TEXT NOT NULL DEFAULT ''
 );
+-- One successful admission per ticket, enforced even across offline batch sync.
 CREATE UNIQUE INDEX idx_admissions_admitted_once ON admissions(ticket_id) WHERE result = 'admitted';
 CREATE INDEX idx_admissions_event_id ON admissions(event_id);
 CREATE INDEX idx_admissions_ticket_id ON admissions(ticket_id);
--- Backs the /api/scan/sync idempotency contract: idempotent by
--- (ticket_id, device_id, scanned_at).
 CREATE INDEX idx_admissions_sync_key ON admissions(ticket_id, device_id, scanned_at);
 
 CREATE TABLE allocations (
@@ -177,15 +248,33 @@ CREATE TABLE allocations (
 CREATE INDEX idx_allocations_event_id ON allocations(event_id);
 CREATE INDEX idx_allocations_device_id ON allocations(device_id);
 
+-- ── Payments (seam) ─────────────────────────────────────────────────────────
+
 CREATE TABLE payouts (
     id           TEXT PRIMARY KEY,
     event_id     TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     org_id       TEXT NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
-    amount_cents INTEGER NOT NULL,
+    amount_minor INTEGER NOT NULL,
     status       TEXT NOT NULL DEFAULT 'pending',
     provider_ref TEXT,
     created_at   TEXT NOT NULL,
-    paid_at      TEXT
+    paid_at      TEXT,
+    currency     TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX idx_payouts_event_id ON payouts(event_id);
 CREATE INDEX idx_payouts_org_id ON payouts(org_id);
+
+CREATE TABLE payment_records (
+    provider     TEXT NOT NULL,
+    reference    TEXT NOT NULL,
+    amount_minor INTEGER NOT NULL,
+    currency     TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    instructions TEXT NOT NULL DEFAULT '',
+    marked_by    TEXT NOT NULL DEFAULT '',
+    marked_at    TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY (provider, reference)
+);
+CREATE INDEX idx_payment_records_provider ON payment_records(provider);
