@@ -53,6 +53,23 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   their state (including manual's audit trail) to a new `payment_records`
   table instead of an in-memory map, so a restart no longer loses in-flight
   payment state.
+- **Payments migrated onto the [patala](https://github.com/vul-os/patala)
+  substrate.** 19 provider adapters (Stripe, Adyen, Checkout.com, PayPal,
+  Square, Mollie, Flutterwave, Xendit, Midtrans, Mercado Pago, Razorpay,
+  PayU, iyzico, PayFast, Yoco, BTCPay Server, lnbits, OpenNode, Coinbase
+  Commerce) were removed from `internal/payments` and are now reached
+  through patala's Go binding on an opt-in `-tags patala` cgo build
+  (`internal/payments/patala.go`); the default, pure-Go `make build`/
+  `make test` are unaffected. `manual` stays native (no network/cgo
+  needed, and patala's generic surface can't drive its `MarkPaid`
+  operator action anyway); `paystack.go` and `stablecoin.go` also stay
+  native — see [docs/PAYMENTS.md](docs/PAYMENTS.md) for why. See
+  [ROADMAP.md](ROADMAP.md) for the full migration writeup, including the
+  honest gaps (no webhook path through patala yet; poll `Verify` instead).
+- Homepage (`/`) now shows the full demo events listing (Featured +
+  Upcoming, sourced live from `GET /api/events`) in the same shot as the
+  hero — the flagship screenshot (`docs/screenshots/hero.png`) captures
+  the whole scrollable page, not just the marketing hero above the fold.
 
 ## What came before
 
