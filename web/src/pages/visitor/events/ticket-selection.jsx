@@ -44,10 +44,17 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
 
     return (
         <Card id="ticket-panel" className={cn('overflow-hidden', className)}>
-            <CardHeader className="pb-3">
-                <CardTitle className="font-display text-lg">Tickets</CardTitle>
+            <CardHeader className="pb-5">
+                <CardTitle className="flex items-center gap-2 font-display text-lg">
+                    <Ticket className="h-4 w-4 text-primary" aria-hidden="true" />
+                    Tickets
+                </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            {/* Perforated tear-line under the header — this panel IS the ticket
+                stub the visitor is about to buy. --notch matches the card
+                surface so the punched circles read as cut through it. */}
+            <div className="ticket-perforation mx-6" style={{ '--notch': 'var(--card)' }} aria-hidden="true" />
+            <CardContent className="space-y-4 pt-6">
                 {available.length === 0 ? (
                     <EmptyState
                         icon={Ticket}

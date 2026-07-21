@@ -65,6 +65,22 @@
 
     --radius: 0.75rem;
 
+    /* Categorical chart series (analytics only — never used for brand UI).
+       Validated against this theme's actual card surface (#fff light /
+       #131316-ish dark) with dataviz's six-check palette validator: fixed
+       hue ORDER is the CVD-safety mechanism, never re-cycle or reassign by
+       rank. Light mode carries a contrast WARN on slots 3/5/6 (below 3:1) —
+       every chart using them ships direct text labels, never color alone. */
+    --chart-1: 213 68% 50%; /* blue */
+    --chart-2: 120 100% 26%; /* green */
+    --chart-3: 337 70% 70%; /* magenta */
+    --chart-4: 41 100% 46%; /* yellow */
+    --chart-5: 159 73% 40%; /* aqua */
+    --chart-6: 17 82% 56%; /* orange */
+    --chart-7: 249 48% 44%; /* violet */
+    --chart-8: 0 73% 59%; /* red */
+    --chart-track: 240 5% 90%;
+
     /* The organiser console chrome (top bar + side nav) is intentionally a
        persistent dark shell in both themes — a deliberate brand choice, not
        an unstyled corner. Tokenised here rather than hardcoded so contrast
@@ -116,6 +132,19 @@
     --ring: 355 90% 61%;
 
     --radius: 0.75rem;
+
+    /* Same eight categorical hues, stepped for the dark surface (not a
+       separate palette) — validator re-run with --mode dark, all 8 clear
+       3:1 with no WARN. */
+    --chart-1: 213 77% 56%;
+    --chart-2: 120 100% 26%;
+    --chart-3: 338 61% 58%;
+    --chart-4: 40 100% 39%;
+    --chart-5: 159 73% 36%;
+    --chart-6: 17 70% 50%;
+    --chart-7: 247 69% 72%;
+    --chart-8: 0 72% 65%;
+    --chart-track: 240 8% 20%;
 
     /* --sidebar-* tokens are deliberately NOT redefined here: the console
        chrome stays visually identical in light and dark mode (see :root). */
@@ -207,4 +236,57 @@
 .scanner-surface {
   background: radial-gradient(120% 120% at 50% -10%, hsl(var(--primary) / 0.18), transparent 60%),
     hsl(var(--background));
+}
+
+/* ── Ticket motifs ─────────────────────────────────────────────────────────
+   Cackle's mark is a ticket stub with a dashed tear-line — these three
+   utilities carry that idea into layout instead of just the logo. Intentionally
+   outside @layer (they set structural background-image, not a themeable
+   token) and used sparingly: hero/section seams and the odd card divider,
+   never as ambient decoration on every panel. */
+
+/* A perforated "tear line" — a dashed rule with two punched circles at its
+   ends, like the line you'd fold a real ticket stub along. `--notch` must be
+   set to whatever surface the notches should "punch through to" (the
+   background right behind the rule); it defaults to the page background. */
+.ticket-perforation {
+  position: relative;
+  border-top: 2px dashed hsl(var(--border));
+}
+.ticket-perforation::before,
+.ticket-perforation::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: hsl(var(--notch, var(--background)));
+}
+.ticket-perforation::before {
+  left: -8px;
+}
+.ticket-perforation::after {
+  right: -8px;
+}
+
+/* A torn-edge seam between two stacked sections — a strip of triangular
+   "teeth" in the color of the section BELOW, so the section above appears to
+   tear into it. Height is fixed and small; it is a seam, not a hero element. */
+.ticket-tear {
+  height: 14px;
+  width: 100%;
+  background-image:
+    linear-gradient(135deg, hsl(var(--tear, var(--background))) 25%, transparent 25.5%),
+    linear-gradient(225deg, hsl(var(--tear, var(--background))) 25%, transparent 25.5%);
+  background-position: 0 0;
+  background-size: 18px 18px;
+  background-repeat: repeat-x;
+}
+
+/* A calm dot-grid atmosphere for dark, image-free hero/band surfaces —
+   subtle enough to read as texture, never as content. */
+.dot-grid {
+  background-image: radial-gradient(hsl(0 0% 100% / 0.14) 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
 }

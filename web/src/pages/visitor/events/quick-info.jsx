@@ -2,8 +2,23 @@ import React from 'react';
 import { Calendar, Clock, MapPin, Tag, Ticket } from 'lucide-react';
 import { availabilitySummary, priceFromMinor, formatMoney } from './ticket-utils';
 
-const QuickFact = ({ icon: Icon, label, value, tone }) => (
-    <div className="flex items-center gap-3">
+const QuickFact = ({ icon: Icon, label, value, tone, first }) => (
+    <div
+        className={
+            'relative flex items-center gap-3 ' +
+            // Dashed dividers between facts on wide screens — the same
+            // perforated tear-line as the ticket mark, run horizontally
+            // through the quick-facts row instead of only living in the logo.
+            // Positioned in the grid GUTTER (half the column gap to the left,
+            // via a pseudo-element) rather than as padding/border on the
+            // column itself, so it never steals width from the value text
+            // next to it — a long venue name or date still gets its full
+            // column and truncates only when it truly has to.
+            (first
+                ? ''
+                : "lg:before:absolute lg:before:-left-3 lg:before:top-1/2 lg:before:h-10 lg:before:-translate-y-1/2 lg:before:border-l lg:before:border-dashed lg:before:border-border lg:before:content-['']")
+        }
+    >
         <div
             className={
                 'flex h-11 w-11 shrink-0 items-center justify-center rounded-full ' +
@@ -61,7 +76,7 @@ const EventQuickInfo = ({ event, ticketTypes = [] }) => {
 
     return (
         <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-5">
-            <QuickFact icon={Calendar} label="Date" value={formatDate(event.starts_at)} />
+            <QuickFact icon={Calendar} label="Date" value={formatDate(event.starts_at)} first />
             <QuickFact icon={Clock} label="Time" value={formatTimeRange(event.starts_at, event.ends_at)} />
             <QuickFact icon={MapPin} label="Venue" value={event.venue_name || 'Venue TBA'} />
             <QuickFact

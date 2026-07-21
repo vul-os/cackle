@@ -163,11 +163,20 @@ const LandingPage = () => {
 
                 <section className="border-t border-border bg-muted/30 py-20">
                     <div className="container mx-auto px-4">
-                        <div className="mx-auto mb-12 max-w-2xl text-center">
-                            <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">How it works</h2>
-                            <p className="mt-2 text-muted-foreground">The gate is the whole product. Here&apos;s the flow.</p>
+                        <div className="mx-auto mb-14 max-w-2xl text-center">
+                            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">The whole flow</span>
+                            <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">How it works</h2>
+                            <p className="mt-2 text-muted-foreground">The gate is the whole product. Here&apos;s the flow, start to finish.</p>
                         </div>
-                        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+
+                        {/* A dashed thread connects the three steps on wide screens — the
+                            same tear-line motif as the ticket mark, running through the
+                            whole sequence rather than three disconnected cards. */}
+                        <div className="relative grid grid-cols-1 gap-8 md:grid-cols-3">
+                            <div
+                                className="pointer-events-none absolute left-0 right-0 top-8 hidden border-t-2 border-dashed border-border md:block"
+                                aria-hidden="true"
+                            />
                             {HOW_IT_WORKS.map(({ icon: Icon, title, description }, i) => (
                                 <motion.div
                                     key={title}
@@ -175,10 +184,13 @@ const LandingPage = () => {
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true, margin: '-80px' }}
                                     transition={{ duration: 0.4, delay: i * 0.1 }}
-                                    className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm"
+                                    className="relative rounded-2xl border border-border bg-card p-6 text-center shadow-sm"
                                 >
-                                    <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                        <Icon className="h-6 w-6" aria-hidden="true" />
+                                    <div className="relative mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-4 border-muted/30 bg-primary/10 text-primary">
+                                        <Icon className="h-7 w-7" aria-hidden="true" />
+                                        <span className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-black text-primary-foreground shadow-soft">
+                                            {i + 1}
+                                        </span>
                                     </div>
                                     <h3 className="mb-2 font-semibold">{title}</h3>
                                     <p className="text-sm text-muted-foreground">{description}</p>

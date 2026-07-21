@@ -31,12 +31,20 @@ generation should never be the reason CI goes red for an unrelated change.
 
 | Surface | File | What it shows |
 |---|---|---|
-| Hero | `hero.png` | Copied from one of the surfaces below — whichever best represents the product at a glance, currently the organiser dashboard. |
-| Dashboard | `dashboard-{light,dark}.png` | Organiser view of an event: sales, revenue, admission counts, per-ticket-type breakdown. |
-| Event page | `event-{light,dark}.png` | The public event page an attendee lands on: ticket types, pricing, availability. |
+| Hero | `hero.png` | Copied from one of the surfaces below — whichever best represents the product at a glance, currently the **homepage** (`landing`). |
+| Landing | `landing-{light,dark}.png` | The homepage: hero, category filter, featured/upcoming events. |
+| Browse | `event-browse-{light,dark}.png` | The full events list — search, category filter. |
+| Event detail | `event-detail-{light,dark}.png` | The public event page an attendee lands on: ticket types, pricing, availability. |
 | Checkout | `checkout-{light,dark}.png` | Cart / checkout flow before handoff to the payment provider. |
-| Ticket | `ticket-{light,dark}.png` | An attendee's issued ticket, QR code included — this QR *is* the signed capability described in [TICKET-FORMAT.md](TICKET-FORMAT.md). |
+| My tickets | `my-tickets-{light,dark}.png` | An attendee's ticket list. |
+| Ticket | `ticket-qr-{light,dark}.png` | An attendee's issued ticket, QR code included — this QR *is* the signed capability described in [TICKET-FORMAT.md](TICKET-FORMAT.md). |
+| Organiser home | `organiser-home-{light,dark}.png` | Organiser dashboard: their events, next-up event, quick actions. |
+| Event editor | `event-editor-{light,dark}.png` | Organiser's event management view. |
+| Ticket types | `ticket-types-{light,dark}.png` | Ticket types for an event, organiser side. |
+| Attendees | `attendees-{light,dark}.png` | Attendee roster for an event. |
 | Scanner | `scanner-{light,dark}.png` | The gate scanning view, mid-scan, showing an admission result. |
+| Stats | `stats-{light,dark}.png` | Event analytics: sold/revenue/admitted, per-ticket-type breakdown, capacity and admission meters. |
+| Settings | `settings-{light,dark}.png` | Organiser settings. |
 
 ## Adding a new surface
 
