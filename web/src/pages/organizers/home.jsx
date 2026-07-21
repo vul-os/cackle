@@ -101,7 +101,14 @@ const HomePage = () => {
     const revenueDisplay = useMemo(() => {
         const entries = Object.entries(totals.revenueByCurrency);
         if (entries.length === 0) return '—';
-        return entries.map(([currency, minor]) => formatMoney(minor, currency)).join(' · ');
+        // Only surface currencies that actually earned something. An org whose
+        // events span currencies it has made no sales in would otherwise pad the
+        // figure with "€0.00 · $0.00" noise that overflows the tile and reads as
+        // broken. If every currency is genuinely at zero, show a single zero in
+        // one real currency rather than a misleading dash.
+        const earning = entries.filter(([, minor]) => minor > 0);
+        if (earning.length === 0) return formatMoney(0, entries[0][0]);
+        return earning.map(([currency, minor]) => formatMoney(minor, currency)).join(' · ');
     }, [totals]);
 
     const nextEvent = useMemo(() => {
