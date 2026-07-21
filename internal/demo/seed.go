@@ -259,6 +259,8 @@ func Seed(ctx context.Context, st *store.Store, ev *events.Service, or *orders.S
 	// strongest proof this migration actually works, not just that the
 	// event row itself displays a currency code.
 	eventsWithOrders := map[string]bool{
+		"cape-town-pub-quiz-championship": true, // the soonest event — what the
+		// admin stats/attendees/scanner screens default to on first open.
 		"rocking-the-daisies":      true,
 		"karoo-rock-revival":       true,
 		"jozi-jazz-and-soul-night": true,
@@ -394,67 +396,112 @@ func seedOneEvent(ctx context.Context, ev *events.Service, orgID string, se seed
 	return created.ID, nil
 }
 
-// seedOrdersAndAdmissions places a couple of paid orders against eventID's
-// first ticket type and marks one of the resulting tickets admitted, so
-// the event's stats and scanner views aren't empty on first look.
+// demoBuyers is a pool of attendees spanning the demo's regions (SA, JP, KW)
+// so seeded events read like a real crowd — a populated attendee list and
+// non-trivial sales/admission stats — rather than two placeholder rows.
+var demoBuyers = []struct{ email, name string }{
+	{"thandi.nkosi@example.co.za", "Thandi Nkosi"},
+	{"pieter.vandermerwe@example.co.za", "Pieter van der Merwe"},
+	{"aisha.patel@example.co.za", "Aisha Patel"},
+	{"sipho.dlamini@example.co.za", "Sipho Dlamini"},
+	{"lerato.mokoena@example.co.za", "Lerato Mokoena"},
+	{"johan.botha@example.co.za", "Johan Botha"},
+	{"nomvula.zulu@example.co.za", "Nomvula Zulu"},
+	{"kagiso.molefe@example.co.za", "Kagiso Molefe"},
+	{"chantal.adams@example.co.za", "Chantal Adams"},
+	{"tebogo.maluleke@example.co.za", "Tebogo Maluleke"},
+	{"riaan.pretorius@example.co.za", "Riaan Pretorius"},
+	{"zanele.khumalo@example.co.za", "Zanele Khumalo"},
+	{"haruki.tanaka@example.jp", "Haruki Tanaka"},
+	{"yuki.sato@example.jp", "Yuki Sato"},
+	{"aya.watanabe@example.jp", "Aya Watanabe"},
+	{"fatima.alsabah@example.kw", "Fatima Al-Sabah"},
+	{"omar.alrashid@example.kw", "Omar Al-Rashid"},
+	{"grace.okafor@example.co.za", "Grace Okafor"},
+}
+
+// seedOrdersAndAdmissions sells a realistic fraction of eventID's ticket
+// types through the REAL order -> settle flow, then marks a majority of the
+// issued tickets admitted, so the event's stats, attendees and scanner
+// views demonstrate a populated event instead of an empty one. Every number
+// here is real demo data produced by the actual code paths — no fabricated
+// counts. It is deterministic (fixed buyer/quantity cycles, no randomness)
+// so the generated screenshots are stable across runs.
 func seedOrdersAndAdmissions(ctx context.Context, st *store.Store, ev *events.Service, or *orders.Service, eventID, userID string) error {
 	types, err := ev.ListTicketTypes(ctx, eventID)
 	if err != nil || len(types) == 0 {
 		return err
 	}
-	ticketTypeID := types[0].ID
 
-	buyers := []struct{ email, name string }{
-		{"thandi@example.co.za", "Thandi Nkosi"},
-		{"pieter@example.co.za", "Pieter van der Merwe"},
+	// A fixed spread of order sizes so sales don't all look identical.
+	qtyCycle := []int{1, 2, 1, 3, 2, 1, 2, 4}
+	var issued []string
+	buyerIdx, qtyIdx := 0, 0
+
+	for _, tt := range types {
+		// Aim for ~60% of capacity sold, capped so even a large-capacity
+		// event (e.g. 800) seeds quickly — the loop runs a full order ->
+		// settle round trip per order.
+		target := tt.QuantityTotal * 6 / 10
+		if target > 42 {
+			target = 42
+		}
+		for sold := 0; sold < target; {
+			qty := qtyCycle[qtyIdx%len(qtyCycle)]
+			qtyIdx++
+			if sold+qty > target {
+				qty = target - sold
+			}
+			buyer := demoBuyers[buyerIdx%len(demoBuyers)]
+			in := orders.CreateOrderInput{
+				EventID:    eventID,
+				BuyerEmail: buyer.email,
+				BuyerName:  buyer.name,
+				Items:      []orders.OrderItemInput{{TicketTypeID: tt.ID, Quantity: qty}},
+				Provider:   "stub",
+			}
+			if buyerIdx == 0 {
+				in.UserID = userID // the signed-in demo user owns one order
+			}
+			buyerIdx++
+
+			order, charge, err := or.Create(ctx, in)
+			if err != nil {
+				return err
+			}
+			result := payments.Result{
+				Provider:    charge.Provider,
+				Reference:   charge.Reference,
+				EventID:     "demo-seed-" + order.ID,
+				Status:      payments.StatusPaid,
+				AmountMinor: order.TotalMinor,
+				Currency:    order.Currency,
+				PaidAt:      time.Now(),
+			}
+			_, tickets, err := or.Settle(ctx, result)
+			if err != nil {
+				return err
+			}
+			for _, t := range tickets {
+				issued = append(issued, t.ID)
+			}
+			sold += qty
+		}
 	}
 
-	var firstTicketID string
-	for i, buyer := range buyers {
-		in := orders.CreateOrderInput{
-			EventID:    eventID,
-			BuyerEmail: buyer.email,
-			BuyerName:  buyer.name,
-			Items:      []orders.OrderItemInput{{TicketTypeID: ticketTypeID, Quantity: 1}},
-			Provider:   "stub",
+	// Admit ~62% of the issued tickets ("walked through the gate"), leaving a
+	// realistic no-show remainder, so stats show a meaningful admitted count
+	// and admission rate. Deterministic (every ticket whose index mod 8 < 5).
+	admittedAt := time.Now().UTC().Format(time.RFC3339)
+	for i, ticketID := range issued {
+		if i%8 >= 5 {
+			continue
 		}
-		if i == 0 {
-			in.UserID = userID
-		}
-
-		order, charge, err := or.Create(ctx, in)
-		if err != nil {
-			return err
-		}
-
-		result := payments.Result{
-			Provider:    charge.Provider,
-			Reference:   charge.Reference,
-			EventID:     "demo-seed-" + order.ID,
-			Status:      payments.StatusPaid,
-			AmountMinor: order.TotalMinor,
-			Currency:    order.Currency,
-			PaidAt:      time.Now(),
-		}
-		_, tickets, err := or.Settle(ctx, result)
-		if err != nil {
-			return err
-		}
-		if i == 0 && len(tickets) > 0 {
-			firstTicketID = tickets[0].ID
-		}
-	}
-
-	// Mark the first order's ticket admitted, so this event's stats show
-	// a non-zero "admitted" count and the scanner has one real duplicate
-	// scenario to demonstrate if the same QR is presented twice.
-	if firstTicketID != "" {
-		_, err := st.DB().ExecContext(ctx, `
+		if _, err := st.DB().ExecContext(ctx, `
 			INSERT INTO admissions (id, ticket_id, event_id, gate_id, scanned_by, device_id, scanned_at, result, note)
 			VALUES (?, ?, ?, 'main-gate', ?, 'demo-scanner', ?, 'admitted', 'seeded for demo')`,
-			store.NewID(), firstTicketID, eventID, userID, time.Now().UTC().Format(time.RFC3339),
-		)
-		if err != nil {
+			store.NewID(), ticketID, eventID, userID, admittedAt,
+		); err != nil {
 			return err
 		}
 	}
