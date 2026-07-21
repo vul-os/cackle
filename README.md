@@ -20,7 +20,7 @@ working even if the venue's network, or the server itself, goes down mid-event.
 
 <br/>
 
-<img src="docs/screenshots/hero.png" alt="Cackle — event dashboard and offline gate scanner" width="900" />
+<img src="docs/screenshots/hero.png" alt="The Cackle homepage — offline-verified tickets, browse events, and featured/upcoming listings" width="900" />
 
 </div>
 

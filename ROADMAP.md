@@ -18,39 +18,43 @@ point.
 - Orders and checkout against live ticket-type availability, money as integer minor units in the event's currency
 - Ed25519-signed ticket capabilities (`internal/tickets`) — the offline-verifiable format, see [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md)
 - **Offline gate scan** — `scan-bundle` endpoint, pure offline `Verify()`, local append-only admission dedupe, batch sync back once online (`internal/scan`), see [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md)
-- Payment provider seam (`internal/payments`), `manual` as the always-on default, 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more), and a `stub` provider for `--demo` and tests — Cackle is country/currency agnostic and never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md)
+- Payment provider seam (`internal/payments`), `manual` as the always-on default, 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more), and a `stub` provider for `--demo` and tests — Cackle is country/currency agnostic and never holds funds, see [docs/PAYMENTS.md](docs/PAYMENTS.md). **These adapters are migrating out** — see the next section.
 - Per-event sales/admission stats
 - `--demo` mode: fully seeded, zero setup
 
 Everything below this line is **not yet built** — each is marked with what it
 would take and why it isn't v1.
 
-## Next — sandbox-verify the payment adapters (prerequisite for real money)
+## Next — migrate payments to the `patala` substrate (Cackle becomes just ticketing)
 
-This is the highest-priority near-term item, listed first on purpose: it is
-not a feature, it is what stands between "the code compiles" and "you can take
-real money." All 23 payment adapters were written against each provider's
-published API documentation and are covered by `httptest` unit tests, but
-**not one has been run against a real merchant sandbox.** Until an adapter is
-verified end-to-end against its provider's test environment, it must be
-treated as unproven — see the per-adapter status table in
-[docs/PAYMENTS.md](docs/PAYMENTS.md), and the warning at the top of the README.
+Payment processing is not ticketing, and it had grown to nearly half of
+Cackle's code. Those 20+ adapters are a general-purpose asset other VulOS
+projects want too, so they are moving out into **[patala](https://github.com/vul-os/patala)** —
+a sovereign, centerless payment-rail substrate (non-custodial, no token, one
+honest interface over fiat and crypto rails). Cackle then consumes patala
+through its Go binding and keeps only what it owns: events, tickets, and the
+offline gate.
 
-What each adapter needs before it can be trusted with real money: a real
-sandbox/merchant account for that provider, a live `Begin` → provider
-checkout → `Verify`/`Webhook` round trip driven against the sandbox, the
-webhook signature scheme confirmed against a genuine provider-signed payload
-(several are only doc-derived — Adyen's non-ISO currency multipliers,
-iyzico's outbound signing, PayPal, Coinbase Commerce's under/overpayment
-states), and the subunit conversion confirmed for at least one zero- and one
-three-decimal currency the provider supports. Each verified adapter should
-have its `docs/PAYMENTS.md` row moved from `unit-tested — NOT sandbox-verified`
-to `sandbox-verified`, with the date.
+The migration, in order:
 
-Verifying **one** adapter properly is worth more than adding five more.
-`manual` (the default) and `stub` need no provider sandbox and are already
-proven end-to-end. **Not yet done — needs merchant sandbox access this
-project can't self-provide.**
+1. **Port the adapters into patala** (Rust core, faithful ports of Cackle's
+   tested Go logic — same minor-unit/currency rules, same fail-closed verify,
+   same "never holds funds" invariant). In progress.
+2. **Cackle consumes patala's Go binding** in place of `internal/payments`,
+   keeping the `manual` default no-network path native so a zero-key event
+   still runs with no dependency at all.
+3. **`internal/payments` is removed from Cackle** once the substrate covers it.
+
+The honest sandbox-verification gap moves with the adapters: they were
+written against published API docs and unit-tested (`httptest` / wiremock),
+but **not one has been run against a real merchant sandbox** — that
+end-to-end verification (a live `Begin` → provider → `Verify`/`Webhook` round
+trip, webhook signatures confirmed against genuine signed payloads, subunit
+conversion confirmed for zero- and three-decimal currencies) is now patala's
+top payment priority, per adapter, and it still needs real merchant sandbox
+access this project can't self-provide. `manual`/`stub` need no sandbox and
+stay proven end-to-end. **In progress — the substrate exists; the port and
+the cutover are underway.**
 
 ## Later — signed transfers & resale
 
