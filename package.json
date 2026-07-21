@@ -2,7 +2,7 @@
   "name": "cackle",
   "private": true,
   "version": "0.1.0",
-  "license": "MIT",
+  "license": "MIT OR Apache-2.0",
   "type": "module",
   "description": "Cackle — events + ticketing, offline-verifiable gate. Root package for repo-wide tooling (screenshots, third-party notices). The frontend itself lives in web/ with its own package.json.",
   "scripts": {
