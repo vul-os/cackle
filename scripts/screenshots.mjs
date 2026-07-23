@@ -389,8 +389,9 @@ async function makeThemeContext(browser, theme) {
   return ctx;
 }
 
-async function capture(page, surface, theme, discoveryCtx) {
+async function capture(page, surface, theme, discoveryCtx, pageIssues = []) {
   console.log(`  → [${theme}] ${surface.name} — ${surface.description}`);
+  const issuesBefore = pageIssues.length;
   let url = `${BASE}${surface.path}`;
   if (surface.discover) {
     const resolved = await surface.discover(discoveryCtx).catch(() => null);
@@ -419,10 +420,10 @@ async function capture(page, surface, theme, discoveryCtx) {
     const outPath = path.join(OUT, `${surface.name}-${theme}.png`);
     await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
     console.log(`     saved ${path.relative(ROOT, outPath)}`);
-    return { name: surface.name, theme, status: 'ok', url };
+    return { name: surface.name, theme, status: 'ok', url, issues: pageIssues.slice(issuesBefore) };
   } catch (err) {
     console.warn(`     FAILED: ${err.message}`);
-    return { name: surface.name, theme, status: 'failed', error: err.message, url };
+    return { name: surface.name, theme, status: 'failed', error: err.message, url, issues: pageIssues.slice(issuesBefore) };
   } finally {
     if (surface.seedCart) {
       await page.evaluate(() => localStorage.removeItem('cackle_cart_v1')).catch(() => {});
@@ -474,8 +475,15 @@ async function main() {
       await context.grantPermissions(['camera']).catch(() => {});
     }
     const page = await context.newPage();
-    page.on('console', () => {});
-    page.on('pageerror', () => {});
+    // Capture uncaught exceptions and console errors so a screenshot of a page
+    // that is actually throwing cannot masquerade as a healthy one. Buffered
+    // per page (shared across this theme's surfaces); capture() slices out the
+    // window belonging to each surface. Non-error console output is ignored.
+    const pageIssues = [];
+    page.on('pageerror', (err) => pageIssues.push({ type: 'pageerror', text: String(err?.message ?? err) }));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') pageIssues.push({ type: 'console.error', text: msg.text() });
+    });
 
     let loggedIn = false;
     if (SURFACES.some((s) => s.auth)) {
@@ -495,7 +503,7 @@ async function main() {
         results.push({ name: surface.name, theme, status: 'skipped', error: 'demo login unavailable' });
         continue;
       }
-      results.push(await capture(page, surface, theme, discoveryCtx));
+      results.push(await capture(page, surface, theme, discoveryCtx, pageIssues));
     }
 
     await context.close();
@@ -529,6 +537,25 @@ async function main() {
     console.warn('  Usually a route that does not exist, or an auth-gated route silently redirecting.');
   } else if (ok.length) {
     console.log('  all captures are distinct');
+  }
+
+  // JS-health guard. A saved screenshot proves a page painted, not that it ran
+  // cleanly — a route can throw uncaught exceptions or log console errors and
+  // still produce a plausible-looking image. Surface those so a broken page is
+  // never silently shipped as "captured".
+  const withIssues = results.filter((r) => r.issues && r.issues.length);
+  if (withIssues.length) {
+    const total = withIssues.reduce((n, r) => n + r.issues.length, 0);
+    console.warn(`\n  WARNING: ${total} console error(s)/uncaught exception(s) across ${withIssues.length} capture(s):`);
+    for (const r of withIssues) {
+      console.warn(`    [${r.theme}] ${r.name} — ${r.issues.length}:`);
+      for (const it of r.issues.slice(0, 3)) {
+        console.warn(`        ${it.type}: ${it.text.replace(/\s+/g, ' ').slice(0, 160)}`);
+      }
+    }
+    console.warn('  A clean-looking screenshot of a page that threw is a false positive.');
+  } else if (ok.length) {
+    console.log('  no console errors or uncaught exceptions during capture');
   }
 
   // Hero: the single most representative shot, copied to the gallery top.
