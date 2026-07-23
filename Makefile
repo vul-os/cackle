@@ -9,10 +9,11 @@ BIN := cackle
 # to build/vet/test that, which is both wrong and fragile.
 GO_PKGS := ./cmd/... ./internal/...
 
-# Where the sibling patala repo lives, relative to this Makefile — matches
-# go.mod's `replace github.com/vul-os/patala/patala-go => ../patala/patala-go`.
-# Override with `make PATALA_DIR=/path/to/patala patala-generate` if your
-# checkout lives somewhere else (go.mod's replace path would need to match).
+# Where the sibling patala repo lives, relative to this Makefile — matches the
+# gitignored go.work's `use ../patala/patala-go` (see the go.work target below;
+# go.mod deliberately stays patala-free). Override with
+# `make PATALA_DIR=/path/to/patala patala-generate` if your checkout lives
+# somewhere else (go.work's use path would need to match).
 PATALA_DIR := ../patala
 PATALA_GO_DIR := $(PATALA_DIR)/patala-go
 PATALA_BINDINGS := $(PATALA_GO_DIR)/bindings/patala

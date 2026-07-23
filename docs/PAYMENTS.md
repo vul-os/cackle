@@ -192,9 +192,10 @@ binding (`patala-go`), via `internal/payments/patala.go`.
 
 This is opt-in and requires more than `go build`:
 
-1. Clone patala next to this repo, so `../patala` exists (matching
-   `go.mod`'s `replace github.com/vul-os/patala/patala-go =>
-   ../patala/patala-go`).
+1. Clone patala next to this repo, so `../patala` exists. The gitignored
+   `go.work` (created by `make go.work`) wires in `../patala/patala-go` for
+   the `-tags patala` build only; `go.mod` deliberately stays patala-free, so
+   the default `go build`/CI never fetch or touch it.
 2. Install `uniffi-bindgen-go`, pinned to the version this workspace's
    `uniffi` crate needs — see `../patala/patala-go/README.md`'s exact
    `cargo install` command.
