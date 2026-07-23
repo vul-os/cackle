@@ -20,7 +20,10 @@ with `--demo` on port **8087** (so it doesn't collide with a Cackle instance
 you might already have running on 8080), and drives a real Chromium browser
 at 1440×900, deviceScaleFactor 2. It shoots each surface in both light and
 dark mode to `docs/screenshots/<surface>-<theme>.png`, then copies the hero
-shot to `docs/screenshots/hero.png` for the README header.
+shot to `docs/screenshots/hero.png` for the README header. `landing` is the
+one surface captured as the FULL scrollable page rather than just the
+1440×900 viewport, so the flagship `hero.png` shows the demo events listed
+below the hero, not just the hero on its own.
 
 If the app can't boot (missing build, port conflict, migration failure),
 the script exits `0` and writes an explanatory
@@ -31,12 +34,20 @@ generation should never be the reason CI goes red for an unrelated change.
 
 | Surface | File | What it shows |
 |---|---|---|
-| Hero | `hero.png` | Copied from one of the surfaces below — whichever best represents the product at a glance, currently the organiser dashboard. |
-| Dashboard | `dashboard-{light,dark}.png` | Organiser view of an event: sales, revenue, admission counts, per-ticket-type breakdown. |
-| Event page | `event-{light,dark}.png` | The public event page an attendee lands on: ticket types, pricing, availability. |
+| Hero | `hero.png` | Copied from one of the surfaces below — whichever best represents the product at a glance, currently the **homepage** (`landing`), captured full-page. |
+| Landing | `landing-{light,dark}.png` | The homepage, captured full-page (not just the viewport): hero, category filter, and the featured/upcoming events listing — sourced live from `GET /api/events`, so what's visible is always the real seeded catalogue, not a mockup. |
+| Browse | `event-browse-{light,dark}.png` | The full events list — search, category filter. |
+| Event detail | `event-detail-{light,dark}.png` | The public event page an attendee lands on: ticket types, pricing, availability. |
 | Checkout | `checkout-{light,dark}.png` | Cart / checkout flow before handoff to the payment provider. |
-| Ticket | `ticket-{light,dark}.png` | An attendee's issued ticket, QR code included — this QR *is* the signed capability described in [TICKET-FORMAT.md](TICKET-FORMAT.md). |
+| My tickets | `my-tickets-{light,dark}.png` | An attendee's ticket list. |
+| Ticket | `ticket-qr-{light,dark}.png` | An attendee's issued ticket, QR code included — this QR *is* the signed capability described in [TICKET-FORMAT.md](TICKET-FORMAT.md). |
+| Organiser home | `organiser-home-{light,dark}.png` | Organiser dashboard: their events, next-up event, quick actions. |
+| Event editor | `event-editor-{light,dark}.png` | Organiser's event management view. |
+| Ticket types | `ticket-types-{light,dark}.png` | Ticket types for an event, organiser side. |
+| Attendees | `attendees-{light,dark}.png` | Attendee roster for an event. |
 | Scanner | `scanner-{light,dark}.png` | The gate scanning view, mid-scan, showing an admission result. |
+| Stats | `stats-{light,dark}.png` | Event analytics: sold/revenue/admitted, per-ticket-type breakdown, capacity and admission meters. |
+| Settings | `settings-{light,dark}.png` | Organiser settings. |
 
 ## Adding a new surface
 

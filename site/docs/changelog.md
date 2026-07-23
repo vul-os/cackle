@@ -23,7 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   append-only admission dedupe, and a batch sync endpoint for reconciling
   once back online. See [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md).
 - Events, ticket types, orgs and org roles (`owner` / `admin` / `scanner`),
-  orders and checkout, integer minor-unit accounting throughout.
+  orders and checkout, integer-cents accounting throughout.
 - Pluggable payment provider seam (`internal/payments`): a Paystack adapter
   and a `stub` provider used by `--demo` and tests. Cackle never holds funds.
   See [docs/PAYMENTS.md](docs/PAYMENTS.md).
@@ -37,6 +37,39 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - Payments story is ZAR-first (the platform's South African origin) but no
   longer hardcoded to Paystack — the provider sits behind a seam.
+- **Genuinely country- and currency-agnostic**: removed every remaining ZAR/
+  "cents" assumption. Every `*_cents` column and JSON field is renamed
+  `*_minor` (`internal/store/migrations/0006_currency_minor_units.sql`) and
+  goes through `internal/money`'s ISO-4217 exponent table instead of a
+  hardcoded 100 — JPY/KRW/VND/CLP/ISK (0 decimal places) and KWD/BHD/JOD/
+  OMR/TND (3 decimal places) now render correctly everywhere, frontend
+  included (new shared `web/src/lib/money.js`, `currencyDisplay:
+  'narrowSymbol'` so a mismatched browser locale doesn't render "ZAR 450.00"
+  instead of "R 450.00"). Currency is per-event, defaulting from a new
+  `orgs.default_currency`; a `GET /api/currencies` endpoint replaces every
+  hardcoded currency-picker shortlist. The `manual` payment provider (bank
+  transfer/cash/invoice — zero API keys, zero network calls) is now always
+  registered as Cackle's default, and both `manual` and `lnbits` persist
+  their state (including manual's audit trail) to a new `payment_records`
+  table instead of an in-memory map, so a restart no longer loses in-flight
+  payment state.
+- **Payments migrated onto the [patala](https://github.com/vul-os/patala)
+  substrate.** 19 provider adapters (Stripe, Adyen, Checkout.com, PayPal,
+  Square, Mollie, Flutterwave, Xendit, Midtrans, Mercado Pago, Razorpay,
+  PayU, iyzico, PayFast, Yoco, BTCPay Server, lnbits, OpenNode, Coinbase
+  Commerce) were removed from `internal/payments` and are now reached
+  through patala's Go binding on an opt-in `-tags patala` cgo build
+  (`internal/payments/patala.go`); the default, pure-Go `make build`/
+  `make test` are unaffected. `manual` stays native (no network/cgo
+  needed, and patala's generic surface can't drive its `MarkPaid`
+  operator action anyway); `paystack.go` and `stablecoin.go` also stay
+  native — see [docs/PAYMENTS.md](docs/PAYMENTS.md) for why. See
+  [ROADMAP.md](ROADMAP.md) for the full migration writeup, including the
+  honest gaps (no webhook path through patala yet; poll `Verify` instead).
+- Homepage (`/`) now shows the full demo events listing (Featured +
+  Upcoming, sourced live from `GET /api/events`) in the same shot as the
+  hero — the flagship screenshot (`docs/screenshots/hero.png`) captures
+  the whole scrollable page, not just the marketing hero above the fold.
 
 ## What came before
 

@@ -8,7 +8,9 @@
   "scripts": {
     "screenshots": "node scripts/screenshots.mjs",
     "demo-screenshots": "node scripts/screenshots.mjs",
-    "notices": "bash scripts/gen-notices.sh"
+    "notices": "bash scripts/gen-notices.sh",
+    "docs:sync": "node scripts/sync-docs.mjs",
+    "docs:check": "node scripts/sync-docs.mjs --check"
   },
   "devDependencies": {
     "playwright": "^1.55.0"
