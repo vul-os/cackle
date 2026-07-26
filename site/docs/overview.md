@@ -59,25 +59,26 @@ full adapter list and each one's verification status.
 
 ## Part of VulOS
 
-**Vulos = free, open-source software + two paid services.** The Vulos OS, all
-its apps (Cackle included), and the app store are **OSS and free — you
-self-host them**. You self-provision and self-pay your own box (Fly / Hetzner
-/ any VPS / home server); Vulos does **not** host or provision boxes. Vulos
-bills for only two things: **Vulos Relay** (reachability) and **backup
-storage** (buckets). There is no compute/box billing, no mail billing, and no
-app-store subscription.
+**Vulos is free, open-source software — all of it (MIT / Apache-2.0), with no
+paid Vulos services.** The Vulos OS, all its apps (Cackle included), and the
+app store are OSS and free — you self-host them. You self-provision your own
+box (Fly / Hetzner / any VPS / home server); Vulos does **not** host or
+provision boxes, and there is no Vulos control plane, managed hosting, or
+billing. Reachability is handled by **Ephor**, an open, self-hostable broker —
+run your own or point at a hosted one; your box dials out to it. Backup
+storage is your own bucket. Nothing here bills you.
 
 VulOS is an open, self-hostable web OS + app suite. The **Vulos OS** is the
 shell (launcher, windows, dock, assistant) that hosts the apps; each product
 also runs independently on its own:
 
 - **Vulos OS** — the web-native desktop shell that hosts the apps
-- **Vulos Office** — documents: docs, sheets, slides, PDF, and **whiteboards**
-  (the Excalidraw-based whiteboard is an Office **document type** — there is
+- **Ofisi** — documents: docs, sheets, slides, PDF, and **whiteboards**
+  (the Excalidraw-based whiteboard is an Ofisi **document type** — there is
   **no separate Board product**)
 - **Vulos Files** — file storage + P2P sharing, built into the OS
-- **Vulos Relay** — sovereign connectivity / reachability fabric
-  (`@vulos/relay-client`) — one of the two paid services
+- **Ephor** — open, self-hostable reachability broker; your box dials out
+  (`@vulos/relay-client`)
 - **llmux** — sovereign AI gateway
 
 PIM is **bring-your-own** (Mail / Calendar / Contacts via lilmail + the OS's

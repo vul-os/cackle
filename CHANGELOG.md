@@ -30,8 +30,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Full documentation set (`docs/`), roadmap, security policy, contributing
   guide, and this changelog.
 - Joined VulOS as a product: standalone-first, hostable as an app by the
-  Vulos OS, no dependency on Vulos billing beyond the two-service model
-  (Relay, backup storage) described in [README.md](README.md#part-of-vulos).
+  Vulos OS, with no dependency on any Vulos service — Vulos is free and
+  open-source, self-hosted, as described in
+  [README.md](README.md#part-of-vulos).
 
 ### Changed
 

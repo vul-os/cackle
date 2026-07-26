@@ -77,8 +77,8 @@ accessibility, and documentation are low-friction entry points.
   the single static binary possible.
 - **No .tsx files.** Frontend is JSX only (`*.jsx`) — a house-wide VulOS
   invariant.
-- **No hard runtime dependency** on Supabase, Firebase, Vulos Relay, Vulos
-  CP, or DMTAP. Cackle must build and run fully standalone.
+- **No hard runtime dependency** on Supabase, Firebase, Ephor, or DMTAP.
+  Cackle must build and run fully standalone.
 - **No float money.** Amounts are integer cents, always.
 - Making `internal/tickets.Verify` impure (adding a DB call, a network call,
   or an implicit clock read) — it must stay a pure function of

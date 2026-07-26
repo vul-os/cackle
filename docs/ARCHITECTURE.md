@@ -22,8 +22,8 @@ Everything else in this document exists to protect that property.
   it either way.
 - **`./cackle --demo` boots fully seeded with zero setup.** The screenshotter
   and anyone kicking the tyres for the first time depend on this.
-- **No hard runtime dependency** on Supabase, Firebase, Vulos Relay, Vulos
-  CP, or DMTAP. Cackle runs standalone, full stop.
+- **No hard runtime dependency** on Supabase, Firebase, Ephor, or DMTAP.
+  Cackle runs standalone, full stop.
 - Go 1.25. Frontend is JSX, not TSX — a house-wide VulOS invariant.
 - MIT licence. Module path `github.com/vul-os/cackle`.
 - Money is **integer minor units** plus an ISO-4217 currency, never a float.
@@ -211,7 +211,7 @@ required.
 ## Why standalone-first
 
 Cackle must build and run with nothing else present — no Vulos OS, no
-Vulos Relay, no Vulos control plane, no DMTAP node. When Cackle runs *as* a
+Ephor, no DMTAP node. When Cackle runs *as* a
 Vulos OS app, the OS wires identity and scoped storage in front of the same
 binary; it never becomes a build-time dependency. See the [README's "Part of
 VulOS" section](../README.md#part-of-vulos) for the product framing, and the
