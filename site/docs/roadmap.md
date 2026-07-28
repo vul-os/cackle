@@ -68,15 +68,19 @@ The migration, as it actually landed:
    `libpatala_py` link. `make build-patala`/`make test-patala`/
    `make run-patala` opt into the cgo path.
 
-**A real, honest gap, not glossed over**: patala's generic FFI surface
-(`PatalaRailNewFiat` → `quote`/`charge`/`verify`) has **no webhook
-method** — provider webhook verification is Rust-only, not exported over
-UniFFI yet. A patala-backed processor today can only be confirmed by
-polling `Verify`, never by a provider's push webhook. See
-docs/PAYMENTS.md's "What's different from the native adapters this
-replaces" for this and the other disclosed deltas (best-effort redirect
-URL, `Flow` always reported as redirect, replay-protection keyed on the
-order reference instead of a provider event id).
+**The webhook gap this section used to describe is closed.** patala's
+generic FFI surface originally exposed only `quote`/`charge`/`verify`, so a
+patala-backed processor could be confirmed only by polling `Verify`;
+`patala_core::PaymentRail` now also exports `verify_webhook`, and
+`PatalaFiatProvider.Webhook` is wired to it (authenticated push, with only
+`WebhookStatus::Settled` ever treated as payment). What remains is
+narrower: patala-fiat's `manual` rail still has no push surface, and
+`Capabilities().Webhooks` is inferred from the rail name because
+`RailCapabilities` carries no webhook flag. See docs/PAYMENTS.md's "What's
+different from the native adapters this replaces" for those and the other
+disclosed deltas (best-effort redirect URL, `Flow` always reported as
+redirect, `Verify`-path replay protection keyed on the order reference
+instead of a provider event id).
 
 The honest sandbox-verification gap moves with the adapters: they were
 written against published API docs and unit-tested (`httptest` /

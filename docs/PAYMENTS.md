@@ -61,39 +61,40 @@ universal concept:
 | 3 | KWD, BHD, JOD, OMR, TND, IQD, LYD | 1/1000 of a major unit — 1 KWD is `AmountMinor: 1000` |
 
 The authoritative table (exponent + display name per code) lives in
-`internal/money`, not in this package. `internal/payments` never assumes 2 —
-every adapter that needs to convert `AmountMinor` to/from a provider's own
-wire format routes through `internal/payments/currency.go`'s
-`minorUnitExponent` / `minorToMajorString` / `majorStringToMinor`, which
-mirror `internal/money`'s table. Getting this exponent wrong in either
-direction is a 100x bug: it either overcharges a buyer 100x or lets an event
-sell out for 1% of its actual price.
+`internal/money`, and — since the fold that removed `internal/payments`' own
+private copy of it — that is now the **only** copy in the repo.
+`internal/payments` never assumes 2: anything that needs a currency's
+exponent, or needs to render `AmountMinor` in major units, calls
+`money.Exponent` / `money.Amount.Major` directly and fails closed on a code
+`internal/money` doesn't know rather than guessing 2. Getting this exponent
+wrong in either direction is a 100x bug: it either overcharges a buyer 100x
+or lets an event sell out for 1% of its actual price.
 
 ### Providers disagree with ISO-4217, and with each other
 
 This is the single most important thing to know before writing a new
 adapter: **the "how many decimals does this currency have on the wire"
 question is a property of *(currency, provider)*, not of the currency
-alone.** Three real, confirmed examples from the adapters in this package:
+alone.** Three real examples, all of them now living in patala rather than
+here — the adapter files named below moved out with the rest of the
+processors and are **not** in `internal/payments`:
 
 - **Stripe** treats ISK and UGX as **forced two-decimal** even though ISO-4217
   (and every other currency in Stripe's own zero-decimal list) says they have
-  no minor unit — see `stripe.go`'s `stripeZeroDecimalCurrencies` /
-  `stripeForcedTwoDecimalCurrencies` and
+  no minor unit — see
   [docs.stripe.com/currencies](https://docs.stripe.com/currencies): "ISK
   transitioned to a zero-decimal currency... to charge 5 ISK, provide an
   amount value of 500."
 - **Checkout.com** makes the *same kind of exception*, but for a *different*
   currency: it forces **CLP** to a ×100 representation ("the last two digits
   must be 00") while treating ISK as genuinely zero-decimal — the opposite
-  of Stripe's ISK treatment. See `checkoutcom.go`'s
-  `checkoutComZeroDecimalCurrencies` / `checkoutComForcedTwoDecimalCurrencies`.
+  of Stripe's ISK treatment.
 - **Adyen** keeps its own **non-ISO-standard bucket** (CLP, CVE, IDR, ISK) with
   a currency-specific multiplier Adyen documents separately from the ordinary
-  ISO-4217 exponent table — see `adyen.go`'s `adyenNonISOStandardCurrencies`.
-  This adapter could not confirm the exact multiplier for that bucket from
-  documentation alone and **refuses those four currencies outright**
-  (`ErrAdyenUnsupportedCurrency`) rather than guess.
+  ISO-4217 exponent table. Cackle's port of that adapter could not confirm the
+  exact multiplier from documentation alone and refused those four currencies
+  outright rather than guess; whether patala's port still does is patala's
+  question to answer, not this repo's.
 
 Anyone writing a new adapter: check that specific provider's own currency
 documentation for zero/three-decimal exceptions. Do not assume ISO-4217's
@@ -249,15 +250,37 @@ each one was ported from this repo's original Go adapter.
 
 Read this before relying on the patala path for anything beyond `manual`:
 
-- **No webhook support yet.** `patala_core::PaymentRail` (the trait
-  `PatalaRailNewFiat` hands back) has exactly `quote`/`charge`/`verify` —
-  no webhook concept at all; provider-specific webhook verification exists
-  as free Rust functions in patala-fiat that are **not** part of the
-  UniFFI-exported surface. `PatalaFiatProvider.Webhook` always returns
-  `ErrPatalaNoWebhook`. Settlement can only be confirmed by **polling
-  `Verify`** — an operator or a periodic job, not an instant provider push.
-  This is a real, current limitation of the binding, not a Cackle
-  shortcut; it will improve if/when patala exposes a webhook surface.
+- **Webhooks work, with one exception and one caveat.**
+  `patala_core::PaymentRail` (the trait `PatalaRailNewFiat` hands back) now
+  exports `verify_webhook` alongside `quote`/`charge`/`verify`, so
+  `PatalaFiatProvider.Webhook` authenticates a real processor push through
+  patala's own Rust verification rather than returning
+  `ErrPatalaNoWebhook` unconditionally as it did before that export
+  existed. Settlement can therefore be confirmed either way: an instant
+  provider push, or polling `Verify`.
+  - *The exception*: patala-fiat's `manual` rail has no processor behind
+    it, so it leaves `verify_webhook` at the trait's `Err(Unsupported)`
+    default. That still surfaces as `ErrPatalaNoWebhook` — now a per-rail
+    answer rather than a blanket one. (Cackle never registers patala's
+    `manual` anyway; it uses its own native `manual.go`.)
+  - *The caveat*: `RailCapabilities` carries no webhook flag, and probing
+    for one is not free (Mollie's and PayPal's `verify_webhook` both
+    re-fetch the named object from the processor, while
+    `Capabilities()` must never make a network call). So
+    `Capabilities().Webhooks` is derived from the rail's name — true for
+    every rail except `manual`, which is the one rail in patala-fiat that
+    does not implement `verify_webhook`. A wrong answer there can only
+    mis-advertise, never mis-settle: `Webhook` still asks the real rail
+    every time.
+  - Only `WebhookStatus::Settled` is ever treated as payment.
+    `NotSettled` and `Unconfirmed` (the latter meaning "authentic, but
+    this delivery asserts nothing about money" — what every
+    signature-only rail sends: BTCPay, Coinbase Commerce, OpenNode,
+    LNbits, Mollie) are reported as `ErrUnhandledEvent`, which the HTTP
+    route acknowledges with 200 and acts on not at all. That mapping is
+    pinned variant-by-variant by a test in the DEFAULT (untagged) suite,
+    `internal/payments/patala_webhook_status_test.go`, precisely because
+    getting it wrong would mark unpaid orders paid.
 - **Anti-fraud reconciliation happens INSIDE `Verify`, not after it.**
   `patala_core::verify` returns only a `bool`, never the amount/currency it
   observed — so `PatalaFiatProvider.Verify` reconstructs the `Receipt` it
@@ -279,11 +302,13 @@ Read this before relying on the patala path for anything beyond `manual`:
   `RailCapabilities` has no equivalent fields (see
   `patala-fiat/PORTING.md` §4's own gap list); Cackle's `Capabilities`
   struct reports the honest default rather than fabricating a value.
-- **Replay protection keys on the order reference**, not a provider
-  transaction id — there is no per-event id available through this
-  generic `bool`-only surface. Reusing the reference is still correct
-  (don't re-process an already-settled order twice), just coarser than
-  the true per-event id the old native webhooks used.
+- **Replay protection on the VERIFY path keys on the order reference**,
+  not a provider transaction id — `verify` returns only a `bool`, so there
+  is no per-event id available through it. Reusing the reference is still
+  correct (don't re-process an already-settled order twice), just coarser.
+  The webhook path does not have this problem: `WebhookEvent` carries the
+  rail's own `event_id`, and `Webhook` refuses to report a settlement
+  that arrives without one rather than fall back to a coarser key.
 
 ### Deliberately not built (patala side)
 
@@ -348,8 +373,8 @@ before paying the organiser out, same as any card processor.
 - No processor reached through patala is sandbox-verified — see the note
   at the top of this document, and
   [What's different from the native adapters this replaces](#whats-different-from-the-native-adapters-this-replaces)
-  for the webhook/reconciliation/redirect-URL gaps specific to the patala
-  path.
+  for the reconciliation/redirect-URL/capability-reporting deltas specific
+  to the patala path.
 
 ## Security rules every adapter follows
 

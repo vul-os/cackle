@@ -54,20 +54,70 @@
     </div>
   </div></footer>
 <script>
+// `base` is where this chapter's SOURCE lives in the repo, which is what
+// relative links inside it resolve against: chapters mirrored from docs/
+// resolve "API.md" as docs/API.md and "../ROADMAP.md" as ROADMAP.md, while
+// roadmap/changelog (mirrored from the repo root) and the site-only overview
+// resolve "docs/API.md" instead. rewriteLinks below needs this to turn a
+// relative link into either an in-page chapter jump or a GitHub URL — without
+// it every cross-document link on this page 404s.
 const DOCS = [
-  {"slug":"overview","title":"Overview","path":"./docs/overview.md"},
-  {"slug":"getting-started","title":"Getting started","path":"./docs/getting-started.md"},
-  {"slug":"architecture","title":"Architecture","path":"./docs/architecture.md"},
-  {"slug":"ticket-format","title":"Ticket format","path":"./docs/ticket-format.md"},
-  {"slug":"offline-gates","title":"Offline gates","path":"./docs/offline-gates.md"},
-  {"slug":"api","title":"API","path":"./docs/api.md"},
-  {"slug":"payments","title":"Payments","path":"./docs/payments.md"},
-  {"slug":"configuration","title":"Configuration","path":"./docs/configuration.md"},
-  {"slug":"self-hosting","title":"Self-hosting","path":"./docs/self-hosting.md"},
-  {"slug":"screenshots","title":"Screenshots","path":"./docs/screenshots.md"},
-  {"slug":"roadmap","title":"Roadmap","path":"./docs/roadmap.md"},
-  {"slug":"changelog","title":"Changelog","path":"./docs/changelog.md"}
+  {"slug":"overview","title":"Overview","path":"./docs/overview.md","base":""},
+  {"slug":"getting-started","title":"Getting started","path":"./docs/getting-started.md","base":"docs/"},
+  {"slug":"architecture","title":"Architecture","path":"./docs/architecture.md","base":"docs/"},
+  {"slug":"ticket-format","title":"Ticket format","path":"./docs/ticket-format.md","base":"docs/"},
+  {"slug":"offline-gates","title":"Offline gates","path":"./docs/offline-gates.md","base":"docs/"},
+  {"slug":"api","title":"API","path":"./docs/api.md","base":"docs/"},
+  {"slug":"payments","title":"Payments","path":"./docs/payments.md","base":"docs/"},
+  {"slug":"configuration","title":"Configuration","path":"./docs/configuration.md","base":"docs/"},
+  {"slug":"self-hosting","title":"Self-hosting","path":"./docs/self-hosting.md","base":"docs/"},
+  {"slug":"screenshots","title":"Screenshots","path":"./docs/screenshots.md","base":"docs/"},
+  {"slug":"roadmap","title":"Roadmap","path":"./docs/roadmap.md","base":""},
+  {"slug":"changelog","title":"Changelog","path":"./docs/changelog.md","base":""}
 ];
+const REPO_BLOB = 'https://github.com/vul-os/cackle/blob/main/';
+
+/** Resolve a repo-relative path (may contain ../) against a base directory. */
+function resolveRepoPath(base, href){
+  const parts = (base + href).split('/');
+  const out = [];
+  for (const part of parts){
+    if (part === '' || part === '.') continue;
+    if (part === '..') { out.pop(); continue; }
+    out.push(part);
+  }
+  return out.join('/');
+}
+
+/**
+ * Rewrite every relative link in a rendered chapter. A link to another
+ * chapter becomes an in-page jump (#slug); anything else — CONTRIBUTING.md,
+ * the Dockerfile, ticket-format-vectors.json, a source file — becomes a link
+ * to it on GitHub. Before this existed, all of them resolved against
+ * /docs.html and 404'd.
+ *
+ * Known limitation, stated rather than hidden: a link to a specific HEADING
+ * in another chapter (`OFFLINE-GATES.md#some-section`) lands on that chapter,
+ * not that heading, because this page routes chapters on location.hash and
+ * cannot carry a second fragment.
+ */
+function rewriteLinks(root, doc){
+  root.querySelectorAll('a[href]').forEach(a=>{
+    const href = a.getAttribute('href') || '';
+    if (!href || /^(https?:|mailto:|#)/i.test(href)) return;
+    const [rawPath] = href.split('#');
+    if (!rawPath) return;
+    const repoPath = resolveRepoPath(doc.base || '', rawPath);
+    const slug = (repoPath.split('/').pop() || '').toLowerCase().replace(/\.md$/, '');
+    if (/\.md$/i.test(repoPath) && bySlug[slug]) {
+      a.setAttribute('href', '#' + slug);
+      return;
+    }
+    a.setAttribute('href', REPO_BLOB + repoPath);
+    a.target = '_blank';
+    a.rel = 'noopener';
+  });
+}
 const bySlug = Object.fromEntries(DOCS.map(d=>[d.slug,d]));
 const content = document.getElementById('content');
 const crumb = document.getElementById('crumb');
@@ -109,6 +159,7 @@ async function load(slug){
       const m=s.match(/(?:\.\.\/)*(?:docs\/)?screenshots\/(.+)$/);
       if(m) img.setAttribute('src','screenshots/'+m[1]);
     });
+    rewriteLinks(content, doc);
     content.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener';});
     await renderMermaid();
     window.scrollTo({top:0});

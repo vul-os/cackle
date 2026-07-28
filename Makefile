@@ -57,12 +57,25 @@ run:
 	go run ./cmd/cackle --demo
 
 # ── Verification ───────────────────────────────────────────────────────────
+# Both implementations of the ticket wire format: the Go verifier and the
+# browser one that actually ships to a gate. The frontend half needs
+# web/node_modules (@noble/curves), so run `make build-frontend` — or a plain
+# `npm ci` in web/ — at least once first; the runner itself is node:test, a
+# Node built-in, so it pulls in nothing of its own.
 test:
 	go test $(GO_PKGS)
+	cd web && npm test
 
 lint:
+	@unformatted="$$(gofmt -l ./cmd ./internal)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo "not gofmt-clean:"; echo "$$unformatted"; \
+		echo "run: gofmt -w ./cmd ./internal"; exit 1; \
+	fi
 	go vet $(GO_PKGS)
 	cd web && npm run lint
+	node scripts/sync-docs.mjs --check
+	node scripts/check-doc-links.mjs
 
 # Single gate to run at the end of every change — mirrors CI.
 check: lint test build

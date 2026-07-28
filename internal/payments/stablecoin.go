@@ -92,6 +92,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/vul-os/cackle/internal/money"
 )
 
 // ProviderNameStablecoin is the stable Name() this provider registers
@@ -195,9 +197,18 @@ func NewStablecoin(allocator StablecoinAddressAllocator) (*StablecoinProvider, e
 	if err != nil || minConfirms <= 0 {
 		return nil, fmt.Errorf("payments: stablecoin: %s must be a positive integer", EnvStablecoinMinConfirmations)
 	}
-	quoteCurrency := strings.ToUpper(strings.TrimSpace(os.Getenv(EnvStablecoinQuoteCurrency)))
+	quoteCurrency := strings.TrimSpace(os.Getenv(EnvStablecoinQuoteCurrency))
 	if quoteCurrency == "" {
 		quoteCurrency = stablecoinDefaultQuoteCurrency
+	}
+	// Normalize through internal/money at construction, not at settlement:
+	// this adapter's fiat arithmetic depends on the currency's exponent, and
+	// a code internal/money cannot resolve should stop the process at boot
+	// with a clear config error rather than surface as a mis-scaled amount
+	// halfway through an event.
+	quoteCurrency, err = money.Normalize(quoteCurrency)
+	if err != nil {
+		return nil, fmt.Errorf("payments: stablecoin: %s: %w", EnvStablecoinQuoteCurrency, err)
 	}
 	ttlSecs := stablecoinDefaultOrderTTLSecs
 	if v := strings.TrimSpace(os.Getenv(EnvStablecoinOrderTTLSeconds)); v != "" {
@@ -270,12 +281,13 @@ func (p *StablecoinProvider) Begin(ctx context.Context, o Order) (Charge, error)
 }
 
 // minorAmountForDisplay renders an amount for a human-readable instructions
-// string. Errors from minorToMajorString are treated as "unknown" rather
-// than propagated, since Begin has already validated amount/currency by
-// this point and this is cosmetic text, not something reconciliation
-// depends on.
+// string, in the currency's own major units via internal/money — never a
+// hardcoded /100, since a zero-decimal quote currency would then be shown
+// 100x too small. An error is rendered as raw minor units rather than
+// propagated: Begin has already validated amount/currency by this point, and
+// this is cosmetic text, not something reconciliation depends on.
 func minorAmountForDisplay(amountMinor int64, currency string) string {
-	s, err := minorToMajorString(amountMinor, currency)
+	s, err := money.Amount{Minor: amountMinor, Currency: currency}.Major()
 	if err != nil {
 		return fmt.Sprintf("%d (minor units)", amountMinor)
 	}
@@ -333,7 +345,16 @@ func (p *StablecoinProvider) Verify(ctx context.Context, reference string) (Resu
 		total.Add(total, value)
 	}
 
-	receivedMinor := stablecoinTokenMinorToFiatMinor(total, p.tokenDecimals, currencyExponentForStablecoin(alloc.Currency))
+	// The quote currency's ISO-4217 exponent is what turns a token amount
+	// into fiat minor units, so an unknown code fails closed here rather
+	// than falling back to "probably 2": guessing 2 for a zero-decimal
+	// currency would under-count what arrived by 100x and could report
+	// StatusPaid on an order that was barely paid at all.
+	fiatExponent, err := money.Exponent(alloc.Currency)
+	if err != nil {
+		return Result{}, fmt.Errorf("payments: stablecoin: allocation currency %q: %w", alloc.Currency, err)
+	}
+	receivedMinor := stablecoinTokenMinorToFiatMinor(total, p.tokenDecimals, fiatExponent)
 
 	raw, _ := json.Marshal(transfers)
 	result := Result{
@@ -361,13 +382,6 @@ func (p *StablecoinProvider) Verify(ctx context.Context, reference string) (Resu
 		result.Status = StatusPending
 	}
 	return result, nil
-}
-
-// currencyExponentForStablecoin is a tiny indirection so this file's
-// arithmetic reads clearly at the call site; it is exactly
-// minorUnitExponent from currency.go.
-func currencyExponentForStablecoin(currency string) int {
-	return minorUnitExponent(currency)
 }
 
 // stablecoinTokenMinorToFiatMinor converts a token amount (in the token's

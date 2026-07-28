@@ -68,8 +68,8 @@ full adapter list and each one's verification status.
 
 | | |
 |---|---|
-| 🎟️ **Offline-verifiable tickets** | Every ticket is an Ed25519-signed capability, `cackle.<payload>.<sig>`, verified with a pure function — no database, no network, no clock but the one you hand it. This is what lets a gate keep admitting people with no connection. See [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md). |
-| 🚪 **Offline gate scanning** | A scanner pulls one `scan-bundle` while online (event details, issuer public keys, a ticket index, an allocation) and can then run the whole event unplugged. Admission dedupe is local and append-only — first scan wins, duplicates are recorded, never overwritten. See [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md). |
+| 🎟️ **Offline-verifiable tickets** | Every ticket is an Ed25519-signed capability, `cackle.<payload>.<sig>`, verified with a pure function — no database, no network, no clock but the one you hand it. This is what lets a gate keep admitting people with no connection. The format is specified as a wire format with [frozen conformance vectors](docs/ticket-format-vectors.json) that both shipped verifiers (Go and browser) are held to in CI. See [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md). |
+| 🚪 **Offline gate scanning** | A scanner pulls one `scan-bundle` while online (event details, issuer public keys, and a ticket index of what's still valid) and can then run the whole event unplugged. Admission dedupe is local and append-only — first scan wins, duplicates are recorded, never overwritten. It is **per device**: a second scan on the *same* scanner is refused at the door, while two offline scanners at two entrances only reconcile once they sync. See [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md#what-offline-double-scan-protection-actually-gives-you) for exactly what that does and doesn't stop. |
 | 🏟️ **Events & ticket types** | Organisations own events; events own ticket types with pricing, quantity caps, sales windows, and per-order limits. Draft → published → cancelled lifecycle. |
 | 🛒 **Orders & checkout** | Cart-style checkout against live ticket-type availability, integer minor-unit accounting in the event's own currency (money is never a float), per-order item breakdown. |
 | 💳 **Pluggable payments** | A small `Provider` interface (`Begin` / `Verify` / `Webhook` / `Capabilities`) behind every charge. `manual` is the always-on default (no API key, works anywhere); 20+ optional adapters (Stripe, Paystack, BTCPay, LNbits, and more) are off by default and enabled per deployment via `CACKLE_PAYMENT_PROVIDERS`. Webhooks verify signatures and fail closed. Cackle never holds funds. See [docs/PAYMENTS.md](docs/PAYMENTS.md). |
@@ -145,7 +145,7 @@ flowchart LR
         direction LR
         capability -->|presents QR| scanner
         scanner -->|"Verify(token, pubkey, now)<br/>pure function, no DB, no network"| admit{"valid?"}
-        admit -->|"local admissions table<br/>first scan wins, duplicates recorded"| result["admitted / duplicate / invalid"]
+        admit -->|"this device's local admissions table<br/>first scan wins, duplicates recorded"| result["admitted / duplicate / invalid"]
     end
     scanner -.->|"sync admissions back<br/>once online again"| cackle
 ```
@@ -183,7 +183,8 @@ Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layout, request flow, the contract behind every package |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Every env var / flag, defaults, and what requires a restart |
 | [docs/API.md](docs/API.md) | The full HTTP API the frontend (and any client) codes against |
-| [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md) | The ticket capability format and why offline verification works — read this first |
+| [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md) | The ticket capability wire format, precise enough to implement from, and why offline verification works — read this first |
+| [docs/ticket-format-vectors.json](docs/ticket-format-vectors.json) | Frozen conformance vectors for that format — what any new implementation must reproduce |
 | [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md) | Running a gate with no network: scan-bundle, allocations, sync |
 | [docs/PAYMENTS.md](docs/PAYMENTS.md) | The payment provider seam, the full adapter table + verification status, `manual` by default, why Cackle never holds funds |
 | [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | Full screenshot gallery and how to regenerate it |
@@ -204,10 +205,15 @@ go test ./cmd/... ./internal/...
 
 # Frontend
 cd web && npm install && npm run dev
+
+# Frontend tests — the browser ticket verifier against the same frozen
+# conformance vectors the Go one is checked against. node:test, no extra
+# dependency; needs `npm install` in web/ first for @noble/curves.
+cd web && npm test
 ```
 
-`make check` runs the same gate CI does (lint + test + full build) in one
-command.
+`make check` runs the same gate CI does (gofmt + lint + tests + full build)
+in one command.
 
 ```bash
 # Regenerate screenshots (Playwright, builds the binary, boots --demo on :8087)
@@ -227,11 +233,6 @@ dev-environment setup, branch conventions, and what we say yes and no to. See
 [MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE) — © VulOS. Cackle is a
 VulOS project; source and issues at
 [github.com/vul-os/cackle](https://github.com/vul-os/cackle).
-
----
-
-<div align="center">
-</div>
 
 ---
 

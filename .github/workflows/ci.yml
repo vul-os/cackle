@@ -1,7 +1,7 @@
 # .github/workflows/ci.yml — build, test, vet, lint and boot-check Cackle.
 #
 # House rule: a green build proves nothing about whether the app RUNS.
-# Sibling repos (ofisi, wede) shipped blank screens behind green builds
+# Sibling repos (diwan, wede) shipped blank screens behind green builds
 # because nothing ever loaded the bundle in a real browser. The `boot` job
 # below builds the REAL single-binary artifact (frontend embedded) and points
 # headless Chromium at it, failing on any uncaught exception or empty #root.
@@ -36,6 +36,18 @@ jobs:
       - name: Build
         run: go build ./cmd/... ./internal/...
 
+      # Scoped to the real Go trees for the same reason as everything else in
+      # this job — `gofmt -l .` would walk web/node_modules.
+      - name: Gofmt
+        run: |
+          unformatted="$(gofmt -l ./cmd ./internal)"
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt-clean:"
+            echo "$unformatted"
+            echo "Run: gofmt -w ./cmd ./internal"
+            exit 1
+          fi
+
       - name: Vet
         run: go vet ./cmd/... ./internal/...
 
@@ -62,6 +74,13 @@ jobs:
       - name: Docs mirror in sync (docs/ -> site/docs/)
         run: node scripts/sync-docs.mjs --check
 
+      # Every relative documentation link must resolve — as GitHub renders
+      # the repo, as site/docs.html serves the flat mirror, and as a reader
+      # follows a "see SOMETHING.md" from a source comment. Nothing checked
+      # these before, and several were dead. No deps, just node built-ins.
+      - name: Docs links resolve
+        run: node scripts/check-doc-links.mjs
+
       - name: Install
         working-directory: web
         run: npm ci
@@ -69,6 +88,16 @@ jobs:
       - name: Lint
         working-directory: web
         run: npm run lint
+
+      # The browser ticket verifier is a second implementation of the wire
+      # format in docs/TICKET-FORMAT.md, and it is the one that actually runs
+      # at a gate. It is held to the same frozen corpus as the Go verifier
+      # (docs/ticket-format-vectors.json) so the two cannot drift into
+      # disagreeing about whether a ticket is admissible. node:test, no extra
+      # dependency — see web/src/lib/capability.conformance.test.js.
+      - name: Test (ticket-format conformance vectors)
+        working-directory: web
+        run: npm test
 
       - name: Build
         working-directory: web

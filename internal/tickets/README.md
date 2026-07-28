@@ -57,7 +57,10 @@ internal clock — `now` is always supplied by the caller. That's the whole
 trick. A gate device:
 
 1. Downloads a `Bundle` (see `internal/scan`) once, while it still has
-   signal: event metadata, the event's `KeyRing`, and an allocation.
+   signal: event metadata, the event's `KeyRing`, and a `TicketIndex` of the
+   ticket ids still valid at that moment. (The `Bundle.Allocation` field is
+   for unbuilt delegated-issuance work and is always `null` — see
+   `docs/OFFLINE-GATES.md`.)
 2. Goes fully offline for the rest of the event.
 3. For every scanned QR code, calls `tickets.VerifyWithRing(token, ring,
    time.Now())` — a pure function of bytes already resident on the device.
@@ -133,6 +136,17 @@ if err != nil {
 // payload.TID, payload.Sub, payload.Seat, ... now trustworthy — hand off to
 // internal/scan for the admit/duplicate decision.
 ```
+
+## The wire format is specified and pinned
+
+`docs/TICKET-FORMAT.md` specifies this format precisely enough to implement
+in another language, and `docs/ticket-format-vectors.json` freezes a corpus
+of tokens and outcomes that any implementation must reproduce.
+`conformance_test.go` runs that corpus against this package;
+`web/src/lib/capability.conformance.test.js` runs the *same file* against the
+browser verifier, which is what stops the two implementations that ship here
+from drifting apart. Do not change the vectors to make a code change pass —
+they are the contract, and a real change to them is a `CurrentVersion` bump.
 
 ## Rejection cases covered by tests
 

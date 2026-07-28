@@ -25,8 +25,10 @@ type EventMeta struct {
 // network unplugged:
 //
 //   - Event: which event this is, for display.
+//
 //   - IssuerKeys: the pinned KeyRing (kid -> pubkey) tickets.VerifyWithRing
 //     checks every scanned capability against.
+//
 //   - TicketIndex: the set of ticket IDs currently valid (issued, not void,
 //     not refunded) for this event, as of IssuedAt. A signature alone only
 //     proves a capability was validly issued at some point — it says
@@ -41,6 +43,7 @@ type EventMeta struct {
 //     is an inherent limitation of fully offline operation, not a bug; the
 //     mitigation is operational (re-sync the bundle periodically, e.g. at
 //     shift changes), not a code fix.
+//
 //   - TicketIndexPresent: whether TicketIndex is authoritative. This is the
 //     crucial distinction. An empty TicketIndex is ambiguous on its own:
 //     it could mean "no tickets have been issued yet" OR "every ticket for
@@ -52,9 +55,11 @@ type EventMeta struct {
 //     nothing". TicketIndexPresent=false is reserved for a legacy or
 //     hand-built bundle that carries no index data at all, and only then
 //     does DecideWithBundle fall back to signature-only checking.
+//
 //   - Allocation: optional — present only when this specific device is a
 //     delegated sub-issuer allowed to mint tickets of its own while
 //     disconnected (see allocation.go). nil for an ordinary scan-only gate.
+//
 //   - IssuedAt: when the server generated this bundle, so a gate can warn
 //     an operator if it's stale relative to some operationally-chosen
 //     staleness threshold (Bundle itself does not enforce a threshold —

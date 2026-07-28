@@ -16,12 +16,6 @@ import (
 	"github.com/vul-os/cackle/internal/store"
 )
 
-// NOTE on internal/orders field names: as with internal/events (see
-// event_handlers.go), only Service method SIGNATURES were fixed ahead of
-// time by WAVE2-CONTRACT.md; orders.CreateOrderInput's own field names are
-// an informed guess reconciled against the real package once it landed —
-// see the final report.
-
 type orderItemRequest struct {
 	TicketTypeID string `json:"ticket_type_id"`
 	Quantity     int    `json:"quantity"`

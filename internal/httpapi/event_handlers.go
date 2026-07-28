@@ -19,15 +19,6 @@ import (
 	"github.com/vul-os/cackle/internal/store"
 )
 
-// NOTE on struct field names: internal/events was being written concurrently
-// with this package (see WAVE2-CONTRACT.md) — only its Service method
-// SIGNATURES were fixed ahead of time, not its struct field names. Field
-// references below (ev.ID, ev.Title, ev.OrgID, ...) follow the schema in
-// BUILD-SPEC.md with idiomatic Go naming and the same convention already
-// used by internal/store's own types (User.ID, Org.Name, ...). These were
-// reconciled against the real internal/events package once it landed — see
-// the final report for anything that had to change.
-
 // eventToMeta builds the minimal offline-gate context scan.Bundle needs
 // from a full events.Event.
 func eventToMeta(ev *events.Event) scan.EventMeta {

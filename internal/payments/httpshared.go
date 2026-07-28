@@ -14,7 +14,11 @@ import (
 // (see docs/PAYMENTS.md "The patala path" and internal/payments/patala.go)
 // — stablecoin.go (never ported to patala; see its own doc comment) and
 // paystack.go (stays native for its orgs.BankingProvider payout methods —
-// see paystack.go's doc comment) are this file's only remaining consumers.
+// see paystack.go's doc comment) are the only remaining NATIVE adapters,
+// and boundedRead below has one further caller: patala.go's own Webhook,
+// which bounds the inbound body it hands to patala for signature
+// verification (that file is `-tags patala` only, so this one stays
+// reachable and tested with or without it).
 // It intentionally does NOT reuse paystack.go's private
 // paystackReadLimited (kept scoped to Paystack so that adapter's existing
 // tests/sentinel error are untouched) nor provider.go's own read-limiting

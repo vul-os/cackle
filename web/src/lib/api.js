@@ -1,6 +1,6 @@
 // lib/api.js
 //
-// Thin, typed fetch wrapper for Cackle's HTTP API (see BUILD-SPEC.md "HTTP API").
+// Thin, typed fetch wrapper for Cackle's HTTP API (see docs/API.md).
 // Every backend error is shaped { "error": { "code", "message" } } — we surface
 // that as an `ApiError` instance so callers can branch on `.code` when useful
 // and otherwise just show `.message`.

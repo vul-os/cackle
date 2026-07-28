@@ -12,7 +12,7 @@ working even if the venue's network, or the server itself, goes down mid-event.
 
 <sub><img src="docs/assets/cackle-logo.svg" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-F5A623.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-F5A623.svg)](LICENSE-MIT)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Offline-verified](https://img.shields.io/badge/tickets-Ed25519%20offline--verified-FF4848)](docs/TICKET-FORMAT.md)
@@ -73,8 +73,8 @@ shell (launcher, windows, dock, assistant) that hosts the apps; each product
 also runs independently on its own:
 
 - **Vulos OS** — the web-native desktop shell that hosts the apps
-- **Ofisi** — documents: docs, sheets, slides, PDF, and **whiteboards**
-  (the Excalidraw-based whiteboard is an Ofisi **document type** — there is
+- **Diwan** — documents: docs, sheets, slides, PDF, and **whiteboards**
+  (the Excalidraw-based whiteboard is a Diwan **document type** — there is
   **no separate Board product**)
 - **Vulos Files** — file storage + P2P sharing, built into the OS
 - **Ephor** — open, self-hostable reachability broker; your box dials out
@@ -249,7 +249,7 @@ dev-environment setup, branch conventions, and what we say yes and no to. See
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE-MIT) OR [Apache-2.0](LICENSE-APACHE)
 
 ---
 

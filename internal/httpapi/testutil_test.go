@@ -246,9 +246,10 @@ func (h *testHarness) signupUser(email, password, name string) (token, userID st
 }
 
 // newOrgWithOwner creates an org directly against the store (there is no
-// HTTP route to create an org in BUILD-SPEC's API — org membership is
-// assumed to already exist, e.g. via --demo seed data or an
-// out-of-band/admin path) and makes userID its owner.
+// HTTP route to create an org — see docs/API.md's "Org management", which
+// starts at managing an org's members: the org itself is assumed to already
+// exist, e.g. via --demo seed data or an out-of-band/admin path) and makes
+// userID its owner.
 func (h *testHarness) newOrgWithOwner(name, slug, userID string) string {
 	h.t.Helper()
 	org := &store.Org{Name: name, Slug: slug}

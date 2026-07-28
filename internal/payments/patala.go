@@ -59,20 +59,37 @@
 // # What this adapter can and cannot do
 //
 // patala_core::PaymentRail (the trait patala-fiat's 20 adapters implement,
-// and the only thing PatalaRailNewFiat hands back) has exactly three
-// methods reachable here: quote, charge, verify. It has NO webhook
-// concept at all — webhook signature verification is provider-specific
-// Rust code (patala-fiat's own `<provider>::webhook` modules) that is
-// NOT part of the UniFFI-exported surface. So PatalaFiatProvider.Webhook
-// below unconditionally fails — a patala-backed provider can only ever be
-// confirmed by polling Verify, never by a provider's push webhook, until
-// (unless) patala grows a webhook export. This is a real, current gap in
-// what the binding exposes, not a Cackle shortcut — see docs/PAYMENTS.md.
+// and the only thing PatalaRailNewFiat hands back) has four methods
+// reachable here: quote, charge, verify, and verify_webhook. Settlement can
+// therefore be confirmed BOTH ways — by polling Verify, and by
+// authenticating a processor's pushed webhook
+// ((*PatalaFiatProvider).Webhook). Webhook verification used to live only
+// in provider-specific free Rust functions that no binding could reach,
+// which is why this adapter's Webhook returned ErrPatalaNoWebhook
+// unconditionally until patala exported verify_webhook on the trait.
+//
+// Two things about that surface still shape the code below:
+//
+//   - patala-fiat's own `manual` rail (and patala_core's mock) leave
+//     verify_webhook at its trait default, Err(Unsupported) — there is no
+//     processor behind them to push anything. That surfaces here as
+//     ErrPatalaNoWebhook, which is now a per-rail answer rather than a
+//     blanket one.
+//   - RailCapabilities carries no webhook flag, so Capabilities() cannot
+//     ask the rail whether push delivery works; and it must not find out by
+//     trying, because several rails' verify_webhook legitimately makes a
+//     network call (Mollie and PayPal both re-fetch the named object from
+//     the processor) while Capabilities() is contractually forbidden from
+//     dialling anything. See Capabilities' own doc comment for what it
+//     reports instead.
 //
 // verify() also returns only a bool, never the amount/currency it actually
 // observed at the provider — see (*PatalaFiatProvider).Verify's own doc
 // comment for how this adapter still gets Cackle's full
-// pay-10-claim-1000 anti-fraud guarantee out of that bool.
+// pay-10-claim-1000 anti-fraud guarantee out of that bool. The webhook path
+// does not have that problem: WebhookEvent carries the rail's own reported
+// amount/currency, which Webhook passes through untouched so
+// payments.Reconcile can do the comparison it exists to do.
 package payments
 
 import (
@@ -81,6 +98,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -89,10 +107,41 @@ import (
 	patala "github.com/vul-os/patala/patala-go/bindings/patala"
 )
 
-// ErrPatalaNoWebhook is returned unconditionally by
-// PatalaFiatProvider.Webhook — see this file's module doc comment ("What
-// this adapter can and cannot do").
-var ErrPatalaNoWebhook = errors.New("payments: this provider settles via patala, which has no webhook surface through its Go binding yet -- poll Verify instead")
+// ErrPatalaNoWebhook is returned by PatalaFiatProvider.Webhook when THIS
+// rail has no push-delivery surface — patala answers verify_webhook with
+// Error::Unsupported. That is patala-fiat's `manual` rail (and
+// patala_core's mock): there is no processor behind either to push
+// anything. Every real processor patala-fiat ships implements
+// verify_webhook, so this is a per-rail answer, not the blanket one it was
+// before patala exported webhook verification on PaymentRail. See this
+// file's module doc comment ("What this adapter can and cannot do").
+var ErrPatalaNoWebhook = errors.New("payments: this patala rail has no webhook surface (patala answered Unsupported) -- poll Verify instead")
+
+// patalaManualRailName is patala-fiat's always-available, no-processor
+// rail. Cackle never registers it (cmd/cackle/patala_register.go skips it
+// in favour of native manual.go); it is named here only because it is the
+// one rail whose webhook support differs from every other — see
+// (*PatalaFiatProvider).Capabilities.
+const patalaManualRailName = "manual"
+
+// patalaMaxWebhookBodyBytes caps the inbound webhook body Webhook will read
+// before handing it to patala for signature verification, so a misbehaving
+// or hostile caller can never force an unbounded read. Same 1 MiB bound
+// stablecoin.go uses via the shared boundedRead helper (httpshared.go).
+const patalaMaxWebhookBodyBytes int64 = 1 << 20
+
+// Compile-time proof that patala_webhook_status.go's untagged copy of
+// patala's WebhookStatus discriminants still matches the generated
+// binding's own constants. Each line is an array index that is only in
+// range when the two agree, so a regeneration that renumbers the enum
+// breaks THIS BUILD instead of silently re-pointing the mapping that
+// decides whether an order is marked paid. (uint subtraction wraps, so a
+// binding value smaller than ours fails just as loudly as a larger one.)
+var (
+	_ = [1]struct{}{}[uint(patala.WebhookStatusSettled)-uint(patalaWebhookSettled)]
+	_ = [1]struct{}{}[uint(patala.WebhookStatusNotSettled)-uint(patalaWebhookNotSettled)]
+	_ = [1]struct{}{}[uint(patala.WebhookStatusUnconfirmed)-uint(patalaWebhookUnconfirmed)]
+)
 
 // patalaKeyOverrides documents the small number of cases where Cackle's
 // existing CACKLE_<PROVIDER>_<SUFFIX> environment variable name does not
@@ -226,8 +275,9 @@ func (p *PatalaFiatProvider) Name() string { return p.name }
 //   - Refunds: patala_core::PaymentRail does have a refund() method, but
 //     this adapter does not call it (Cackle's Provider interface has no
 //     Refund method at all to expose it through) — always false here.
-//   - Webhooks: always false — see ErrPatalaNoWebhook and this file's
-//     module doc comment.
+//   - Webhooks: true for every rail except patala-fiat's `manual` — see
+//     webhooksSupported below for why that is a name check and not a
+//     question asked of the rail.
 //   - ZeroDecimalOK: always true. Every patala-fiat adapter routes its
 //     amount conversion through patala-fiat's own currency table
 //     (PORTING.md §8), which is the whole point of this migration.
@@ -238,9 +288,36 @@ func (p *PatalaFiatProvider) Capabilities() Capabilities {
 		Flow:          FlowRedirect,
 		Refunds:       false,
 		Payouts:       false,
-		Webhooks:      false,
+		Webhooks:      p.webhooksSupported(),
 		ZeroDecimalOK: true,
 	}
+}
+
+// webhooksSupported reports what Capabilities().Webhooks promises: that
+// Webhook can actually do something for this rail.
+//
+// It is a name comparison because patala offers no better answer. Two
+// alternatives were rejected:
+//
+//   - Ask the rail. RailCapabilities (the only thing PatalaRail exposes
+//     without performing an operation) has no webhook field at all.
+//   - Probe it: call verify_webhook once with an empty delivery and read
+//     Error::Unsupported. Several rails' verify_webhook makes a real
+//     network call before it can reject anything (Mollie's and PayPal's
+//     both re-fetch the named object from the processor), and
+//     Capabilities() is contractually forbidden from dialling anything —
+//     so probing would turn a capability query into an outbound request.
+//
+// What makes the name check honest rather than a guess: in patala-fiat,
+// all 20 processor rails implement verify_webhook, and `manual` is the one
+// rail that leaves it at PaymentRail's Err(Unsupported) trait default —
+// deliberately, because it has no processor behind it to push anything.
+// If that ever stops being true, the failure mode is bounded and loud
+// rather than silent: Webhook still asks the real rail every time and
+// still returns ErrPatalaNoWebhook whenever patala answers Unsupported, so
+// a wrong answer here can only ever mis-advertise, never mis-settle.
+func (p *PatalaFiatProvider) webhooksSupported() bool {
+	return p.name != patalaManualRailName
 }
 
 // Begin maps cackle's Order onto patala_core::PayRequest and calls
@@ -275,7 +352,7 @@ func (p *PatalaFiatProvider) Begin(ctx context.Context, o Order) (Charge, error)
 
 	now := time.Now()
 	rec := PaymentRecord{
-		Provider: p.name,
+		Provider:  p.name,
 		Reference: o.Reference,
 		// Persist the ORDER's real total/currency, not receipt.AmountMinor
 		// (always 0 here — see patala_core::Receipt's honest
@@ -311,7 +388,7 @@ func (p *PatalaFiatProvider) Begin(ctx context.Context, o Order) (Charge, error)
 		Provider:     p.name,
 		Reference:    o.Reference,
 		RedirectURL:  redirectURL,
-		Instructions: fmt.Sprintf("Payment started via patala (%s). Waiting for confirmation — the organiser or this deployment will need to poll for settlement (see docs/PAYMENTS.md: this path has no webhook yet).", p.name),
+		Instructions: fmt.Sprintf("Payment started via patala (%s). Waiting for confirmation — either the processor's webhook or a Verify poll (see docs/PAYMENTS.md, \"The patala path\").", p.name),
 	}, nil
 }
 
@@ -387,8 +464,147 @@ func (p *PatalaFiatProvider) Verify(ctx context.Context, reference string) (Resu
 	}, nil
 }
 
-// Webhook always fails — see this file's module doc comment ("What this
-// adapter can and cannot do") and ErrPatalaNoWebhook.
+// Webhook authenticates an inbound processor delivery through
+// patala_core::PaymentRail::verify_webhook and reports the settlement it
+// establishes. It fails closed at every step, exactly as the Provider
+// interface requires: patala raises on a missing, malformed, stale or
+// mismatched signature, and every ambiguity on this side is an error rather
+// than a guessed Result.
+//
+// The body is read here, once, as the LITERAL bytes the processor signed
+// (bounded — see patalaMaxWebhookBodyBytes); a JSON round-trip on the way in
+// would invalidate every signature scheme patala-fiat implements. Headers
+// and query parameters are forwarded as-is: patala matches header names
+// case-insensitively, and the query map is read only by the schemes that
+// put their secret in the URL rather than a header (LNbits).
+//
+// What comes back, and how each case is treated:
+//
+//   - Error::Unsupported — this rail has no push surface at all
+//     (patala-fiat's `manual`). ErrPatalaNoWebhook, so callers can tell
+//     "poll Verify instead" apart from "this delivery was rejected".
+//   - Any other error — the delivery did not authenticate. Rejected.
+//   - WebhookStatus::Settled — the only case that produces a Result, and
+//     only if the delivery also names an order reference, an event id, and
+//     a charge this deployment actually began.
+//   - WebhookStatus::NotSettled / ::Unconfirmed — authentic, but not a
+//     settlement (patala_core is explicit that Unconfirmed asserts nothing
+//     whatsoever about money). Reported as ErrUnhandledEvent so the HTTP
+//     route acknowledges the delivery with 200 instead of making the
+//     processor retry a message there is nothing to do with, while Verify
+//     stays the thing that governs the order. The Settled-vs-not decision
+//     runs through patalaWebhookStatusToCackle, whose mapping is pinned
+//     variant-by-variant by patala_webhook_status_test.go in the DEFAULT
+//     (untagged) test suite.
+//
+// AmountMinor/Currency are what the RAIL reported, passed through
+// untouched. They are deliberately NOT replaced with the stored order's own
+// figures: payments.Reconcile compares the two, and substituting Cackle's
+// own expectation here would make that comparison trivially true and throw
+// away the pay-10-claim-1000 guarantee it exists for.
 func (p *PatalaFiatProvider) Webhook(ctx context.Context, r *http.Request) (Result, error) {
-	return Result{}, ErrPatalaNoWebhook
+	if r == nil || r.Body == nil {
+		return Result{}, fmt.Errorf("payments: patala %s: webhook request has no body", p.name)
+	}
+	body, err := boundedRead(r.Body, patalaMaxWebhookBodyBytes)
+	if err != nil {
+		if errors.Is(err, errBoundedReadTooLarge) {
+			return Result{}, fmt.Errorf("payments: patala %s: webhook body exceeds %d bytes", p.name, patalaMaxWebhookBodyBytes)
+		}
+		return Result{}, fmt.Errorf("payments: patala %s: reading webhook body: %w", p.name, err)
+	}
+
+	headers := make(map[string]string, len(r.Header))
+	for name, values := range r.Header {
+		if len(values) > 0 {
+			headers[name] = values[0]
+		}
+	}
+	query := make(map[string]string)
+	if r.URL != nil {
+		for name, values := range r.URL.Query() {
+			if len(values) > 0 {
+				query[name] = values[0]
+			}
+		}
+	}
+
+	event, err := p.rail.VerifyWebhook(patala.WebhookDelivery{
+		RawBody: body,
+		Headers: headers,
+		Query:   &query,
+		// Explicit, not a clock read inside patala: this is what replay
+		// windows are checked against, and passing it makes a delivery
+		// exactly reproducible.
+		NowUnix: uint64(time.Now().Unix()),
+	})
+	if err != nil {
+		if errors.Is(err, patala.ErrPatalaErrorUnsupported) {
+			return Result{}, fmt.Errorf("%w (rail %s: %v)", ErrPatalaNoWebhook, p.name, err)
+		}
+		return Result{}, fmt.Errorf("payments: patala %s: webhook rejected: %w", p.name, err)
+	}
+
+	status, err := patalaWebhookStatusToCackle(patalaWebhookStatus(event.Status))
+	if err != nil {
+		return Result{}, fmt.Errorf("payments: patala %s: %w", p.name, err)
+	}
+	if status != StatusPaid {
+		return Result{}, fmt.Errorf("%w: patala %s delivery %q is authentic but reports %s (object %q) -- not a settlement; Verify still governs this order",
+			ErrUnhandledEvent, p.name, event.EventId, patalaWebhookStatusName(patalaWebhookStatus(event.Status)), event.ObjectId)
+	}
+
+	reference := strings.TrimSpace(event.Reference)
+	if reference == "" {
+		// A settled delivery that names only a processor-side object.
+		// Cackle keys orders by reference and has no object-id index, so
+		// there is nothing to reconcile this against — refuse rather than
+		// return a Result whose Reference cannot match any order.
+		return Result{}, fmt.Errorf("payments: patala %s: settled webhook names no order reference (object %q); cannot reconcile it against an order", p.name, event.ObjectId)
+	}
+	if strings.TrimSpace(event.EventId) == "" {
+		// Replay protection is keyed on this; a paid result that cannot be
+		// deduped is worse than no result at all.
+		return Result{}, fmt.Errorf("payments: patala %s: settled webhook for %q carries no event id (cannot dedupe)", p.name, reference)
+	}
+	if event.AmountMinor > uint64(math.MaxInt64) {
+		return Result{}, fmt.Errorf("payments: patala %s: settled webhook for %q reports amount %d, which does not fit Cackle's int64 minor units", p.name, reference, event.AmountMinor)
+	}
+
+	rec, ok, err := p.store.GetPaymentRecord(ctx, p.name, reference)
+	if err != nil {
+		return Result{}, fmt.Errorf("payments: patala %s: loading record: %w", p.name, err)
+	}
+	if !ok {
+		// Every patala charge persists a record at Begin, so a settled
+		// delivery for a reference this deployment never began is
+		// anomalous. Fail closed, exactly as Verify does.
+		return Result{}, fmt.Errorf("payments: patala %s: settled webhook for unknown reference %q", p.name, reference)
+	}
+
+	now := time.Now()
+	if rec.Status != StatusPaid {
+		rec.Status = StatusPaid
+		rec.UpdatedAt = now
+		if err := p.store.PutPaymentRecord(ctx, rec); err != nil {
+			return Result{}, fmt.Errorf("payments: patala %s: persisting settlement: %w", p.name, err)
+		}
+	}
+
+	result := Result{
+		Provider:    p.name,
+		Reference:   reference,
+		EventID:     event.EventId,
+		Status:      StatusPaid,
+		AmountMinor: int64(event.AmountMinor),
+		Currency:    event.Currency,
+		PaidAt:      now,
+	}
+	// Raw is audit data typed as JSON. Several patala-fiat rails sign a
+	// form-encoded body (OpenNode), so only attach it when it really is
+	// JSON rather than storing something no reader can parse.
+	if json.Valid(body) {
+		result.Raw = json.RawMessage(body)
+	}
+	return result, nil
 }

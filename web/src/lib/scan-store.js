@@ -37,8 +37,12 @@ function getDB() {
 }
 
 /**
- * Cache a scan bundle fetched from GET /api/events/:id/scan-bundle. Shape
- * (per BUILD-SPEC): { event, issuer_keys[], ticket_index[], allocation, issued_at }.
+ * Cache a scan bundle fetched from GET /api/events/:id/scan-bundle. Shape:
+ * { event, issuer_keys, ticket_index[], ticket_index_present, allocation,
+ * issued_at } — see internal/scan/bundle.go and docs/OFFLINE-GATES.md.
+ * `ticket_index_present` is the one that decides whether an EMPTY index means
+ * "admit nothing" or "no data, fall back to signature-only"; `allocation` is
+ * always null today (unbuilt delegated issuance).
  */
 export async function saveBundle(eventId, bundle) {
     const db = await getDB();

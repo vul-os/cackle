@@ -91,7 +91,7 @@ sequenceDiagram
 
     Note over Gate,API: ONCE, while the gate has network
     Gate->>API: GET /api/events/{id}/scan-bundle
-    API-->>Gate: event, issuer_keys[], ticket_index[], allocation
+    API-->>Gate: event, issuer_keys[], ticket_index[] (allocation: always null)
 
     Note over Gate,Tickets: AT THE DOOR, no network required
     loop every attendee
@@ -131,13 +131,15 @@ sequenceDiagram
   (`tickets.VerifyWithRing`, no I/O), checks it against the bundle's
   `ticket_index` when present (`DecideWithBundle` — this is what catches a
   ticket voided/refunded after issuance, since a signature alone can't;
-  see [OFFLINE-GATES.md](OFFLINE-GATES.md)), dedupes against the local
+  see [OFFLINE-GATES.md](OFFLINE-GATES.md)), and dedupes against the local
   `admissions` table (unique on `ticket_id`, first scan wins, every
   subsequent scan recorded as its own `duplicate` row rather than
-  overwritten), and the offline `allocations` bookkeeping a device used
-  while running unplugged. `Decide` (no bundle, signature+dedupe only) and
+  overwritten). `Decide` (no bundle, signature+dedupe only) and
   `DecideWithBundle` (adds the index check) share one signature-stable
   entry point each — see the package's doc comments before changing either.
+  The package also carries `allocation.go` (sign/verify/count helpers for a
+  delegated capacity grant), which is **not wired to anything**: no code
+  path writes the `allocations` table and no scan consults it.
 - **`internal/httpapi`** — chi router, middleware (auth, CSRF, rate
   limiting, security headers), and handlers that compose the packages
   above. This is the only package that knows about HTTP.
@@ -183,10 +185,13 @@ Notes that matter more than the diagram:
   `tickets.Verify` itself knows nothing of this column by design (purity),
   so revocation is enforced entirely by `internal/scan` consulting the
   index, never inside the signature check.
-- **`allocations`** exists so a scanner can be handed a bounded, signed claim
-  ("this device may admit up to N more of ticket-type X") for scenarios
-  where even the scan-bundle's ticket index isn't precise enough — the seam
-  the capacity-delegation roadmap item builds on.
+- **`allocations` is an empty seam, not a feature.** The table exists, and
+  `internal/scan/allocation.go` can sign, verify and count against a grant,
+  but nothing populates the table and `scan-bundle` returns
+  `"allocation": null` unconditionally. Its intended use is *delegated
+  issuance* — letting a disconnected sub-issuer mint up to N tickets of a
+  type — not bounding admissions, and it is roadmap work either way. Do not
+  plan around it; see [ROADMAP.md](../ROADMAP.md).
 
 ## Security bar
 
@@ -213,8 +218,8 @@ required.
 Cackle must build and run with nothing else present — no Vulos OS, no
 Ephor, no DMTAP node. When Cackle runs *as* a
 Vulos OS app, the OS wires identity and scoped storage in front of the same
-binary; it never becomes a build-time dependency. See the [README's "Part of
-VulOS" section](../README.md#part-of-vulos) for the product framing, and the
+binary; it never becomes a build-time dependency. See
+[vulos.org](https://vulos.org) for the product framing, and the
 [VulOS product standard] for the house-wide rule this follows.
 
 [VulOS product standard]: https://github.com/vul-os

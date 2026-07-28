@@ -299,7 +299,8 @@ code an attendee presents at the gate.
 ```
 GET    /api/events/{id}/scan-bundle  scanner auth → {event, issuer_keys[], ticket_index[],
                                      ticket_index_present, allocation, issued_at} —
-                                     everything a gate needs to run the whole event offline
+                                     everything a gate needs to run the whole event offline.
+                                     `allocation` is always null (unbuilt — see OFFLINE-GATES.md)
 POST   /api/scan                     {event_id, capability, device_id, gate_id, scanned_at}
                                      → {result, ticket, holder}
 POST   /api/scan/sync                {admissions:[...]} batch upload of offline scans;

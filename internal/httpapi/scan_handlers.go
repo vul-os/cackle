@@ -22,18 +22,15 @@ import (
 // package), which means the server-side persistence for the online
 // /api/scan and /api/scan/sync routes has nowhere else to live but here.
 //
-// NOTE on /api/scan's event scoping: BUILD-SPEC/docs/API.md describe the
-// request body as {capability, device_id, gate_id, scanned_at} with no
-// event id anywhere in the route or body. But internal/scan.Decide requires
-// an eventID to check the capability against (that's what produces
-// wrong_event rather than trusting whatever event id the token itself
-// claims), and RBAC requires knowing which event/org to authorize against.
-// Rather than silently trusting the unverified token's own "eid" claim for
-// both authorization AND the wrong-event check (which would make
-// wrong_event unreachable — the check would always trivially pass), this
-// handler requires an explicit event_id field in the request body. This is
-// an additive, backward-compatible field, not a breaking change to the
-// documented shape; flagged here for the docs owner to reconcile.
+// NOTE on /api/scan's event scoping: the request body carries an explicit
+// event_id — {event_id, capability, device_id, gate_id, scanned_at}, as
+// documented in docs/API.md's "Offline gate" section — even though neither
+// the route nor the capability token needs one to be decoded. It is
+// required because internal/scan.Decide checks the capability AGAINST an
+// eventID (that's what produces wrong_event), and RBAC needs to know which
+// event/org to authorize against. Taking both from the unverified token's
+// own "eid" claim instead would make wrong_event unreachable — the check
+// would always trivially pass, comparing the claim against itself.
 
 // --- dbSeenSet: online-scan SeenSet backed by the admissions table ---
 
@@ -94,7 +91,8 @@ func (s *dbSeenSet) Seen(ctx context.Context, ticketID string) (bool, error) {
 
 // dbSyncSink implements scan.SyncSink against the admissions table for
 // batch sync of offline-recorded scans. Idempotency key is exactly what
-// BUILD-SPEC specifies: (ticket_id, device_id, scanned_at). A second
+// docs/API.md's "Offline gate" section and docs/OFFLINE-GATES.md document:
+// (ticket_id, device_id, scanned_at). A second
 // device that independently believed it was first to admit a ticket is
 // downgraded to 'duplicate' server-side — the admissions table's partial
 // unique index is the final authority on which single row gets to be

@@ -132,7 +132,7 @@ func TestLoad_DefaultsDeriveBaseURLAndPersistSecret(t *testing.T) {
 func TestLoad_FlagBeatsEnvBeatsDefault(t *testing.T) {
 	isolateEnv(t)
 	dir := t.TempDir()
-	t.Setenv(envAddr, ":7777")                                    // env
+	t.Setenv(envAddr, ":7777")                                     // env
 	t.Setenv(envSessionSecret, "an-explicit-32-char-long-secret!") // >= 16
 
 	cfg, err := Load(Flags{Addr: ":9999", DB: filepath.Join(dir, "x.db")}) // flag

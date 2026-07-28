@@ -29,10 +29,28 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   See [docs/PAYMENTS.md](docs/PAYMENTS.md).
 - Full documentation set (`docs/`), roadmap, security policy, contributing
   guide, and this changelog.
+- **Frozen conformance vectors for the ticket wire format**
+  (`docs/ticket-format-vectors.json`): fixed keys, tokens pinned as bytes,
+  and the exact accept/reject outcome for each. Run against BOTH shipped
+  verifiers — `internal/tickets` (Go) and `web/src/lib/capability.js` (the
+  browser scanner) — by `internal/tickets/conformance_test.go` and
+  `web/src/lib/capability.conformance.test.js`. Both assert minimum vector
+  counts and that every documented error code is exercised, so a truncated
+  corpus fails loudly instead of passing by running nothing.
+- Frontend test suite (`npm test` in `web/`, Node's built-in `node:test` —
+  no new dependency) and a CI job that runs it. `CONTRIBUTING.md` had
+  documented this command for some time; until now it did not exist.
+- `gofmt` gate in CI and `make lint` (five files were not gofmt-clean).
+- `scripts/check-doc-links.mjs` plus a CI job: every relative documentation
+  link must resolve, both as GitHub renders the repo and as
+  `site/docs.html` serves the flat mirror. It found five dead links on its
+  first run.
+- Relative-link rewriting in the published docs viewer (`site/docs.html`).
+  Cross-chapter links in the mirror previously resolved against
+  `/docs.html` and 404'd, every one of them.
 - Joined VulOS as a product: standalone-first, hostable as an app by the
   Vulos OS, with no dependency on any Vulos service — Vulos is free and
-  open-source, self-hosted, as described in
-  [README.md](README.md#part-of-vulos).
+  open-source, self-hosted — see [vulos.org](https://vulos.org).
 
 ### Changed
 
@@ -40,7 +58,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   longer hardcoded to Paystack — the provider sits behind a seam.
 - **Genuinely country- and currency-agnostic**: removed every remaining ZAR/
   "cents" assumption. Every `*_cents` column and JSON field is renamed
-  `*_minor` (`internal/store/migrations/0006_currency_minor_units.sql`) and
+  `*_minor` (since folded into the `0001_init.sql` baseline) and
   goes through `internal/money`'s ISO-4217 exponent table instead of a
   hardcoded 100 — JPY/KRW/VND/CLP/ISK (0 decimal places) and KWD/BHD/JOD/
   OMR/TND (3 decimal places) now render correctly everywhere, frontend
@@ -65,12 +83,67 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   needed, and patala's generic surface can't drive its `MarkPaid`
   operator action anyway); `paystack.go` and `stablecoin.go` also stay
   native — see [docs/PAYMENTS.md](docs/PAYMENTS.md) for why. See
-  [ROADMAP.md](ROADMAP.md) for the full migration writeup, including the
-  honest gaps (no webhook path through patala yet; poll `Verify` instead).
+  [ROADMAP.md](ROADMAP.md) for the full migration writeup and the
+  disclosed deltas.
+- **Webhooks on the patala path.** `patala_core::PaymentRail` gained a
+  `verify_webhook` export, so `PatalaFiatProvider.Webhook` now
+  authenticates a real processor push through patala's own Rust
+  verification instead of returning `ErrPatalaNoWebhook` unconditionally;
+  that error now means only "this rail has no push surface" (patala-fiat's
+  `manual`). Only `WebhookStatus::Settled` is ever treated as payment —
+  `Unconfirmed` (authentic, but asserting nothing about money) maps to
+  pending, pinned variant-by-variant by a test in the default,
+  non-cgo test suite.
 - Homepage (`/`) now shows the full demo events listing (Featured +
   Upcoming, sourced live from `GET /api/events`) in the same shot as the
   hero — the flagship screenshot (`docs/screenshots/hero.png`) captures
   the whole scrollable page, not just the marketing hero above the fold.
+- **One ISO-4217 exponent table, not two.** `internal/payments` carried its
+  own private copy of the zero-/three-decimal currency lists alongside
+  `internal/money`'s. The copy is deleted; `internal/payments` now calls
+  `money.Exponent` / `money.Amount.Major` directly. Its dead
+  `majorStringToMinor` helper (no caller outside its own test) went with it.
+  The stablecoin adapter now **fails closed** on a currency `internal/money`
+  cannot resolve — at construction for `CACKLE_STABLECOIN_QUOTE_CURRENCY`,
+  and at settlement for an allocation's currency — instead of assuming two
+  decimals, which for a zero-decimal currency would have mis-scaled the
+  settled amount by 100x.
+- **The browser ticket verifier was laxer than the Go one, and now isn't.**
+  Building the conformance corpus surfaced five cases the JavaScript
+  verifier accepted that Go rejects: unknown payload fields, a non-object
+  payload, wrong JSON field types, padded base64url, and standard-alphabet
+  base64. All are now rejected, matching `internal/tickets` exactly.
+- `docs/TICKET-FORMAT.md` rewritten as an implementable wire-format
+  specification: exact encodings, canonical field order and omission rules,
+  strict-parsing rules, `kid` derivation, key-ring wire shape, the full
+  check order, and the error-code taxonomy.
+
+### Fixed
+
+- Documentation claims that ran ahead of the code, corrected in the docs
+  rather than papered over:
+  - `scan-bundle`'s `allocation` field was described as "a signed claim
+    bounding how many admissions a device may grant". Nothing populates it:
+    the server always sends `null`, no gate reads it, and the underlying
+    helpers are for delegated *issuance*, not admission. README,
+    `docs/OFFLINE-GATES.md`, `docs/ARCHITECTURE.md`, `docs/API.md` and
+    `internal/tickets/README.md` now say so plainly.
+  - Offline double-scan protection is now stated precisely: **prevented**
+    on one device, **detected at sync** (downgraded to `duplicate`) across
+    two offline devices — not stopped at the door. See
+    [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md).
+  - `docs/PAYMENTS.md` referenced `stripe.go`, `checkoutcom.go` and
+    `adyen.go` as "adapters in this package"; they moved to patala.
+  - `CONTRIBUTING.md` still said Cackle was MIT-only and that money is
+    "integer cents"; both were stale.
+  - `CHANGELOG.md` referenced `0006_currency_minor_units.sql`, folded into
+    the `0001_init.sql` baseline.
+- The browser gate now **fails closed** when its local dedupe store errors,
+  recording the scan `invalid` with the reason instead of throwing out of the
+  decode handler and leaving the operator staring at an unchanged screen
+  (which looks exactly like "the scanner didn't see the code" and invites a
+  retry that admits). This matches `scan.admitOrDuplicate` on the Go side,
+  which already refused in that case.
 
 ## What came before
 

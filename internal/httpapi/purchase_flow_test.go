@@ -9,8 +9,8 @@ import (
 )
 
 // eventFixture creates an owner user + org + a published event with one
-// ticket type, entirely over HTTP (except org creation, which has no
-// route in BUILD-SPEC — see newOrgWithOwner).
+// ticket type, entirely over HTTP (except org creation, which has no HTTP
+// route at all — see newOrgWithOwner).
 type eventFixture struct {
 	ownerToken   string
 	ownerID      string

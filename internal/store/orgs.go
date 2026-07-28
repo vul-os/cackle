@@ -12,9 +12,9 @@ import (
 
 // Org is a ticket-selling organisation (the tenant boundary for events).
 type Org struct {
-	ID        string
-	Name      string
-	Slug      string
+	ID   string
+	Name string
+	Slug string
 	// DefaultCurrency is the ISO-4217 alpha-3 code new events under this
 	// org default to when the event itself doesn't specify one — see
 	// internal/events.Service.Create. Cackle has no privileged global

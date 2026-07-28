@@ -101,8 +101,8 @@ you'd be upset to lose:
   lock; wrap either in a cron job.
 - **Off-box:** copy the backup somewhere that isn't the same disk — this is
   exactly the kind of thing Vulos's backup-storage service (buckets) is
-  for, if you're running Cackle as part of a broader Vulos deployment; see
-  the [README's "Part of VulOS" section](../README.md#part-of-vulos). It is
+  for, if you're running Cackle as part of a broader Vulos deployment (see
+  [vulos.org](https://vulos.org)). It is
   equally fine to sync backups to your own storage of choice — Cackle has
   no opinion here.
 

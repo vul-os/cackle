@@ -9,6 +9,14 @@
 // Wire format: cackle.<base64url(payload_json)>.<base64url(ed25519_sig)>
 // The signature covers the raw decoded payload bytes, verified with the
 // event's Ed25519 public key pinned ahead of time from the scan bundle.
+//
+// This file and internal/tickets/capability.go must agree on every accept and
+// every reject. docs/ticket-format-vectors.json is the shared corpus that
+// holds them to it, run here by capability.conformance.test.js and in Go by
+// internal/tickets/conformance_test.go. Anything this verifier accepts that Go
+// rejects is a hole at the gate, so the strictness below (base64url alphabet,
+// unknown payload fields, field types) is deliberate and load-bearing, not
+// defensive noise — see docs/TICKET-FORMAT.md.
 
 import { ed25519 } from '@noble/curves/ed25519';
 
@@ -32,7 +40,19 @@ export class CapabilityError extends Error {
     }
 }
 
+// Only the RFC 4648 base64url alphabet, with padding omitted. `=` (padding),
+// `+` and `/` (the standard alphabet) are all rejected rather than quietly
+// re-mapped, matching Go's base64.RawURLEncoding — a token encoded the wrong
+// way is malformed, not something to guess at.
+const BASE64URL_RE = /^[A-Za-z0-9_-]*$/;
+
 function base64UrlToBytes(b64url) {
+    if (!BASE64URL_RE.test(b64url)) {
+        throw new CapabilityError(
+            CapabilityErrorCode.MALFORMED,
+            'segment is not unpadded base64url (RFC 4648 §5)',
+        );
+    }
     let base64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
     const pad = base64.length % 4;
     if (pad === 2) base64 += '==';
@@ -43,6 +63,49 @@ function base64UrlToBytes(b64url) {
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     return bytes;
+}
+
+// The complete set of payload fields, and the JSON type each must have.
+// Anything outside this map is rejected outright rather than ignored, so a
+// token cannot smuggle a field that some later code might trust without it
+// ever having been validated here. This mirrors Go's
+// json.Decoder.DisallowUnknownFields plus its typed decode into Payload.
+const PAYLOAD_FIELDS = {
+    v: 'int',
+    tid: 'string',
+    eid: 'string',
+    tt: 'string',
+    kid: 'string',
+    sub: 'string',
+    nm: 'string',
+    iat: 'int',
+    nbf: 'int',
+    exp: 'int',
+    seat: 'string',
+};
+
+/**
+ * Structural validation of a parsed payload, mirroring what Go's typed
+ * decode enforces for free. `null` is treated as absent, because that is what
+ * encoding/json does when unmarshalling null into a string or int field.
+ */
+function validatePayloadShape(payload) {
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+        throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'payload is not a JSON object');
+    }
+    for (const [key, value] of Object.entries(payload)) {
+        const want = PAYLOAD_FIELDS[key];
+        if (!want) {
+            throw new CapabilityError(CapabilityErrorCode.MALFORMED, `unknown payload field "${key}"`);
+        }
+        if (value === null) continue; // absent, per encoding/json
+        if (want === 'string' && typeof value !== 'string') {
+            throw new CapabilityError(CapabilityErrorCode.MALFORMED, `payload field "${key}" must be a string`);
+        }
+        if (want === 'int' && !Number.isInteger(value)) {
+            throw new CapabilityError(CapabilityErrorCode.MALFORMED, `payload field "${key}" must be an integer`);
+        }
+    }
 }
 
 function bytesToUtf8(bytes) {
@@ -93,6 +156,14 @@ export function publicKeyToBytes(encoded) {
  * @returns {{v:number,tid:string,eid:string,tt:string,kid:string,sub:string,nm:string,iat:number,nbf?:number,exp?:number,seat?:string}}
  */
 export function verifyCapability(token, publicKey, now = new Date()) {
+    // Key size first, exactly like Go's Verify: a caller that pinned a broken
+    // key should hear about it regardless of what was scanned.
+    if (!(publicKey instanceof Uint8Array) || publicKey.length !== 32) {
+        throw new CapabilityError(
+            CapabilityErrorCode.MALFORMED,
+            `invalid public key length ${publicKey?.length}`,
+        );
+    }
     if (typeof token !== 'string') {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'token must be a string');
     }
@@ -116,9 +187,6 @@ export function verifyCapability(token, publicKey, now = new Date()) {
     if (sig.length !== 64) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `invalid signature length ${sig.length}`);
     }
-    if (publicKey.length !== 32) {
-        throw new CapabilityError(CapabilityErrorCode.MALFORMED, `invalid public key length ${publicKey.length}`);
-    }
 
     let ok = false;
     try {
@@ -136,6 +204,9 @@ export function verifyCapability(token, publicKey, now = new Date()) {
     } catch (err) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `bad payload json: ${err.message}`);
     }
+    // Shape before version, matching Go: a structurally broken payload is
+    // malformed even if it also claims a version we do not support.
+    validatePayloadShape(payload);
 
     if (payload.v !== CURRENT_VERSION) {
         throw new CapabilityError(CapabilityErrorCode.UNSUPPORTED_VERSION, `got version ${payload.v}, want ${CURRENT_VERSION}`);
@@ -160,13 +231,22 @@ export function peekKid(token) {
     if (parts.length !== 3 || parts[0] !== TOKEN_PREFIX) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'malformed token');
     }
+    let partial;
     try {
-        const body = base64UrlToBytes(parts[1]);
-        const partial = JSON.parse(bytesToUtf8(body));
-        return partial.kid;
+        partial = JSON.parse(bytesToUtf8(base64UrlToBytes(parts[1])));
     } catch (err) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `bad payload json: ${err.message}`);
     }
+    // Go's peekKID unmarshals into a struct, so a non-object payload or a
+    // non-string kid is an error there rather than a missing key. Match it,
+    // or a malformed token would surface as unknown_kid instead.
+    if (partial === null || typeof partial !== 'object' || Array.isArray(partial)) {
+        throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'payload is not a JSON object');
+    }
+    if (partial.kid !== undefined && partial.kid !== null && typeof partial.kid !== 'string') {
+        throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'payload field "kid" must be a string');
+    }
+    return partial.kid;
 }
 
 /**

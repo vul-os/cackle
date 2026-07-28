@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 
 // The new API has no server-side cart (no /api/carts endpoint) — an order is
 // created directly from a client-held list of {ticket_type_id, quantity} for
-// a single event (see POST /api/orders in BUILD-SPEC.md). So the cart here is
+// a single event (see POST /api/orders in docs/API.md). So the cart here is
 // purely client state, persisted to localStorage so it survives a reload,
 // and never synced to the backend until checkout creates the order.
 

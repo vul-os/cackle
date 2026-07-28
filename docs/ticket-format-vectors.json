@@ -1,0 +1,368 @@
+{
+  "$comment": [
+    "Conformance vectors for the Cackle capability token wire format.",
+    "Companion to docs/TICKET-FORMAT.md, which specifies the format these pin down.",
+    "FROZEN: these bytes are the contract. A change here is a wire-format change and",
+    "must be accompanied by a version bump and a note in CHANGELOG.md.",
+    "Verified by internal/tickets/conformance_test.go (Go) and",
+    "web/src/lib/capability.conformance.test.js (JavaScript).",
+    "The keys below are fixed, published, and non-secret. They sign nothing real."
+  ],
+  "error_codes": [
+    "malformed",
+    "unsupported_version",
+    "bad_signature",
+    "not_yet_valid",
+    "expired",
+    "unknown_kid"
+  ],
+  "field_order": [
+    "v",
+    "tid",
+    "eid",
+    "tt",
+    "kid",
+    "sub",
+    "nm",
+    "iat",
+    "nbf",
+    "exp",
+    "seat"
+  ],
+  "format": "cackle-capability-token",
+  "issue": [
+    {
+      "name": "full payload — every field populated",
+      "note": "Field order is the struct declaration order: v, tid, eid, tt, kid, sub, nm, iat, nbf, exp, seat.",
+      "payload": {
+        "v": 1,
+        "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U0V",
+        "eid": "01J8ZK8T0M8N0P0Q0R0S0T0U0E",
+        "tt": "01J8ZK8T0M8N0P0Q0R0S0T0U0T",
+        "kid": "k_If4x36FUomFia_hUBG_SJw",
+        "sub": "01J8ZK8T0M8N0P0Q0R0S0T0U0S",
+        "nm": "Ada Lovelace",
+        "iat": 1750000000,
+        "nbf": 1750000000,
+        "exp": 1750086400,
+        "seat": "A14"
+      },
+      "payload_json": "{\"v\":1,\"tid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0V\",\"eid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0E\",\"tt\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0T\",\"kid\":\"k_If4x36FUomFia_hUBG_SJw\",\"sub\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0S\",\"nm\":\"Ada Lovelace\",\"iat\":1750000000,\"nbf\":1750000000,\"exp\":1750086400,\"seat\":\"A14\"}",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg"
+    },
+    {
+      "name": "minimal payload — nbf, exp and seat omitted",
+      "note": "nbf/exp/seat carry omitempty: a zero/empty value is absent from the JSON entirely, not encoded as 0/\"\".",
+      "payload": {
+        "v": 1,
+        "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U1V",
+        "eid": "01J8ZK8T0M8N0P0Q0R0S0T0U0E",
+        "tt": "01J8ZK8T0M8N0P0Q0R0S0T0U0T",
+        "kid": "k_If4x36FUomFia_hUBG_SJw",
+        "sub": "01J8ZK8T0M8N0P0Q0R0S0T0U0S",
+        "nm": "Grace Hopper",
+        "iat": 1750000000
+      },
+      "payload_json": "{\"v\":1,\"tid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U1V\",\"eid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0E\",\"tt\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0T\",\"kid\":\"k_If4x36FUomFia_hUBG_SJw\",\"sub\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0S\",\"nm\":\"Grace Hopper\",\"iat\":1750000000}",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUxViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJHcmFjZSBIb3BwZXIiLCJpYXQiOjE3NTAwMDAwMDB9.47jPToT-BLLnFlIxoYITQqdeB_xVxZZi-DjUpbXlfQGu_p-XYpw1sjHYRithSEX1UxbKBrJZrz8xJ2Oe6FBvBA"
+    },
+    {
+      "name": "holder name with HTML-significant and non-ASCII characters",
+      "note": "Go's encoding/json escapes \u0026, \u003c and \u003e as \\u0026, \\u003c, \\u003e; non-ASCII is emitted as raw UTF-8. Reproduce this to get byte-identical tokens.",
+      "payload": {
+        "v": 1,
+        "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U2V",
+        "eid": "01J8ZK8T0M8N0P0Q0R0S0T0U0E",
+        "tt": "01J8ZK8T0M8N0P0Q0R0S0T0U0T",
+        "kid": "k_If4x36FUomFia_hUBG_SJw",
+        "sub": "01J8ZK8T0M8N0P0Q0R0S0T0U0S",
+        "nm": "Ada \u0026 Grace \u003cVIP\u003e — Ünicode 日本",
+        "iat": 1750000000,
+        "seat": "R2/D2"
+      },
+      "payload_json": "{\"v\":1,\"tid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U2V\",\"eid\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0E\",\"tt\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0T\",\"kid\":\"k_If4x36FUomFia_hUBG_SJw\",\"sub\":\"01J8ZK8T0M8N0P0Q0R0S0T0U0S\",\"nm\":\"Ada \\u0026 Grace \\u003cVIP\\u003e — Ünicode 日本\",\"iat\":1750000000,\"seat\":\"R2/D2\"}",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUyViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgXHUwMDI2IEdyYWNlIFx1MDAzY1ZJUFx1MDAzZSDigJQgw5xuaWNvZGUg5pel5pysIiwiaWF0IjoxNzUwMDAwMDAwLCJzZWF0IjoiUjIvRDIifQ.qulizpNX44ctuUgHibVIgZ2BWajxih9rctc87BRLIzKIPX7IYNH6GdV7dyxxvaTvzsYc9buN2zTSIBeNB_TZAQ"
+    }
+  ],
+  "keys": {
+    "issuer": {
+      "kid": "k_If4x36FUomFia_hUBG_SJw",
+      "public_key_b64url": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+      "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+    },
+    "other": {
+      "kid": "k_OfcT0KZEJT8EUpQhufUbmw",
+      "public_key_b64url": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw",
+      "seed_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb"
+    },
+    "truncated": {
+      "$comment": "The issuer public key cut to 16 bytes — a deliberately invalid key.",
+      "public_key_b64url": "11qYAYKxCrfVS_7TyWQHOg"
+    }
+  },
+  "omit_when_zero": [
+    "nbf",
+    "exp",
+    "seat"
+  ],
+  "payload_version": 1,
+  "verify": [
+    {
+      "name": "valid token inside its window",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "ok",
+      "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U0V"
+    },
+    {
+      "name": "valid token at exactly nbf",
+      "note": "nbf is an INCLUSIVE lower bound.",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTAwMCwiZXhwIjoyMDAwLCJzZWF0IjoiQTE0In0.QBXcY4mHi-XRnU9psFTByXt8_lt71zMaiOuK72fONPuznF-MtelmT4jtCOeheJcgWc8n9TBXdW137NIws7_RCA",
+      "key": "issuer",
+      "now_unix": 1000,
+      "result": "ok",
+      "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U0V"
+    },
+    {
+      "name": "one second before nbf",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTAwMCwiZXhwIjoyMDAwLCJzZWF0IjoiQTE0In0.QBXcY4mHi-XRnU9psFTByXt8_lt71zMaiOuK72fONPuznF-MtelmT4jtCOeheJcgWc8n9TBXdW137NIws7_RCA",
+      "key": "issuer",
+      "now_unix": 999,
+      "result": "error",
+      "error": "not_yet_valid"
+    },
+    {
+      "name": "at exactly exp",
+      "note": "exp is an EXCLUSIVE upper bound: now \u003e= exp is expired.",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTAwMCwiZXhwIjoyMDAwLCJzZWF0IjoiQTE0In0.QBXcY4mHi-XRnU9psFTByXt8_lt71zMaiOuK72fONPuznF-MtelmT4jtCOeheJcgWc8n9TBXdW137NIws7_RCA",
+      "key": "issuer",
+      "now_unix": 2000,
+      "result": "error",
+      "error": "expired"
+    },
+    {
+      "name": "one second before exp",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTAwMCwiZXhwIjoyMDAwLCJzZWF0IjoiQTE0In0.QBXcY4mHi-XRnU9psFTByXt8_lt71zMaiOuK72fONPuznF-MtelmT4jtCOeheJcgWc8n9TBXdW137NIws7_RCA",
+      "key": "issuer",
+      "now_unix": 1999,
+      "result": "ok",
+      "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U0V"
+    },
+    {
+      "name": "minimal payload verifies at any time (no nbf, no exp)",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUxViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJHcmFjZSBIb3BwZXIiLCJpYXQiOjE3NTAwMDAwMDB9.47jPToT-BLLnFlIxoYITQqdeB_xVxZZi-DjUpbXlfQGu_p-XYpw1sjHYRithSEX1UxbKBrJZrz8xJ2Oe6FBvBA",
+      "key": "issuer",
+      "now_unix": 0,
+      "result": "ok",
+      "tid": "01J8ZK8T0M8N0P0Q0R0S0T0U1V"
+    },
+    {
+      "name": "correct token, wrong public key",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "other",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "bad_signature"
+    },
+    {
+      "name": "payload tampered after signing (seat changed)",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiWjk5In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "bad_signature"
+    },
+    {
+      "name": "empty payload segment, original signature",
+      "note": "Decodes as zero bytes, so it fails on the signature, not on parsing.",
+      "token": "cackle..B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "bad_signature"
+    },
+    {
+      "name": "unsupported payload version (validly signed)",
+      "token": "cackle.eyJ2IjoyLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.1dTxVe9oa_vzXYPONEMdvmgRkwrIBj1Gn7eH9a5f2VhcjcJ5LHPTWnhGu8vhtWTzdyWx8_DoozmkbuGotts8Dw",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "unsupported_version"
+    },
+    {
+      "name": "unknown payload field (validly signed)",
+      "note": "Unknown fields are rejected, never ignored. Checked BEFORE the version check.",
+      "token": "cackle.eyJlaWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwRSIsImV4cCI6MTc1MDA4NjQwMCwiZXh0cmEiOiJzbXVnZ2xlZCIsImlhdCI6MTc1MDAwMDAwMCwia2lkIjoia19JZjR4MzZGVW9tRmlhX2hVQkdfU0p3IiwibmJmIjoxNzUwMDAwMDAwLCJubSI6IkFkYSBMb3ZlbGFjZSIsInNlYXQiOiJBMTQiLCJzdWIiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwUyIsInRpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBWIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsInYiOjF9.zoLzv_xP3J49-JnsIgYRHP53Dp_sRKQ0HToeb1P5p8KRZxQTXGLwxZpiLCVZyezfCDp28WVKBsHmgTFOOimnBg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "payload is a JSON array, not an object (validly signed)",
+      "token": "cackle.WzEsMiwzXQ.KKYPYwrmnUEwbIU2slhFkWfwSiC0VuwK0QAz7aAIT0eEh3CjBk4O1ZkwY1j3qNUzjSHM0EG-O90lujO3oao6Ag",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "trailing bytes after the JSON object (validly signed)",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In17IngiOjF9.LVWK-rdo4c8t_75cxUbibKob8hbgGB1knDqehAVlzYd7aDMBsjycbDsIZNfgHmgndONG4QLHLYu_3OmuQxZGBg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "iat encoded as a string instead of a number (validly signed)",
+      "token": "cackle.eyJlaWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwRSIsImV4cCI6MTc1MDA4NjQwMCwiaWF0IjoiMTc1MDAwMDAwMCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsIm5iZiI6MTc1MDAwMDAwMCwibm0iOiJBZGEgTG92ZWxhY2UiLCJzZWF0IjoiQTE0Iiwic3ViIjoiMDFKOFpLOFQwTThOMFAwUTBSMFMwVDBVMFMiLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsInR0IjoiMDFKOFpLOFQwTThOMFAwUTBSMFMwVDBVMFQiLCJ2IjoxfQ.7XfHKqYkhtSgM1mevVl4wnTgHsk7HnN15C9dQpDUxd7b25NUIj_fvPv9U8-CgzbGHr8T-gB9vkaVzaqqQP6ABQ",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "payload segment uses padded base64url",
+      "note": "Padding is not permitted: encoding is RFC 4648 base64url with padding OMITTED.",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0=.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "signature segment uses the standard base64 alphabet",
+      "note": "+ and / are not in the base64url alphabet; a segment encoded with the standard alphabet must be rejected, never re-mapped.",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA+7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN/NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "empty string",
+      "token": "",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "wrong prefix",
+      "token": "notcackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "uppercase prefix",
+      "note": "The prefix is compared byte-for-byte; it is case-sensitive.",
+      "token": "CACKLE.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "two segments (signature missing)",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "four segments",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg.extra",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "non-base64 characters in the payload segment",
+      "token": "cackle.not-valid-base64!!!.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "non-base64 characters in the signature segment",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.not-valid-base64!!!",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "signature segment decodes to the wrong length",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.c2hvcnQ",
+      "key": "issuer",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    },
+    {
+      "name": "public key of the wrong length",
+      "note": "Checked before anything else — a caller that pinned a broken key learns so immediately.",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "key": "truncated",
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    }
+  ],
+  "verify_with_ring": [
+    {
+      "name": "kid present in the ring",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "ring": {
+        "k_If4x36FUomFia_hUBG_SJw": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "now_unix": 1750000001,
+      "result": "ok"
+    },
+    {
+      "name": "kid absent from the ring",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "ring": {
+        "k_OfcT0KZEJT8EUpQhufUbmw": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+      },
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "unknown_kid"
+    },
+    {
+      "name": "empty ring",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "ring": {},
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "unknown_kid"
+    },
+    {
+      "name": "kid present but bound to the wrong public key",
+      "token": "cackle.eyJ2IjoxLCJ0aWQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwViIsImVpZCI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBFIiwidHQiOiIwMUo4Wks4VDBNOE4wUDBRMFIwUzBUMFUwVCIsImtpZCI6ImtfSWY0eDM2RlVvbUZpYV9oVUJHX1NKdyIsInN1YiI6IjAxSjhaSzhUME04TjBQMFEwUjBTMFQwVTBTIiwibm0iOiJBZGEgTG92ZWxhY2UiLCJpYXQiOjE3NTAwMDAwMDAsIm5iZiI6MTc1MDAwMDAwMCwiZXhwIjoxNzUwMDg2NDAwLCJzZWF0IjoiQTE0In0.B99PAA-7ubtmoKHf47N4MKhvzjCVHJzZsTmKlrWGynZ8GzueFQFh9J0zde4WkWVSgY0pcaAgDtzjbvZyFN_NCg",
+      "ring": {
+        "k_If4x36FUomFia_hUBG_SJw": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+      },
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "bad_signature"
+    },
+    {
+      "name": "malformed token surfaces as malformed, not unknown_kid",
+      "token": "garbage",
+      "ring": {
+        "k_If4x36FUomFia_hUBG_SJw": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      },
+      "now_unix": 1750000001,
+      "result": "error",
+      "error": "malformed"
+    }
+  ]
+}

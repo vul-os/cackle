@@ -62,6 +62,14 @@ function describeError(err) {
  * ticket refunded after the bundle was downloaded is still admitted here
  * until the gate re-pulls a fresh bundle — an inherent limitation of
  * offline operation, not a bug.
+ *
+ * Dedupe is per DEVICE, and it FAILS CLOSED. A second scan of the same
+ * ticket on this scanner is refused here, offline, immediately; two offline
+ * scanners at two entrances cannot see each other and only reconcile at sync
+ * (docs/OFFLINE-GATES.md spells out exactly what that does and does not
+ * stop). If the local store errors instead of answering, the scan is
+ * recorded 'invalid' and refused rather than admitted — never guess in the
+ * admitting direction.
  */
 export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, gateId }) {
     const online = useOnline();
@@ -158,21 +166,53 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                     result = 'invalid';
                     note = 'Ticket revoked or not issued for this event';
                 } else {
-                    ticketId = payload.tid;
-                    holderName = payload.nm;
-                    const already = await wasAdmitted(eventId, payload.tid);
-                    result = already ? 'duplicate' : 'admitted';
+                    try {
+                        const already = await wasAdmitted(eventId, payload.tid);
+                        ticketId = payload.tid;
+                        holderName = payload.nm;
+                        result = already ? 'duplicate' : 'admitted';
+                    } catch (err) {
+                        // The local dedupe store itself failed (storage
+                        // evicted, quota, a browser in a weird private mode).
+                        // Fail CLOSED, exactly like Go's
+                        // scan.admitOrDuplicate: refuse rather than risk
+                        // admitting a ticket twice because we could not
+                        // check. Like any invalid result this records no
+                        // ticket id.
+                        result = 'invalid';
+                        note = `Local dedupe check failed: ${err?.message || err}`;
+                    }
                 }
 
-                const record = await recordScan({
-                    eventId,
-                    ticketId,
-                    deviceId: deviceId.current,
-                    gateId: gateId || 'default',
-                    result,
-                    note,
-                    holderName,
-                });
+                let record;
+                try {
+                    record = await recordScan({
+                        eventId,
+                        ticketId,
+                        deviceId: deviceId.current,
+                        gateId: gateId || 'default',
+                        result,
+                        note,
+                        holderName,
+                    });
+                } catch (err) {
+                    // We could not even write the scan down. Show the
+                    // operator a refusal rather than silently doing nothing,
+                    // which would look identical to "the scanner didn't see
+                    // the code" and invites a retry that admits.
+                    setLastResult({
+                        // Still needs a unique id: the result banner is keyed
+                        // on it to re-trigger its flash animation.
+                        id: uuid(),
+                        event_id: eventId,
+                        ticket_id: null,
+                        result: 'invalid',
+                        note: `Could not record this scan: ${err?.message || err}`,
+                        holder_name: null,
+                        at: Date.now(),
+                    });
+                    return;
+                }
 
                 setLastResult({ ...record, at: Date.now() });
                 await refreshCounts();

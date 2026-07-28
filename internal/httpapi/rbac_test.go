@@ -10,9 +10,11 @@ import (
 	"github.com/vul-os/cackle/internal/store"
 )
 
-// TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers is the mandatory
-// regression test called out in BUILD-SPEC's security bar: the old app
-// shipped /admin/events/:id/payouts with NO protection at all. Every
+// TestRBAC_OrgEventRoutesRejectUnauthenticatedAndNonMembers is the
+// regression test behind the security bar in SECURITY.md ("RBAC on every
+// org/event route") and docs/ARCHITECTURE.md's own restated version of it:
+// the old app shipped an /admin/events/:id/payouts-style route with NO
+// protection at all. Every
 // mutating (and org-scoped-read) org/event route in this table must:
 //
 //  1. reject a request with no Authorization at all (401), and

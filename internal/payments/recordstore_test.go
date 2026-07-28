@@ -24,7 +24,9 @@ func newFakeRecordStore() *fakeRecordStore {
 	return &fakeRecordStore{records: make(map[string]PaymentRecord)}
 }
 
-func (f *fakeRecordStore) key(provider, reference string) string { return provider + "\x00" + reference }
+func (f *fakeRecordStore) key(provider, reference string) string {
+	return provider + "\x00" + reference
+}
 
 func (f *fakeRecordStore) GetPaymentRecord(ctx context.Context, provider, reference string) (PaymentRecord, bool, error) {
 	f.mu.Lock()

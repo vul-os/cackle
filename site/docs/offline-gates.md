@@ -35,7 +35,7 @@ unplugged:
   "issuer_keys": [{ "kid": "...", "public_key": "..." }],
   "ticket_index": ["<ticket_id>", "..."],
   "ticket_index_present": true,
-  "allocation": { "...": "see below" },
+  "allocation": null,
   "issued_at": "2026-07-20T18:00:00Z"
 }
 ```
@@ -76,11 +76,14 @@ unplugged:
     changes, or opportunistically whenever a device briefly has signal),
     the same way you'd periodically re-sync admissions in the other
     direction.
-- **`allocation`** — a signed claim, scoped to this device, bounding how
-  many admissions of a given ticket type it may grant before it's expected
-  to reconcile. See [ROADMAP.md](../ROADMAP.md) for where this is headed
-  (capacity delegation to sub-issuers); today it exists as the seam for that
-  work, in the `allocations` table.
+- **`allocation`** — **always `null` today.** The field, the `allocations`
+  table and `internal/scan`'s sign/verify/count helpers exist as the seam for
+  capacity delegation to sub-issuers (a signed grant letting a disconnected
+  device *mint* up to N tickets of a type), but nothing populates it: the
+  server sets it to `null` unconditionally, and no gate consults it. It
+  never bounded *admissions* and does not gate anything you can run today.
+  See [ROADMAP.md](../ROADMAP.md) for where it is headed. Plan your event as
+  though this field did not exist, because operationally it doesn't.
 - **`issued_at`** — when the bundle was generated, so a device (and a human
   looking at it) can tell how stale its offline copy is.
 
@@ -112,16 +115,57 @@ Nothing in this loop touches the network. A gate can run for the length of
 an entire festival on a device that's been in airplane mode the whole time,
 as long as its battery lasts and its clock is right.
 
-> **Known limitation, tracked on the roadmap:** two scanners at two entrances
-> of the same venue, both offline, dedupe **independently** — each has its
-> own local `admissions` table, so the same ticket could in principle be
-> admitted once at each entrance before the devices ever compare notes. A
-> venue mesh sync between scanners (CRDT-merged over local Wi-Fi/Bluetooth,
-> no server required) is the fix, and is **not yet built** — see
-> [ROADMAP.md](../ROADMAP.md#later--venue-mesh-sync-between-scanners). Until
-> then, the practical mitigation is the same one paper tickets always
-> needed: don't run more independent entrances than you can staff with tight
-> communication.
+## What offline double-scan protection actually gives you
+
+"Deduped locally" is doing real work in that sentence, but it is not the
+same guarantee online scanning gives you, and the difference is worth being
+blunt about before you staff a door with it.
+
+**On one device: genuinely prevented.** The second presentation of the same
+ticket to the same scanner is refused at the gate, offline, immediately —
+`result='duplicate'`, and the operator sees a duplicate, not an admit. The
+dedupe is a single atomic claim (`INSERT OR IGNORE` on the Go side,
+`SQLiteSeenSet`; an IndexedDB check-then-append on the browser side, with
+scans serialised so only one is ever in flight). If the dedupe store itself
+errors, the scan **fails closed** — refused, not admitted. Device restarts
+don't lose it: the log is on disk, not in memory.
+
+**Across two devices: detected, not prevented.** Two scanners at two
+entrances, both offline, keep separate local logs and cannot see each
+other's. The same ticket presented at both gets admitted at both — one
+person, two entrances, two admits. Nothing catches that until the devices
+sync. When they do, the server's `admissions` table has a partial unique
+index on `ticket_id WHERE result='admitted'`, so exactly one row wins and
+every later claim is downgraded to `duplicate` no matter which device
+believed it was first (`POST /api/scan/sync`). You end up with an accurate,
+auditable record of what happened — and a person who is already inside.
+
+So: **on-device double-scan is prevented; cross-device double-scan while
+offline is detected after the fact, not stopped at the door.** If your threat
+model is one attendee lending a ticket to a friend at a second entrance
+while the venue is offline, this design does not stop it today.
+
+The fix — a venue mesh sync between scanners, CRDT-merged over local
+Wi-Fi/Bluetooth with no server involved — is **not built**; see
+[ROADMAP.md](../ROADMAP.md#later--venue-mesh-sync-between-scanners). Until it
+is, the mitigations are operational, and they are the same ones paper tickets
+always needed:
+
+- Prefer one gate per event where you can. A single device (or several
+  devices that stay online and share the server's table) has no gap.
+- Sync opportunistically. Every sync narrows the window in which two gates
+  can disagree, because a synced ticket comes back as a duplicate everywhere
+  after the next bundle refresh.
+- Don't run more independent offline entrances than you can staff with tight
+  communication.
+
+**Revocation while offline works the same way, for the same reason.** A
+gate rejects a refunded or voided ticket only if it was already refunded
+when that gate last pulled its bundle — `ticket_index` is a snapshot, not a
+feed (see the bullet above). A refund issued mid-event does not reach an
+offline gate until it re-pulls. There is no mechanism by which it could:
+that is what "no network" means. Re-pull bundles at shift changes and
+whenever a device has signal.
 
 ## Step 3 — syncing back
 

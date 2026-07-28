@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/vul-os/cackle/internal/money"
 )
 
 // fakeStablecoinAllocator is an in-memory StablecoinAddressAllocator for
@@ -470,5 +472,124 @@ func TestStablecoinCapabilities(t *testing.T) {
 	}
 	if caps.Webhooks {
 		t.Fatal("expected Webhooks capability false (poll-only)")
+	}
+}
+
+// --- currency handling: exponents come from internal/money, never a
+// hardcoded /100 ---
+
+func TestNewStablecoin_QuoteCurrencyMustBeKnown(t *testing.T) {
+	t.Setenv(EnvStablecoinIndexerBaseURL, "https://api.etherscan.io/api")
+	t.Setenv(EnvStablecoinIndexerAPIKey, "key")
+	t.Setenv(EnvStablecoinTokenContract, "0xContract")
+	t.Setenv(EnvStablecoinTokenDecimals, "6")
+	t.Setenv(EnvStablecoinMinConfirmations, "12")
+
+	// A code internal/money cannot resolve must be refused at construction:
+	// this adapter's fiat arithmetic needs that currency's exponent, and
+	// there is no safe default to fall back to.
+	t.Setenv(EnvStablecoinQuoteCurrency, "XYZ")
+	if _, err := NewStablecoin(newFakeStablecoinAllocator()); !errors.Is(err, money.ErrUnknownCurrency) {
+		t.Fatalf("expected money.ErrUnknownCurrency for quote currency XYZ, got %v", err)
+	}
+
+	// A known code in any case is accepted and stored canonically.
+	t.Setenv(EnvStablecoinQuoteCurrency, " jpy ")
+	p, err := NewStablecoin(newFakeStablecoinAllocator())
+	if err != nil {
+		t.Fatalf("expected JPY to be accepted, got %v", err)
+	}
+	if p.quoteCurrency != "JPY" {
+		t.Fatalf("quote currency = %q, want normalized %q", p.quoteCurrency, "JPY")
+	}
+}
+
+// TestStablecoinVerify_ZeroDecimalQuoteCurrency is the 100x-money guard: a
+// zero-decimal quote currency must not be scaled as if it had cents. 1500
+// JPY is AmountMinor 1500, and 1500 whole tokens (6-decimal) settle it
+// exactly. If the exponent were assumed to be 2 this would compute 150000
+// and still report paid, which is why the assertion is on the exact amount
+// and not merely on the status.
+func TestStablecoinVerify_ZeroDecimalQuoteCurrency(t *testing.T) {
+	now := time.Now()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"status":"1","message":"OK","result":[%s]}`,
+			tokenTxJSON("0xAddr", "1500000000", 6, 20, now.Unix()))
+	}))
+	defer srv.Close()
+
+	allocator := newFakeStablecoinAllocator()
+	allocator.byAddr["0xaddr"] = StablecoinAllocation{
+		Address: "0xAddr", AmountMinor: 1500, Currency: "JPY", AllocatedAt: now.Add(-time.Minute),
+	}
+	p := newTestStablecoin(t, srv, allocator)
+	p.quoteCurrency = "JPY"
+
+	res, err := p.Verify(context.Background(), "0xAddr")
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if res.AmountMinor != 1500 {
+		t.Fatalf("AmountMinor = %d, want 1500 (JPY has no minor unit)", res.AmountMinor)
+	}
+	if res.Status != StatusPaid {
+		t.Fatalf("Status = %q, want %q", res.Status, StatusPaid)
+	}
+}
+
+// TestStablecoinVerify_UnknownAllocationCurrencyFailsClosed proves the
+// exponent lookup refuses to guess. An allocation stamped with a currency
+// internal/money does not know is an error, never a silent assumption of 2
+// decimals.
+func TestStablecoinVerify_UnknownAllocationCurrencyFailsClosed(t *testing.T) {
+	now := time.Now()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"status":"1","message":"OK","result":[%s]}`,
+			tokenTxJSON("0xAddr", "1000000", 6, 20, now.Unix()))
+	}))
+	defer srv.Close()
+
+	allocator := newFakeStablecoinAllocator()
+	allocator.byAddr["0xaddr"] = StablecoinAllocation{
+		Address: "0xAddr", AmountMinor: 100, Currency: "XYZ", AllocatedAt: now.Add(-time.Minute),
+	}
+	p := newTestStablecoin(t, srv, allocator)
+
+	if _, err := p.Verify(context.Background(), "0xAddr"); !errors.Is(err, money.ErrUnknownCurrency) {
+		t.Fatalf("expected money.ErrUnknownCurrency, got %v", err)
+	}
+}
+
+// TestMinorAmountForDisplay covers the payment-instruction text across all
+// three ISO-4217 exponents. This is the coverage that used to live in
+// internal/payments/currency_test.go, before that file's private copy of the
+// exponent table was folded into internal/money.
+func TestMinorAmountForDisplay(t *testing.T) {
+	cases := []struct {
+		minor    int64
+		currency string
+		want     string
+	}{
+		{10050, "ZAR", "100.50"},
+		{100, "USD", "1.00"},
+		{5, "USD", "0.05"},
+		{0, "ZAR", "0.00"},
+		{1000, "JPY", "1000"}, // zero-decimal: no point, no padding
+		{1, "JPY", "1"},
+		{1000, "KWD", "1.000"}, // three-decimal
+		{1500, "KWD", "1.500"},
+		{10050, "zar", "100.50"}, // lowercase resolves the same way
+	}
+	for _, c := range cases {
+		if got := minorAmountForDisplay(c.minor, c.currency); got != c.want {
+			t.Errorf("minorAmountForDisplay(%d, %q) = %q, want %q", c.minor, c.currency, got, c.want)
+		}
+	}
+
+	// An unresolvable currency degrades to raw minor units rather than
+	// inventing a decimal point — this string is cosmetic, so it must not
+	// fail the charge, but it must also not lie about the amount.
+	if got := minorAmountForDisplay(1234, "XYZ"); got != "1234 (minor units)" {
+		t.Errorf("unknown currency rendered as %q, want %q", got, "1234 (minor units)")
 	}
 }

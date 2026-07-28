@@ -5,6 +5,15 @@ explains the one design decision that makes Cackle different from every
 other ticketing platform: **a gate can prove a ticket is real without ever
 talking to a server.**
 
+It is also a **wire-format specification**. Everything below is stated
+precisely enough to write a verifier in another language from this document
+alone, and
+[`ticket-format-vectors.json`](ticket-format-vectors.json) is the frozen
+conformance corpus you check that verifier against. Two implementations
+already ship in this repo — `internal/tickets` (Go, server + any Go gate) and
+`web/src/lib/capability.js` (JavaScript, the browser scanner that actually
+runs at a door) — and both are held to that corpus in CI.
+
 ## The format
 
 A ticket is a single string that fits comfortably in a QR code:
@@ -19,6 +28,22 @@ Three dot-separated parts:
    garbage before doing any crypto.
 2. A base64url-encoded, compact-JSON payload.
 3. A base64url-encoded Ed25519 signature over that payload.
+
+### Encoding rules (exact)
+
+| Element | Rule |
+|---|---|
+| Separator | ASCII `.` (U+002E). Exactly two of them, so exactly three segments. A token with any other count is malformed. |
+| Segment 1 | The 6 ASCII bytes `cackle`. Compared byte-for-byte — **case-sensitive**, so `CACKLE` is malformed. |
+| Segments 2 and 3 | RFC 4648 §5 base64url — alphabet `A–Z a–z 0–9 - _` — with **padding omitted**. A `=` anywhere, or a `+`/`/` from the standard alphabet, is malformed and must never be re-mapped. (Go: `base64.RawURLEncoding`.) |
+| Signature | Exactly 64 bytes after decoding. Any other length is malformed, checked before the signature is verified. |
+| Public key | Exactly 32 raw bytes. Checked first, before the token is even parsed. |
+| Signed bytes | The **raw decoded bytes of segment 2** — not the base64 text, not a re-serialisation of the parsed payload. |
+| Character set | The whole token is ASCII. |
+
+Nothing in the token is encrypted. A capability is a bearer token: anyone
+holding the string can present it. Its value is that it cannot be *forged* or
+*altered*, not that it is secret.
 
 ### Payload
 
@@ -39,21 +64,65 @@ Three dot-separated parts:
 ```
 
 Compact keys, no whitespace — every byte here is a byte a QR code has to
-encode at a higher error-correction cost. Field meanings:
+encode at a higher error-correction cost.
 
-| Field | Meaning |
-|---|---|
-| `v` | Payload version. A scanner that doesn't understand a version rejects the ticket rather than guessing. |
-| `tid` | Ticket ID (ULID) — what `admissions` dedupes on. |
-| `eid` | Event ID — a scanner rejects a ticket presented at the wrong event's gate. |
-| `tt` | Ticket type ID — lets a gate show "GA" vs "VIP" without a lookup. |
-| `kid` | Key ID — which of the event's `event_keys` rows signed this ticket. Supports key rotation without invalidating already-issued tickets. |
-| `sub` | Holder's user ID. |
-| `nm` | Holder's display name, embedded so a gate can show it without a lookup. |
-| `iat` | Issued-at timestamp. |
-| `nbf` | Not-before — a ticket isn't valid before doors open, even if presented. |
-| `exp` | Expiry — a ticket stops being admittable after the event's admission window closes. |
-| `seat` | Optional seat/section label. |
+| Field | JSON type | Meaning |
+|---|---|---|
+| `v` | integer | Payload version. A scanner that doesn't understand a version rejects the ticket rather than guessing. |
+| `tid` | string | Ticket ID (ULID) — what `admissions` dedupes on. |
+| `eid` | string | Event ID — a scanner rejects a ticket presented at the wrong event's gate. |
+| `tt` | string | Ticket type ID — lets a gate show "GA" vs "VIP" without a lookup. |
+| `kid` | string | Key ID — which of the event's `event_keys` rows signed this ticket. Supports key rotation without invalidating already-issued tickets. |
+| `sub` | string | Holder's user ID. |
+| `nm` | string | Holder's display name, embedded so a gate can show it without a lookup. |
+| `iat` | integer | Issued-at, Unix seconds. |
+| `nbf` | integer | Not-before, Unix seconds. Omitted or `0` means no lower bound. |
+| `exp` | integer | Expiry, Unix seconds. Omitted or `0` means no upper bound. |
+| `seat` | string | Optional seat/section label. |
+
+**Field order is canonical and fixed:** `v, tid, eid, tt, kid, sub, nm, iat,
+nbf, exp, seat`. `nbf`, `exp` and `seat` are omitted entirely when
+zero/empty — they are never emitted as `0` or `""`.
+
+Order and omission matter **only to an issuer** that wants to produce
+byte-identical tokens (and therefore to reproduce the vectors). A *verifier*
+never re-serialises: it checks the signature over the bytes exactly as they
+arrived, so it is indifferent to how the issuer laid them out. What a
+verifier does care about is the strictness below.
+
+### Payload parsing is strict
+
+A verifier must reject, as **malformed**:
+
+- a payload that is not a JSON **object** (an array, a bare number, `null`);
+- any **field name not in the table above** — unknown fields are never
+  ignored, so nothing can be smuggled through the signature into code that
+  might later trust it;
+- any field whose **JSON type** differs from the table (`"iat": "1750000000"`
+  is malformed; so is a non-integer number);
+- any **trailing bytes** after the closing `}`.
+
+`null` for any field is treated as absent — that is what Go's
+`encoding/json` does when unmarshalling `null` into a string or integer, and
+the JavaScript verifier matches it deliberately.
+
+### Reproducing byte-identical tokens (issuers only)
+
+The reference issuer is Go's `encoding/json` over the `Payload` struct, which
+means:
+
+- No whitespace anywhere.
+- `&`, `<` and `>` inside string values are escaped as the six-character
+  sequences `\u0026`, `\u003c` and `\u003e` (Go escapes
+  HTML-significant characters by default).
+- All other non-ASCII is emitted as raw UTF-8, not `\u`-escaped.
+
+The third issue vector in
+[`ticket-format-vectors.json`](ticket-format-vectors.json) pins exactly this,
+with a holder name containing `&`, `<`, `>`, an em dash, a diaeresis and CJK
+characters. An issuer that escapes differently still produces *valid* tokens
+— the signature covers whatever bytes it emitted — it just won't reproduce
+the vectors byte for byte.
 
 ### Signing
 
@@ -65,6 +134,39 @@ design: a compromised or leaked key compromises exactly one event, and
 rotating it (issue a new `event_keys` row, keep the old one valid via `kid`
 until its tickets expire, then `revoked_at` it) doesn't touch any other
 event on the platform.
+
+Signatures are plain Ed25519 (RFC 8032, PureEdDSA over Curve25519) — no
+pre-hash, no context string, no domain separator. The message is the payload
+bytes and nothing else.
+
+### Key IDs and the key ring
+
+A `kid` is derived deterministically from the public key:
+
+```
+kid = "k_" + base64url_unpadded( SHA-256(public_key)[0:16] )
+```
+
+so two implementations independently given the same key agree on its id.
+
+A gate pins a **key ring**: a map of `kid` to public key, scoped to one
+event, delivered inside the scan bundle
+(see [OFFLINE-GATES.md](OFFLINE-GATES.md)). Its wire shape is:
+
+```json
+{
+  "event_id": "<event_ulid>",
+  "keys": { "k_If4x36FUomFia_hUBG_SJw": "<base64url(32-byte public key)>" }
+}
+```
+
+Ring dispatch reads the token's `kid` **without verifying anything** — the
+same move as reading an unverified `kid` header on a JWT — purely to choose
+which pinned key to check against. It is never trusted for more than that
+map lookup; the actual trust decision is still the signature check. A `kid`
+that isn't in the ring is rejected as `unknown_kid` *before* any signature
+work happens. A `kid` that is in the ring but bound to the wrong key fails on
+the signature, as it must.
 
 ## Verification is a pure function
 
@@ -79,29 +181,91 @@ the mechanism that makes offline scanning possible. If `Verify` ever needs
 anything else, offline scanning is broken, because a gate with no network
 has nothing else to give it.
 
-The checks `Verify` performs, in order, and the failure each one exists to
-catch:
+### Check order, and the error each check produces
 
-1. **Prefix and shape** — malformed or truncated tokens (a QR scanned
-   halfway, a copy-paste error) fail immediately, cheaply.
-2. **Base64url decode** of both segments — corrupt encoding fails here.
-3. **Signature verification** against the supplied `pubkey` — a tampered
-   payload (change the seat, change the name, change the `exp`) fails here,
-   because the signature covers the exact payload bytes. A ticket signed
-   with the **wrong event's key** also fails here — this is what stops a
-   ticket for one event being presented at another event's gate, as long as
-   the gate pins the right key for the event it's guarding.
-4. **Version check (`v`)** — an unrecognised version is rejected rather than
-   partially parsed.
-5. **Time window (`nbf` / `exp`)** against the caller-supplied `now` — a
-   ticket presented before doors open, or after the admission window closes,
-   fails here.
+The order is part of the contract: it decides which error a token that is
+wrong in several ways reports, and the vectors pin it.
 
-None of this touches storage or the network. `internal/tickets` ships
-thorough unit tests for exactly the failure modes above: tamper, wrong key,
-expired, not-yet-valid, truncated, wrong version, and replayed (a
-structurally valid, unexpired ticket presented a second time — which
-`Verify` itself does **not** catch, by design; see below).
+| # | Check | Error on failure |
+|---|---|---|
+| 1 | Public key is exactly 32 bytes | `malformed` |
+| 2 | Exactly three `.`-separated segments, first is `cackle` | `malformed` |
+| 3 | Segments 2 and 3 decode as unpadded base64url | `malformed` |
+| 4 | Decoded signature is exactly 64 bytes | `malformed` |
+| 5 | **Ed25519 signature over the raw decoded payload bytes** | `bad_signature` |
+| 6 | Payload parses as strict JSON per the rules above | `malformed` |
+| 7 | `v` equals the version this build supports | `unsupported_version` |
+| 8 | `nbf == 0` or `now >= nbf` | `not_yet_valid` |
+| 9 | `exp == 0` or `now < exp` | `expired` |
+
+Ring dispatch (`VerifyWithRing`) inserts one step before all of these: peek
+`kid`, look it up, `unknown_kid` if absent.
+
+Three things about that ordering that an implementer must not "improve":
+
+- **The signature is checked before the JSON is parsed.** A parser is never
+  run over bytes that haven't been authenticated. Moving the parse earlier
+  hands an attacker your JSON parser as an attack surface.
+- **Tampering and wrong-key are the same error.** `bad_signature` covers
+  both, deliberately: distinguishing them would hand an attacker an oracle.
+- **`nbf` is inclusive, `exp` is exclusive.** A ticket is valid at exactly
+  `nbf` and expired at exactly `exp`. Both boundary seconds are vectors.
+
+### Error codes
+
+The vectors and the JavaScript verifier use these names; Go uses the
+matching sentinel, matched with `errors.Is`.
+
+| Code | Go sentinel |
+|---|---|
+| `malformed` | `ErrMalformed` |
+| `unsupported_version` | `ErrUnsupportedVersion` |
+| `bad_signature` | `ErrBadSignature` |
+| `not_yet_valid` | `ErrNotYetValid` |
+| `expired` | `ErrExpired` |
+| `unknown_kid` | `ErrUnknownKID` |
+
+On any error a verifier returns **no payload at all** — never a partially
+populated one. Callers must not be able to accidentally read fields off a
+token that failed.
+
+## Conformance vectors
+
+[`ticket-format-vectors.json`](ticket-format-vectors.json) is the executable
+half of this spec: fixed keys, tokens frozen as bytes, and the exact outcome
+each one must produce.
+
+```
+keys.issuer          seed (hex), public key (base64url), derived kid
+keys.other           a second key, for wrong-key cases
+keys.truncated       a deliberately 16-byte "key"
+issue[]              payload -> exact payload_json -> exact token
+verify[]             token + key + now_unix -> "ok" (with tid) or "error" (with code)
+verify_with_ring[]   token + ring + now_unix -> "ok" or "error" (with code)
+```
+
+The keys are published, fixed and non-secret; they exist only to make the
+corpus reproducible and sign nothing real.
+
+To validate a new implementation: reconstruct `keys.issuer` from its seed,
+confirm it derives the published public key and `kid`, then run every
+`issue` vector (byte-identical token required) and every `verify` /
+`verify_with_ring` vector (exact error code required).
+
+In this repo the corpus is run by:
+
+- `internal/tickets/conformance_test.go` — the Go verifier, under `go test`.
+- `web/src/lib/capability.conformance.test.js` — the browser verifier, under
+  `npm test` in `web/` (Node's built-in `node:test`, no extra dependency).
+
+Both assert minimum vector counts and that every documented error code is
+exercised by at least one vector, so a truncated or half-parsed corpus fails
+loudly rather than passing by running nothing.
+
+**These vectors are frozen.** There is no `-update` flag, on purpose. If a
+change to the format is genuinely wanted, that is a `v` bump plus a
+deliberate regeneration plus a CHANGELOG entry — not something a test run
+gets to rubber-stamp.
 
 ## What `Verify` deliberately does not do
 
@@ -117,9 +281,13 @@ possible. Instead:
   discarded. This is what makes the design auditable: you can always
   reconstruct exactly what every gate did, in order, even offline.
 - A gate keeps this table **on the device**, so dedupe works without a
-  network the same way `Verify` does.
-- See [OFFLINE-GATES.md](OFFLINE-GATES.md) for how a gate acquires the keys
-  it needs and reconciles admissions once it's back online.
+  network the same way `Verify` does. That dedupe is per device: what it
+  does and does not stop is spelled out in
+  [OFFLINE-GATES.md](OFFLINE-GATES.md#what-offline-double-scan-protection-actually-gives-you).
+- Nor does it answer **"was this ticket refunded after it was issued?"** — a
+  signature can't, since it was made before the refund existed. The scan
+  bundle's `ticket_index` is what closes that gap, again in
+  [OFFLINE-GATES.md](OFFLINE-GATES.md).
 
 ## Why this beats a server round-trip
 
