@@ -126,6 +126,44 @@ end without touching a real payment processor. See
 setup, and [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) for running it for a
 real event.
 
+### Verifying a release binary
+
+Cackle ships no `curl | sh` installer — you download a binary from
+[Releases](https://github.com/vul-os/cackle/releases) and run it, so the
+verification step is yours to run. [`scripts/verify.sh`](scripts/verify.sh)
+does it, and needs only `curl` and `sha256sum`/`shasum`:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/vul-os/cackle/main/scripts/verify.sh
+bash verify.sh --tag v0.3.0 --attest cackle-linux-amd64   # fetch + verify
+bash verify.sh --dir ~/Downloads cackle-linux-amd64       # already downloaded
+```
+
+It fails closed. A missing, empty, HTML or malformed `checksums.txt`, a
+manifest with no entry for the asset you asked for, a truncated download or a
+digest mismatch each exit non-zero with their own diagnostic, and the partial
+download is deleted. There is deliberately no `--skip-verify` and no path where
+an absent manifest means "nothing to check" — a verifier that shrugs at a 404
+prints a line that looks like verification while checking nothing, which is
+worse than no verifier because it turns *"I don't know"* into *"it's fine"*.
+
+Every release also carries a sigstore build-provenance attestation, signed with
+a short-lived certificate minted from the release workflow's OIDC identity —
+no long-lived key, no secret, nothing to rotate. `--attest` checks it (needs
+the `gh` CLI); without it the script prints that provenance was **not** checked
+rather than letting a pass imply more than it checked.
+
+The container image is attested by digest, which is what a mutable tag like
+`:latest` cannot vouch for on its own:
+
+```bash
+gh attestation verify oci://ghcr.io/vul-os/cackle:v0.3.0 --repo vul-os/cackle
+```
+
+`make release-guards` (part of `make check`) runs the verifier's 24
+synthetic-origin failure cases, so its refusals are exercised rather than
+assumed.
+
 ## How it works
 
 Everything that matters for **admission** happens without the server: an

@@ -74,13 +74,23 @@ jobs:
             -o /tmp/cackle-check ./cmd/cackle
           # main.go prints "cackle <version>" (see cmd/cackle/main.go) — take
           # the last field so this survives that format changing slightly.
-          BIN_VER=$(/tmp/cackle-check --version 2>/dev/null | awk '{print $NF}')
+          # `|| true` so a non-zero exit from the binary cannot kill this step
+          # before the emptiness check below runs; that check is the guard.
+          BIN_VER=$(/tmp/cackle-check --version 2>/dev/null | awk '{print $NF}' || true)
+          # FAIL CLOSED. This used to print "WARNING: --version did not print
+          # anything — skipping strict match" and carry on, which turns the one
+          # outcome that means "I could not check" into a pass. A binary that
+          # will not report its own version is a binary this job knows nothing
+          # about, and shipping it under a tag is the claim being verified.
           if [ -z "$BIN_VER" ]; then
-            echo "WARNING: --version did not print anything — skipping strict match"
-          elif [ "$BIN_VER" != "$VERSION" ] && [ "$BIN_VER" != "v$VERSION" ]; then
-            echo "ERROR: binary reports version '${BIN_VER}' but tag is '${VERSION}'"
+            echo "::error::the release binary printed no version — refusing to publish it under tag ${VERSION}. A version check that cannot read a version has not checked anything."
             exit 1
           fi
+          if [ "$BIN_VER" != "$VERSION" ] && [ "$BIN_VER" != "v$VERSION" ]; then
+            echo "::error::binary reports version '${BIN_VER}' but tag is '${VERSION}'"
+            exit 1
+          fi
+          echo "binary reports ${BIN_VER}, tag is ${VERSION}"
 
       - name: Cross-compile
         env:
@@ -103,10 +113,41 @@ jobs:
         if: always()
         run: rm -rf cmd/cackle/dist
 
+      # Everything that will be published lands in out/ and nothing else does,
+      # so the manifest is generated FROM that directory rather than from a
+      # hand-written `cackle-*` glob: "published" and "covered" become the same
+      # set by construction instead of two lists someone keeps in sync.
       - name: Generate SHA-256 checksums
         working-directory: out
         run: |
-          sha256sum cackle-* > checksums.txt
+          set -euo pipefail
+
+          mapfile -t ASSETS < <(find . -maxdepth 1 -type f ! -name checksums.txt -exec basename {} \; | LC_ALL=C sort)
+
+          # FAIL CLOSED. `sha256sum cackle-*` was the whole step: with no
+          # matching files the glob would go through literally and the job
+          # could still hand a checksums.txt downstream that vouched for
+          # nothing. A build that produced no binaries is a red release.
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::out/ contains no binaries — refusing to publish a release whose manifest would vouch for nothing."
+            exit 1
+          fi
+
+          : > checksums.txt
+          for a in "${ASSETS[@]}"; do
+            sha256sum "$a" >> checksums.txt
+          done
+
+          # COVERAGE ASSERTION. Without this the step is trivially satisfiable:
+          # a one-line manifest "covers" a four-binary release and every later
+          # check still passes.
+          LINES="$(wc -l < checksums.txt | tr -d ' ')"
+          if [ "$LINES" -ne "${#ASSETS[@]}" ]; then
+            echo "::error::checksums.txt has ${LINES} line(s) for ${#ASSETS[@]} staged artifact(s) — the manifest does not cover the release."
+            exit 1
+          fi
+
+          echo "checksums.txt covers ${#ASSETS[@]} artifact(s):"
           cat checksums.txt
 
       - name: Upload artifacts
@@ -117,28 +158,93 @@ jobs:
           retention-days: 7
 
   github-release:
-    name: Create GitHub Release
+    name: Create GitHub Release (checksummed + attested)
     needs: build-and-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write       # create the Release and upload assets
+      id-token: write       # mint the OIDC token the attestation is signed with
+      attestations: write   # record the attestation against this repo
     steps:
+      # scripts/verify.sh checks this job's own output below, so the repo has to
+      # be present.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: cackle-binaries
           path: out
+
+      # The producer checked by the consumer, with the script users run. If the
+      # emit step and verify.sh ever disagree about the manifest format, it
+      # surfaces here — in a red release job, not in a user's terminal after
+      # the release is public.
+      - name: Verify checksums.txt with the same script users run
+        run: |
+          set -euo pipefail
+          mapfile -t ASSETS < <(find out -maxdepth 1 -type f ! -name checksums.txt -exec basename {} \; | LC_ALL=C sort)
+          if [ "${#ASSETS[@]}" -eq 0 ]; then
+            echo "::error::nothing staged in out/ — refusing to publish."
+            exit 1
+          fi
+          bash scripts/verify.sh --dir out "${ASSETS[@]}"
+
+      # Prove the refusals still fire, on this runner, for this release, before
+      # anything is published. A verifier whose failure paths are never
+      # exercised is a verifier that has probably stopped failing.
+      - name: Prove the verifier still refuses broken releases
+        run: bash scripts/verify.sh --selftest
+
+      # Short-lived sigstore cert minted from this job's OIDC identity. No
+      # secret is referenced and none needs to exist — there is no key to
+      # store, own or rotate. Attests every file in out/, including
+      # checksums.txt itself, so an attestation on the manifest transitively
+      # covers every binary the manifest names.
+      - name: Attest build provenance (sigstore via OIDC — no long-lived key)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "out/*"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
           generate_release_notes: true
+          body: |
+            ### Verify before you run this
+
+            ```sh
+            curl -fsSLO https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/scripts/verify.sh
+            bash verify.sh --tag ${{ github.ref_name }} --attest cackle-linux-amd64
+            ```
+
+            `verify.sh` fetches `checksums.txt`, looks up the exact entry for
+            the asset and compares digests. It exits non-zero, with a distinct
+            diagnostic, on a missing or malformed manifest, a missing entry, a
+            truncated download or a digest mismatch. There is no skip path.
+            `--attest` additionally checks the sigstore build provenance (needs
+            the `gh` CLI); without it, provenance is NOT checked and the script
+            says so rather than letting a pass imply more than it checked.
+
+            The `ghcr.io/vul-os/cackle` image for this tag carries its own
+            provenance attestation:
+
+            ```sh
+            gh attestation verify oci://ghcr.io/vul-os/cackle:${{ github.ref_name }} --repo ${{ github.repository }}
+            ```
           files: out/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker:
-    name: Build & push ghcr image
+    name: Build & push ghcr image (attested)
     needs: build-and-test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write       # push to ghcr.io
+      id-token: write       # mint the OIDC token the attestation is signed with
+      attestations: write   # record the attestation against this repo
     steps:
       - uses: actions/checkout@v4
 
@@ -152,6 +258,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
+        id: push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -163,3 +270,32 @@ jobs:
             ghcr.io/vul-os/cackle:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The image is a published artifact too, and a tag is mutable: ":latest"
+      # names whatever was pushed last. The attestation binds the immutable
+      # DIGEST to this repo's workflow run, so `gh attestation verify` answers
+      # "did this repo build these exact layers" rather than "does this tag
+      # currently resolve to something". A checksum manifest cannot cover a
+      # registry artifact, so this is the only vouching the image gets.
+      #
+      # push-to-registry: false keeps the attestation on GitHub rather than as
+      # a registry referrer — no dependency on ghcr supporting referrers, and
+      # nothing here needs a secret beyond the job's own OIDC identity.
+      - name: Attest image provenance (sigstore via OIDC — no long-lived key)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ghcr.io/vul-os/cackle
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: false
+
+      # An empty digest would make the step above a no-op that still reports
+      # success — attesting nothing while looking like it attested the image.
+      - name: Assert the image digest was actually attested
+        run: |
+          set -euo pipefail
+          DIGEST='${{ steps.push.outputs.digest }}'
+          if [ -z "$DIGEST" ]; then
+            echo "::error::docker/build-push-action produced no image digest — nothing was attested, so the published image is unvouched-for."
+            exit 1
+          fi
+          echo "attested ghcr.io/vul-os/cackle@${DIGEST}"

@@ -168,3 +168,30 @@ jobs:
 
       - name: Boot check — fail on uncaught exception or empty #root
         run: node scripts/boot-check.mjs --bin ./cackle --port 8089
+
+  # A checksum guard that has quietly stopped failing is indistinguishable,
+  # from a green CI run, from one that works. So verify.sh's refusals are
+  # exercised on every push — not "does the script parse", but "does it still
+  # REFUSE, with its own exit code and its own diagnostic, on each way a
+  # release can be broken".
+  verify-script:
+    name: Release verifier — lint & failure matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check
+        run: bash -n scripts/verify.sh
+
+      - name: ShellCheck
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq shellcheck
+          shellcheck scripts/verify.sh
+
+      # 24 synthetic-origin cases, each broken in exactly one way. Asserts the
+      # exit code AND that a diagnostic was printed, because "aborted with no
+      # message" was the real bug class in the sibling installers.
+      - name: Failure matrix (synthetic origin)
+        run: bash scripts/verify.sh --selftest

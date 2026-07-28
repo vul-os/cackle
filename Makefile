@@ -1,5 +1,5 @@
 .PHONY: build build-frontend build-backend dev run test lint check screenshots notices clean \
-	patala-generate build-patala test-patala run-patala
+	release-guards patala-generate build-patala test-patala run-patala
 
 BIN := cackle
 
@@ -77,8 +77,16 @@ lint:
 	node scripts/sync-docs.mjs --check
 	node scripts/check-doc-links.mjs
 
+# The release verifier's refusals, exercised rather than assumed: 24 synthetic
+# origins each broken in exactly one way, asserting the exit code AND that a
+# diagnostic was printed. A checksum gate that has quietly stopped failing
+# looks exactly like one that works, right up until someone runs a substituted
+# binary.
+release-guards:
+	bash scripts/verify.sh --selftest
+
 # Single gate to run at the end of every change — mirrors CI.
-check: lint test build
+check: lint test release-guards build
 
 # ── Docs / release housekeeping ─────────────────────────────────────────────
 screenshots:
