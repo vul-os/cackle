@@ -39,6 +39,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // run, not a clean repo. Raise them as the docs grow.
 const MIN_REPO_LINKS = 40;
 const MIN_SITE_LINKS = 25;
+const MIN_SITE_ANCHORS = 20;
 const MIN_SOURCE_CITATIONS = 50;
 
 // Chapter slug -> the directory its SOURCE lives in, mirroring the `base`
@@ -190,7 +191,27 @@ async function checkSiteLinks() {
     }
 
     const slugs = new Set(Object.keys(SITE_CHAPTER_BASE).map((c) => c.replace(/\.md$/, '')));
+
+    // Anchors for links that resolve to a real repo path, keyed by that path
+    // — same cache shape pass 1 uses, checking the same real file.
+    const repoAnchorCache = new Map();
+    // Anchors for links that resolve to an in-page chapter jump, keyed by the
+    // chapter's MIRROR file (site/docs/<chapter>.md), not its docs/ source.
+    // Pass 2 is about what the published site actually renders, and the
+    // mirror is allowed to (transiently) drift from docs/*.md until
+    // `docs:check` catches that — so this checks the file a reader of the
+    // site would actually get, not a stand-in for it.
+    const siteAnchorCache = new Map();
+    async function siteAnchors(chapterFile) {
+        if (!siteAnchorCache.has(chapterFile)) {
+            const abs = join(repoRoot, 'site', 'docs', chapterFile);
+            siteAnchorCache.set(chapterFile, existsSync(abs) ? await anchorsIn(abs) : null);
+        }
+        return siteAnchorCache.get(chapterFile);
+    }
+
     let checked = 0;
+    let anchorsChecked = 0;
 
     for (const file of await markdownFilesUnder(posix.join('site', 'docs'))) {
         const chapter = posix.basename(file);
@@ -202,18 +223,56 @@ async function checkSiteLinks() {
         const src = await readFile(join(repoRoot, file), 'utf8');
 
         for (const target of linksIn(src)) {
-            const [rawPath] = target.split('#');
+            const [rawPath, fragment] = target.split('#');
             if (!rawPath) continue; // same-document anchor; the viewer leaves it alone
-            checked++;
 
             const repoPath = resolveRepoPath(base, rawPath);
             const slug = (repoPath.split('/').pop() || '').toLowerCase().replace(/\.md$/, '');
 
             // Either it becomes an in-page chapter jump...
-            if (/\.md$/i.test(repoPath) && slugs.has(slug)) continue;
+            if (/\.md$/i.test(repoPath) && slugs.has(slug)) {
+                checked++;
+                const chapterFile = `${slug}.md`;
+                const anchors = await siteAnchors(chapterFile);
+                // Being a listed chapter (already checked against
+                // site/docs.html's DOCS table above) does not guarantee the
+                // mirror file is actually there — assert it, don't assume it.
+                if (anchors === null) {
+                    note(file, `link "${target}" resolves to chapter "${slug}", but site/docs/${chapterFile} does not exist`);
+                    continue;
+                }
+                // The rendered viewer currently jumps to the CHAPTER only:
+                // rewriteLinks() in site/docs.html routes on location.hash
+                // and cannot carry a second fragment, so `#heading` ends up
+                // dropped at click time (see the "Known limitation" comment
+                // in that function). That is a gap in the viewer's
+                // navigation, not a license to leave a stale anchor in the
+                // source — the link still names a specific heading, raw
+                // markdown readers (GitHub, editors) still follow it
+                // literally, and pass 1 already holds the identical anchor
+                // style to this exact standard in docs/*.md. So it is
+                // checked here too, against the mirror.
+                if (fragment) {
+                    anchorsChecked++;
+                    if (!anchors.has(fragment)) {
+                        note(file, `link "${target}" -> chapter "${slug}" has no heading anchor "#${fragment}" in site/docs/${chapterFile}`);
+                    }
+                }
+                continue;
+            }
+
             // ...or a GitHub link, which had better point at a real path.
+            checked++;
             if (!existsSync(join(repoRoot, repoPath))) {
                 note(file, `link "${target}" resolves to ${repoPath}, which does not exist in the repo`);
+                continue;
+            }
+            if (fragment && repoPath.toLowerCase().endsWith('.md')) {
+                if (!repoAnchorCache.has(repoPath)) repoAnchorCache.set(repoPath, await anchorsIn(join(repoRoot, repoPath)));
+                anchorsChecked++;
+                if (!repoAnchorCache.get(repoPath).has(fragment)) {
+                    note(file, `link "${target}" -> ${repoPath} has no heading anchor "#${fragment}"`);
+                }
             }
         }
     }
@@ -221,7 +280,10 @@ async function checkSiteLinks() {
     if (checked < MIN_SITE_LINKS) {
         note('scripts/check-doc-links.mjs', `only ${checked} site links checked, expected at least ${MIN_SITE_LINKS} — the mirror or link regex is broken`);
     }
-    return checked;
+    if (anchorsChecked < MIN_SITE_ANCHORS) {
+        note('scripts/check-doc-links.mjs', `only ${anchorsChecked} site-link anchors checked, expected at least ${MIN_SITE_ANCHORS} — a fragment-bearing link stopped being counted`);
+    }
+    return { checked, anchorsChecked };
 }
 
 // --- pass 3: documents cited by source comments ------------------------------
@@ -364,7 +426,7 @@ async function checkSourceCitations() {
 }
 
 const repoChecked = await checkRepoLinks();
-const siteChecked = await checkSiteLinks();
+const { checked: siteChecked, anchorsChecked: siteAnchorsChecked } = await checkSiteLinks();
 const sourceChecked = await checkSourceCitations();
 
 if (problems.length) {
@@ -375,5 +437,5 @@ if (problems.length) {
 }
 
 console.log(
-    `check-doc-links: OK — ${repoChecked} repo links, ${siteChecked} site-mirror links and ${sourceChecked} source-comment citations resolve.`,
+    `check-doc-links: OK — ${repoChecked} repo links, ${siteChecked} site-mirror links (${siteAnchorsChecked} with a heading anchor also verified) and ${sourceChecked} source-comment citations resolve.`,
 );
