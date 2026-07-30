@@ -62,7 +62,16 @@ export function AuthProvider({ children }) {
                 setUser(null);
                 setOrgs([]);
                 setActiveOrgId(null);
-                const path = window.location.pathname;
+                // The SEARCH matters as much as the path. Two of the
+                // routes reachable here carry their whole payload in the
+                // query string — /accept-invite?token=… is a team invite
+                // and /payment/verify?reference=… is a settlement — and
+                // useAuthRedirect prefers this state over the path
+                // ProtectedRoute persists, so a bare pathname here does
+                // not merely lose the token, it OVERRIDES the copy that
+                // still had it. An invited scanner then lands on "this
+                // link is missing its invite code" and cannot join.
+                const path = window.location.pathname + window.location.search;
                 if (PROTECTED_PREFIXES.some((p) => path.startsWith(p))) {
                     navigate('/login', { state: { returnTo: path } });
                 }

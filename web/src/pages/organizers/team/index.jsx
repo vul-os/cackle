@@ -194,7 +194,7 @@ const TeamPage = () => {
                                     <FormItem className="flex-1">
                                         <FormLabel className="sr-only">Email</FormLabel>
                                         <FormControl>
-                                            <Input {...field} type="email" placeholder="teammate@example.com" disabled={inviting} />
+                                            <Input {...field} type="email" placeholder="teammate@example.com" disabled={inviting} className="min-h-11" />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -208,7 +208,7 @@ const TeamPage = () => {
                                         <FormLabel className="sr-only">Role</FormLabel>
                                         <Select value={field.value} onValueChange={field.onChange} disabled={inviting}>
                                             <FormControl>
-                                                <SelectTrigger className="w-full sm:w-40">
+                                                <SelectTrigger className="min-h-11 w-full sm:w-40">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -272,7 +272,7 @@ const TeamPage = () => {
                                                             onValueChange={(role) => handleRoleChange(m, role)}
                                                             disabled={roleChangingId === m.user_id}
                                                         >
-                                                            <SelectTrigger className="ml-auto w-32">
+                                                            <SelectTrigger className="ml-auto min-h-11 w-32">
                                                                 <SelectValue />
                                                             </SelectTrigger>
                                                             <SelectContent>
@@ -336,7 +336,7 @@ const TeamPage = () => {
                                             size="sm"
                                             onClick={() => handleRevoke(inviteId)}
                                             disabled={revokingId === inviteId}
-                                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                            className="min-h-11 min-w-11 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                         >
                                             <X className="mr-1.5 h-4 w-4" />
                                             Revoke

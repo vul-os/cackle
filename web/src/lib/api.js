@@ -219,7 +219,19 @@ export const auth = {
     signup: (data) => post('/auth/signup', data),
     login: (data) => post('/auth/login', data),
     logout: () => post('/auth/logout'),
-    me: () => get('/auth/me'),
+    // `me` takes options and MUST forward them. It used to be
+    // `() => get('/auth/me')`, silently dropping the caller's argument —
+    // and the caller that matters is AuthProvider's boot-time probe, which
+    // passes {skipAuthRedirect:true} precisely because a signed-out
+    // visitor's 401 here is normal, not a session expiry. With the option
+    // dropped, every anonymous page load fired the global 401 handler,
+    // which redirects to /login and (before this was fixed alongside)
+    // dropped the query string doing it — so an invited person opening
+    // /accept-invite?token=... signed out lost the token and was told
+    // their link was missing one. `get`'s second parameter is `query`, so
+    // the old form did not even fail loudly; it turned the option into a
+    // querystring object and moved on.
+    me: (opts = {}) => request('/auth/me', { method: 'GET', ...opts }),
     passwordReset: (email) => post('/auth/password-reset', { email }),
     passwordUpdate: (token, password) => post('/auth/password-update', { token, password }),
 };

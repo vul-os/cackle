@@ -78,6 +78,43 @@ test('the invite link points at a route the app actually declares', () => {
     );
 });
 
+test('an invite link opened signed-out survives the sign-in detour with its token', () => {
+    // Found by driving this for real: the link bounced through /login and
+    // came back WITHOUT ?token=, so the invitee was told their link was
+    // missing its code and could not join. Two independent causes, both
+    // asserted here because either one alone reproduces it.
+    //
+    // 1. The global 401 handler recorded window.location.pathname only.
+    //    useAuthRedirect prefers that router state over the path
+    //    ProtectedRoute persists, so a bare pathname does not merely lose
+    //    the token — it overrides the copy that still had it.
+    const auth = read('context/use-auth.jsx');
+    assert.match(
+        auth,
+        /window\.location\.pathname \+ window\.location\.search/,
+        'the 401 redirect drops the query string, so /accept-invite?token=… comes back tokenless',
+    );
+
+    // 2. AuthProvider's boot probe passes {skipAuthRedirect:true} because
+    //    an anonymous visitor's 401 is normal. `auth.me` took no
+    //    arguments and silently dropped it, so every signed-out page load
+    //    fired the 401 redirect in the first place.
+    const api = read('lib/api.js');
+    assert.match(
+        api,
+        /me:\s*\(opts[^)]*\)\s*=>\s*request\('\/auth\/me',\s*\{[^}]*\.\.\.opts/,
+        'auth.me does not forward its options, so skipAuthRedirect is ignored on every anonymous page load',
+    );
+
+    // 3. ProtectedRoute's persisted copy must keep the search too.
+    const guard = read('components/auth/protected-route.jsx');
+    assert.match(guard, /location\.pathname \+ location\.search/, 'ProtectedRoute persists a tokenless path');
+
+    // 4. /accept-invite must be a path the 401 handler recognises as
+    //    protected, or it never records a return-to at all.
+    assert.match(auth, /PROTECTED_PREFIXES = \[[^\]]*'\/accept-invite'/, 'the 401 handler does not treat /accept-invite as protected');
+});
+
 test('the team page keeps the token it is given instead of discarding it', () => {
     const team = read('pages/organizers/team/index.jsx');
     assert.match(
