@@ -38,6 +38,7 @@ import EventAdmissionsPage from './pages/organizers/events/event/admissions';
 import EventOrdersPage from './pages/organizers/events/event/orders';
 import EventTicketTypesPage from './pages/organizers/events/event/tickets';
 import EventImagesPage from './pages/organizers/events/event/images';
+import CreateOrgPage from './pages/organizers/orgs/create';
 import TeamPage from './pages/organizers/team';
 import PayoutsPage from './pages/organizers/payouts';
 import AcceptInvitePage from './pages/organizers/invite-accept';
@@ -219,6 +220,18 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <EventImagesPage />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Creating an org is the one organiser route that must work
+                    with NO org — it is what a brand new account is sent to,
+                    since signup creates only a user (see the organiser home's
+                    no-org branch). */}
+                <Route
+                    path="/admin/orgs/new"
+                    element={
+                        <ProtectedRoute>
+                            <CreateOrgPage />
                         </ProtectedRoute>
                     }
                 />

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { Calendar, Plus, QrCode, Ticket, Building2, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, Plus, QrCode, Ticket, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
@@ -122,17 +122,19 @@ const HomePage = () => {
     const drafts = state.events.filter((e) => e.status === 'draft').length;
     const published = state.events.filter((e) => e.status === 'published').length;
 
+    // A brand new account has no org: signup creates a user and nothing
+    // else (internal/auth.Signup), deliberately, because most people
+    // signing up are buying a ticket rather than selling one.
+    //
+    // This branch used to claim an org "usually happens automatically at
+    // signup" and tell the reader to sign out and back in. That was simply
+    // false — nothing anywhere created an org — so it left a new organiser
+    // re-reading a dead end instead of finishing setup. Now the console's
+    // entry point sends them straight to the one thing they actually need
+    // to do, which is also the only route in /admin that works without an
+    // org.
     if (!orgs || orgs.length === 0) {
-        return (
-            <div className="mx-auto flex max-w-lg flex-col items-center gap-4 py-24 text-center">
-                <Building2 className="h-12 w-12 text-muted-foreground" />
-                <h1 className="font-display text-2xl font-bold">No organization yet</h1>
-                <p className="text-muted-foreground">
-                    Your account isn&apos;t attached to an organizer profile yet. This usually happens automatically at signup — try
-                    signing out and back in, or contact support if it persists.
-                </p>
-            </div>
-        );
+        return <Navigate to="/admin/orgs/new" replace />;
     }
 
     return (

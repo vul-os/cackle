@@ -4,7 +4,7 @@ import { useTheme } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight } from 'lucide-react';
+import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const THEME_OPTIONS = [
@@ -44,20 +44,23 @@ const SettingsPage = () => {
             <Card>
                 <CardHeader>
                     <CardTitle>Organizations</CardTitle>
-                    <CardDescription>Organizations you belong to</CardDescription>
+                    <CardDescription>Organizations you belong to, and the role you hold in each</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                     {orgs.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">You&apos;re not part of an organization yet.</p>
+                        <p className="text-sm text-muted-foreground">
+                            You&apos;re not part of an organization yet. Create one to start selling tickets, or ask someone who
+                            already runs one to invite you.
+                        </p>
                     ) : (
                         <div className="divide-y divide-border rounded-md border border-border">
                             {orgs.map((org) => (
-                                <div key={org.id} className="flex items-center justify-between p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="rounded-full bg-muted p-2">
+                                <div key={org.id} className="flex flex-wrap items-center justify-between gap-2 p-4">
+                                    <div className="flex min-w-0 items-center gap-3">
+                                        <div className="shrink-0 rounded-full bg-muted p-2">
                                             <Building2 className="h-4 w-4 text-muted-foreground" />
                                         </div>
-                                        <span className="font-medium">{org.name}</span>
+                                        <span className="truncate font-medium">{org.name}</span>
                                     </div>
                                     <Badge variant="secondary" className="capitalize">
                                         {org.role}
@@ -66,6 +69,15 @@ const SettingsPage = () => {
                             ))}
                         </div>
                     )}
+                    {/* The only place in the console, besides the first-run
+                        redirect, that an organiser can reach org creation:
+                        the top bar's switcher only appears once you already
+                        have more than one org, so it can never be the way you
+                        get your first (or second). */}
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => navigate('/admin/orgs/new')}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {orgs.length === 0 ? 'Create your organization' : 'Create another organization'}
+                    </Button>
                 </CardContent>
             </Card>
 

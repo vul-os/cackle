@@ -340,6 +340,29 @@ export const ticketTypes = {
 };
 
 // ---------------------------------------------------------------------------
+// Organisations
+// ---------------------------------------------------------------------------
+
+export const orgs = {
+    /**
+     * POST /api/orgs {name, slug?, default_currency?} — any authenticated
+     * user; the caller becomes the new org's `owner`. Returns
+     * { org: {id, name, slug, default_currency, role} }.
+     *
+     * This is the route that makes a brand new account usable: signup
+     * creates ONLY a user, so until an org exists every organiser surface
+     * (events, ticket types, orders, the gate, stats, team, payouts) has
+     * nothing to hang off.
+     *
+     * `slug` is optional and derived from the name when omitted. It is a
+     * GLOBAL namespace, so a taken one is refused with 409 `conflict` —
+     * surface that to the user as "pick another", never as a generic
+     * failure. Creating an org grants no access to any other org.
+     */
+    create: (data) => post('/orgs', data),
+};
+
+// ---------------------------------------------------------------------------
 // Org members & invites
 // ---------------------------------------------------------------------------
 
