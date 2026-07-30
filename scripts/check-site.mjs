@@ -35,7 +35,7 @@
  */
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, extname, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -86,7 +86,7 @@ const BREAKPOINTS = [360, 768, 1440];
 const CHECKS_PER_PAGE = 5 + BREAKPOINTS.length; // requests, >=400, console, self-contained, images + breakpoints
 const CLAIM_CHECKS = 2;                          // landing only, per shape
 const DOCS_CHECKS = 1;                           // docs.html only: rail vs chapter table
-const SELF_TESTS = 1;                            // the claim gate proving it still bites
+const SELF_TESTS = 2;                            // claim gate + brand-mark-provenance gate, both proving they still bite
 const EXPECTED_CHECKS =
   SELF_TESTS + SHAPES.length * (2 * CHECKS_PER_PAGE + CLAIM_CHECKS + DOCS_CHECKS);
 
@@ -237,6 +237,44 @@ function claimGateSelfTest() {
   return bad;
 }
 
+/**
+ * Every script that draws the brand mark (site/assets/og-card.png's tile,
+ * currently the only one) must PARSE brand/logo.svg's <line>/<path> at run
+ * time rather than re-declaring the coordinates as a literal — a hardcoded
+ * copy already drifted here once (a stale line y-position and a different
+ * smile curve, found and fixed alongside this check). This is a static
+ * source-text check, not a render, so it fails closed even if playwright
+ * never launches for the rest of the file.
+ */
+function brandMarkProvenanceCheck() {
+  const bad = [];
+  const brandSvg = readFileSyncSafe(join(repoRoot, 'brand', 'logo.svg'));
+  if (!brandSvg) return ['brand/logo.svg is missing — cannot verify anything derives from it'];
+  const linePayload = (brandSvg.match(/<line\b([^>]*)\/>/) || [])[1];
+  const pathPayload = (brandSvg.match(/<path\b([^>]*)\/>/) || [])[1];
+  if (!linePayload || !pathPayload) return ['brand/logo.svg has no recognisable <line>/<path> mark to check against'];
+
+  const generators = [{ file: join(repoRoot, 'scripts', 'make-og-card.mjs'), label: 'scripts/make-og-card.mjs' }];
+  let checked = 0;
+  for (const { file, label } of generators) {
+    const src = readFileSyncSafe(file);
+    if (!src) { bad.push(`${label} is missing`); continue; }
+    checked++;
+    if (!/brand.*logo\.svg/.test(src)) bad.push(`${label} never reads brand/logo.svg`);
+    // The mark's own d="..."/coordinate payload must not appear as a second
+    // literal in the generator's source — that would mean it was re-declared
+    // rather than parsed out at run time.
+    const dMatch = pathPayload.match(/d="([^"]+)"/);
+    if (dMatch && src.includes(dMatch[1])) bad.push(`${label} hardcodes the mark's path data instead of parsing it`);
+  }
+  if (checked === 0) bad.push('found zero brand-mark generators to check — this gate is checking nothing');
+  return bad;
+}
+
+function readFileSyncSafe(p) {
+  try { return readFileSync(p, 'utf8'); } catch { return null; }
+}
+
 async function main() {
   if (!existsSync(siteDir)) { console.error(`check-site: no site/ at ${siteDir}`); process.exit(1); }
   const browser = await chromium.launch();
@@ -255,6 +293,11 @@ async function main() {
   const selfTest = claimGateSelfTest();
   note(selfTest.length === 0, 'claim gate',
     `catches a prevention claim and forgives an honest denial${selfTest.length ? ' — ' + selfTest.join('; ') : ''}`);
+
+  log('brand mark provenance');
+  const markProblems = brandMarkProvenanceCheck();
+  note(markProblems.length === 0, 'brand mark provenance',
+    `every mark-drawing generator parses brand/logo.svg instead of re-declaring it${markProblems.length ? ' — ' + markProblems.join('; ') : ''}`);
 
   for (const shape of SHAPES) {
     const server = await serve(shape.base, shape.dir);

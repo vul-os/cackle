@@ -10,6 +10,13 @@
  * Self-contained like the page it advertises — the font is the woff2 this repo
  * already vendors, inlined as a data: URI so the render needs no network.
  *
+ * The small brand tile in the card header is PARSED out of brand/logo.svg at
+ * run time (not re-declared as a second literal) — this script used to draw
+ * its own line/path with different coordinates than the approved mark, which
+ * meant every og-card.png shipped a subtly different glyph than the actual
+ * favicon. See commit history: fixed alongside the rest of the suite's
+ * generator-hardening pass.
+ *
  * Usage: node scripts/make-og-card.mjs
  */
 import { chromium } from 'playwright';
@@ -20,6 +27,18 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fontB64 = readFileSync(join(repoRoot, 'site', 'assets', 'fonts', 'figtree-latin.woff2')).toString('base64');
 const out = join(repoRoot, 'site', 'assets', 'og-card.png');
+
+// Parse the approved mark's line + path out of brand/logo.svg. The tile's
+// background rect (colour/rx) is drawn separately by the card's own CSS
+// (`.tile{background:#FF4848;border-radius:15px}`) to match the card's own
+// tile-corner-radius convention, so we only need the two inner glyph shapes.
+const brandSvg = readFileSync(join(repoRoot, 'brand', 'logo.svg'), 'utf8');
+const lineMatch = brandSvg.match(/<line\b[^>]*\/>/);
+const pathMatch = brandSvg.match(/<path\b[^>]*\/>/);
+if (!lineMatch || !pathMatch) {
+  throw new Error('make-og-card: could not find the mark\'s <line>/<path> in brand/logo.svg');
+}
+const markMarkup = `${lineMatch[0]}\n      ${pathMatch[0]}`;
 
 const html = `<!doctype html><meta charset="utf-8"><style>
 @font-face{font-family:'Figtree';font-weight:300 900;font-display:block;
@@ -47,8 +66,7 @@ p{font-size:27px;color:#A6A3AD;max-width:40ch;line-height:1.42}
 <div class="in">
   <div class="brand">
     <span class="tile"><svg viewBox="0 0 128 128" fill="none">
-      <line x1="22" y1="42" x2="106" y2="42" stroke="#fff" stroke-width="7" stroke-dasharray="13 13" stroke-linecap="round"/>
-      <path d="M40 76 Q64 106 88 76" stroke="#fff" stroke-width="13" stroke-linecap="round" fill="none"/>
+      ${markMarkup}
     </svg></span><span>Cackle<span class="amber">.</span></span>
   </div>
   <h1>The wifi dies.<br>The gate <span class="amber">keeps working</span>.</h1>
