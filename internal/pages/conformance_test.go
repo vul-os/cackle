@@ -256,6 +256,7 @@ func TestConformanceCorpusIsWellFormed(t *testing.T) {
 
 func TestConformanceAccept(t *testing.T) {
 	vf := loadVectors(t)
+	ran := 0
 	for _, v := range vf.Accept {
 		t.Run(v.Name, func(t *testing.T) {
 			raw := documentBytes(t, v.Name, v.Document)
@@ -284,11 +285,19 @@ func TestConformanceAccept(t *testing.T) {
 				t.Errorf("canonical form is not stable:\n first: %s\nsecond: %s", canon, canon2)
 			}
 		})
+		ran++
+	}
+	// This test must not be able to pass having run nothing: a corpus that
+	// shrank, or a loop that quietly stopped iterating, has to fail loudly
+	// here rather than rely on TestConformanceCorpusIsWellFormed alone.
+	if ran != len(vf.Accept) {
+		t.Fatalf("ran %d accept vectors, file has %d", ran, len(vf.Accept))
 	}
 }
 
 func TestConformanceReject(t *testing.T) {
 	vf := loadVectors(t)
+	ran := 0
 	for _, v := range vf.Reject {
 		t.Run(v.Name, func(t *testing.T) {
 			var raw []byte
@@ -315,11 +324,16 @@ func TestConformanceReject(t *testing.T) {
 				t.Errorf("error %q does not name the offending path %q", err.Error(), v.Path)
 			}
 		})
+		ran++
+	}
+	if ran != len(vf.Reject) {
+		t.Fatalf("ran %d reject vectors, file has %d", ran, len(vf.Reject))
 	}
 }
 
 func TestConformanceRender(t *testing.T) {
 	vf := loadVectors(t)
+	ran := 0
 	for _, v := range vf.Render {
 		t.Run(v.Name, func(t *testing.T) {
 			raw := documentBytes(t, v.Name, v.Document)
@@ -376,6 +390,10 @@ func TestConformanceRender(t *testing.T) {
 				}
 			}
 		})
+		ran++
+	}
+	if ran != len(vf.Render) {
+		t.Fatalf("ran %d render vectors, file has %d", ran, len(vf.Render))
 	}
 }
 
@@ -383,6 +401,7 @@ func TestConformanceRender(t *testing.T) {
 // fails to render would be a format whose two halves disagree.
 func TestConformanceEveryAcceptedDocumentRenders(t *testing.T) {
 	vf := loadVectors(t)
+	ran := 0
 	for _, v := range vf.Accept {
 		t.Run(v.Name, func(t *testing.T) {
 			doc, err := Parse(documentBytes(t, v.Name, v.Document))
@@ -409,6 +428,10 @@ func TestConformanceEveryAcceptedDocumentRenders(t *testing.T) {
 				}
 			}
 		})
+		ran++
+	}
+	if ran != len(vf.Accept) {
+		t.Fatalf("ran %d accept vectors, file has %d", ran, len(vf.Accept))
 	}
 }
 
