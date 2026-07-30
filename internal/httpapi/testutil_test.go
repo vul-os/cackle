@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/vul-os/cackle/internal/auth"
@@ -83,6 +84,29 @@ func (a testPaymentRecordStoreAdapter) ListPaymentRecords(ctx context.Context, p
 	return out, nil
 }
 
+// syncBuffer is a bytes.Buffer safe for the router's logger to write to
+// while a test reads it. It exists so tests can assert on what the server
+// LOGGED, not just what it returned — the request logger deliberately
+// records r.URL.Path and never RawQuery, and a credential arriving in a
+// query string (an invite link) must not end up in a log file. See
+// TestInvite_TokenIsReturnedOnceAndNeverLogged.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // testHarness wires up a full, in-memory Cackle stack (real SQLite via
 // :memory:, real auth/events/orders services, the stub payment provider)
 // behind the real httpapi.New router — no mocks below the HTTP layer.
@@ -97,6 +121,9 @@ type testHarness struct {
 	payments *payments.Registry
 	cfg      *config.Config
 	mediaDir string
+	// logs captures everything the server logged during the test. Nothing
+	// is printed unless a test asks for it.
+	logs *syncBuffer
 }
 
 func newTestHarness(t *testing.T) *testHarness {
@@ -164,6 +191,8 @@ func newTestHarness(t *testing.T) *testHarness {
 		MediaDir:      mediaDir,
 	}
 
+	logs := &syncBuffer{}
+
 	h := New(Deps{
 		Store:    st,
 		Auth:     authSvc,
@@ -173,12 +202,13 @@ func newTestHarness(t *testing.T) *testHarness {
 		Payments: reg,
 		Config:   cfg,
 		MediaDir: mediaDir,
-		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Logger:   slog.New(slog.NewTextHandler(logs, nil)),
 	})
 
 	return &testHarness{
 		t: t, handler: h, store: st, auth: authSvc, events: eventsSvc,
 		orders: ordersSvc, orgs: orgsSvc, payments: reg, cfg: cfg, mediaDir: mediaDir,
+		logs: logs,
 	}
 }
 
