@@ -27,57 +27,105 @@
     --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
-    /* ── Cackle's brand colours ───────────────────────────────────────────
-       `--brand` is #F5A623, the accent this product's own mini-site declares
-       in site/assets/style.css and the one the suite's design survey recorded
-       for cackle. The app used to run a red primary that matched nothing; it
-       now leads with the same amber the landing page does, and `--brand-2` is
-       that file's `--accent-2` — the #FF4848 of brand/logo.svg's tile.
+    /* ── Cackle's brand colours: RED, WHITE, INK ──────────────────────────
+       Three colours, and nothing else is structural.
 
-       These two are FIXED in both themes: they are identity, not surface, and
-       a mark that changes colour with the OS theme is not a mark. Everything
-       theme-dependent below is derived from them.
+         RED   #FF4848  hsl(0 100% 64.1%)  the logo tile, the wordmark dot,
+                                           the primary fill, the perforation.
+         WHITE #FFFFFF                     the light page ground.
+         INK   #14121A  hsl(260 18% 9%)    the third colour: body type, the
+                                           dark ground, every structural line.
 
-       The measured reason there is a separate `--primary-emphasis`: #F5A623
-       on white is 1.99:1. It is a superb FILL and an unusable INK on a light
-       surface, so brand-coloured text, icons and the focus ring resolve to a
-       darkened amber in light mode and a lifted one in dark mode. Using
-       `--primary` for text on a light background is the one thing this palette
-       forbids, and contrast.test.js measures it rather than trusting anyone to
-       remember. */
-    --brand: 37.4 91.3% 54.9%;
-    --brand-2: 0 100% 64.1%;
-    /* The only text colour permitted on a `--brand` fill: 8.52:1. */
-    --brand-ink: 30 45% 10%;
+       Amber (#F5A623) used to be `--brand`. It has been RETIRED, and not for
+       taste: it sat one hue-step away from `--verdict-duplicate`, the burnt
+       orange this product floods the whole screen with to say ALREADY
+       SCANNED. Brand chrome that looks like a gate warning is a safety
+       defect. Amber now appears in exactly two places — `--verdict-duplicate`
+       and `--warning` — and in both of them it means "stop and look".
+
+       `--brand` / `--brand-2` / `--brand-ink` are FIXED in both themes: they
+       are identity, not surface, and a mark that changes colour with the OS
+       theme is not a mark. Everything theme-dependent below derives from them.
+
+       ── The measured reason there is a separate `--primary-emphasis` ──
+       #FF4848 on white measures 3.34:1 (contrast.test.js computes this; it is
+       not copied from anywhere). That is a fine FILL and an unusable INK for
+       body copy on a light surface. So brand-coloured TEXT, icons and rules
+       resolve to `--primary-emphasis` — RED-INK #C42323 at 5.87:1 in light,
+       a lifted red in dark. Using `--primary` for small text on a light
+       background is the one thing this palette forbids, and the test measures
+       it rather than trusting anyone to remember. */
+    --brand: 0 100% 64.1%;
+    --brand-2: 260 18% 9%;
+    /* The mark's OWN white — the dashed tear line and the smile arc inside
+       brand/logo.svg. White on #FF4848 is 3.34:1, which clears WCAG 1.4.11
+       for graphics and large display type and clears NOTHING ELSE. It is not
+       a text colour for controls; see `--primary-foreground` below. */
+    --brand-ink: 0 0% 100%;
 
     --background: 0 0% 100%;
-    --foreground: 240 10% 8%;
+    --foreground: 260 18% 9%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 40%;
+    /* BONE #F7F3EE. Warm paper rather than a cool grey, so white cards lift
+       off it instead of merging into it. */
+    --muted: 33 33% 95%;
+    /* MUTE-L #6B6470 — a warm-neutral secondary ink that clears 4.5:1 on
+       BOTH white and bone, because secondary prose lands on both. */
+    --muted-foreground: 280 5% 42%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 8%;
+    --popover-foreground: 260 18% 9%;
 
-    --border: 240 6% 90%;
-    --input: 240 5% 58%;
+    /* LINE-L #E5DED5 — the hairline, tinted toward bone so rules read as
+       part of the paper rather than as a grey imported from somewhere else. */
+    --border: 31 25% 87%;
+    /* A text field is identified by its BORDER, so this is held to WCAG
+       1.4.11's 3:1 against every surface a field sits on (page, card, bone),
+       not to a decorative hairline value. */
+    --input: 265 8% 52%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 8%;
+    --card-foreground: 260 18% 9%;
 
-    --primary: 37.4 91.3% 54.9%;
-    --primary-foreground: 30 45% 10%;
-    /* Brand as INK — text, icons, the focus ring. Never interchangeable with
-       --primary; see the note above. */
-    --primary-emphasis: 30 92% 32%;
+    --primary: 0 100% 64.1%;
+    /* INK, not white. This is the one place the app departs from the design
+       spec's §6 table, and it departs on a measurement the spec itself asks
+       for in §2.2 ("the only permitted ink is #FFFFFF … or INK #14121A. Pick
+       per use and state which").
 
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 10% 12%;
+       White on #FF4848 is 3.34:1. A default button is `text-sm` (14px)
+       medium — normal text under WCAG 1.4.3, which needs 4.5:1 — so white
+       would ship a failing label on the most-clicked control in the product.
+       INK on #FF4848 is 5.48:1 and is safe at any size. The colour changed;
+       the threshold did not.
 
-    --accent: 38 96% 94%;
-    --accent-foreground: 30 92% 28%;
+       It also buys a free affordance: a RED fill with INK type is a primary
+       action, a DEEP-RED fill with WHITE type is destructive. The two can
+       never be confused at a glance even though both are red. */
+    --primary-foreground: 260 18% 9%;
+    /* RED-INK #C42323 — brand as INK: text, icons, rules, the focus ring's
+       relatives. Never interchangeable with --primary; see the note above. */
+    --primary-emphasis: 0 70% 45%;
 
-    --destructive: 0 74% 42%;
+    --secondary: 33 33% 95%;
+    --secondary-foreground: 260 18% 14%;
+
+    /* RED-WASH #FFF0F0 — the lightest useful red. Hover states, callouts and
+       badge fills, always under `--accent-foreground` (a deep red), never
+       under `--primary`. */
+    --accent: 0 100% 97%;
+    --accent-foreground: 0 70% 38%;
+
+    /* Danger in a red-branded product needs a deliberate answer, because the
+       brand is now the colour every other product reserves for "are you sure".
+       Three separations, so no single one has to carry it:
+         hue        h=345 crimson vs the brand's h=0 — 15° apart.
+         lightness  2.49:1 between the two fills on this theme.
+         ink        the brand fill carries INK, this carries WHITE.
+       And, as always, colour is never the only signal: a destructive control
+       carries an explicit verb (WCAG 1.4.1). All three are asserted in
+       contrast.test.js. */
+    --destructive: 345 78% 34%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 152 65% 26%;
@@ -100,24 +148,36 @@
        instantly at a distance, and hue is never the only signal — every
        verdict also carries a distinct icon and an explicit word.
 
-       `--verdict-duplicate` is a burnt orange, held well away from
-       `--brand`'s amber on purpose: "already scanned" is a state, the brand
-       is not, and the two must never be mistaken for each other. */
+       These values are FROZEN. The brand moved off amber precisely so that
+       `--verdict-duplicate`'s burnt orange has the screen to itself: amber
+       on a gate now means one thing only, and it is not branding. */
     --verdict-admit: 150 70% 29%;
     --verdict-reject: 0 78% 46%;
     --verdict-duplicate: 28 95% 34%;
     --verdict-ink: 0 0% 100%;
 
-    --ring: 30 92% 40%;
+    /* The focus ring is red — it is the brand's own signal for "this is the
+       thing you are touching". Held one step darker than `--primary` because
+       the ring must clear 3:1 against the LIGHTEST surface it can surround,
+       which is bone, and #FF4848 on bone is 3.02:1 — passing, but with no
+       margin at all for a future tint. */
+    --ring: 0 84% 55%;
 
     --radius: 0.75rem;
 
+    /* The ticket perforation (see the motif utilities near the bottom). Red
+       at low alpha on paper; the dark theme lifts it, because the same alpha
+       over ink reads as nothing. */
+    --perforation: 0 100% 64.1% / 0.55;
+
     /* Categorical chart series (analytics only — never used for brand UI).
-       Validated against this theme's actual card surface (#fff light /
-       #131316-ish dark) with dataviz's six-check palette validator: fixed
-       hue ORDER is the CVD-safety mechanism, never re-cycle or reassign by
-       rank. Light mode carries a contrast WARN on slots 3/5/6 (below 3:1) —
-       every chart using them ships direct text labels, never color alone. */
+       Validated against this theme's actual card surface with dataviz's
+       six-check palette validator: fixed hue ORDER is the CVD-safety
+       mechanism, never re-cycle or reassign by rank. Light mode carries a
+       contrast WARN on slots 3/5/6 (below 3:1) — every chart using them ships
+       direct text labels, never color alone. Untouched by the palette change:
+       these are data, not brand, and re-ranking them would silently rewrite
+       every chart already in the product. */
     --chart-1: 213 68% 50%; /* blue */
     --chart-2: 120 100% 26%; /* green */
     --chart-3: 337 70% 70%; /* magenta */
@@ -126,15 +186,16 @@
     --chart-6: 17 82% 56%; /* orange */
     --chart-7: 249 48% 44%; /* violet */
     --chart-8: 0 73% 59%; /* red */
-    --chart-track: 240 5% 90%;
+    --chart-track: 31 20% 90%;
 
     /* The organiser console chrome (top bar + side nav) is intentionally a
-       persistent dark shell in both themes — a deliberate brand choice, not
-       an unstyled corner. Tokenised here rather than hardcoded so contrast
-       stays auditable and consistent between light/dark mode. */
-    --sidebar-background: 240 12% 6%;
+       persistent INK shell in both themes — a deliberate brand choice, not an
+       unstyled corner. Held one step deeper than `--background`'s ink so the
+       shell still separates from the page in dark mode. Tokenised rather than
+       hardcoded so contrast stays auditable. */
+    --sidebar-background: 258 22% 6%;
     --sidebar-foreground: 0 0% 96%;
-    /* 0.6 alpha over the sidebar measures 7.25:1 — the alpha is composited
+    /* 0.6 alpha over the sidebar measures 7.29:1 — the alpha is composited
        before it is scored, because measuring a translucent token as if it
        were opaque reports a number no eye ever receives. See lib/contrast.js. */
     --sidebar-muted-foreground: 0 0% 100% / 0.6;
@@ -142,45 +203,65 @@
     --sidebar-accent: 0 0% 100% / 0.1;
     --sidebar-accent-foreground: 0 0% 100%;
     /* The active nav item's brand wash. Its FOREGROUND is what has to be
-       legible, so the wash stays a low-alpha amber tint and the label on top
-       is the lifted brand ink, not white-on-amber. */
-    --sidebar-primary: 37.4 91.3% 54.9% / 0.16;
-    --sidebar-primary-foreground: 38 95% 68%;
+       legible, so the wash stays a low-alpha red tint and the label on top is
+       a lifted red, not ink-on-red — the wash is far too dark for that. */
+    --sidebar-primary: 0 100% 64.1% / 0.18;
+    --sidebar-primary-foreground: 0 100% 78%;
   }
 
   .dark {
-    --background: 240 12% 6%;
-    --foreground: 0 0% 96%;
+    /* INK is the ground. `--background` and the brand's `--brand-2` are the
+       same colour on purpose: in dark mode the page IS the third brand
+       colour, rather than a generic near-black borrowed from a template. */
+    --background: 260 18% 9%;
+    --foreground: 0 0% 100%;
 
-    --muted: 240 8% 13%;
-    --muted-foreground: 240 5% 65%;
+    --muted: 258 18% 15%;
+    /* MUTE-D #A9A2B4 — clears 4.5:1 on ink, on the card ink and on the muted
+       fill, all three of which secondary prose lands on. */
+    --muted-foreground: 263 11% 67%;
 
-    --popover: 240 12% 8%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 258 18% 12%;
+    --popover-foreground: 0 0% 100%;
 
-    --border: 240 8% 18%;
-    --input: 240 6% 46%;
+    /* INK-3 #2A2633 hairline / INK-2 #1D1A25 raised surface. */
+    --border: 258 15% 18%;
+    --input: 258 12% 48%;
 
-    --card: 240 10% 9%;
-    --card-foreground: 0 0% 96%;
+    --card: 258 18% 12%;
+    --card-foreground: 0 0% 100%;
 
-    /* The brand fill lifts very slightly on a dark canvas so it reads as the
-       same amber rather than a muddier one; its ink stays the near-black
-       `--brand-ink`, because a white-on-amber button is 1.99:1 in either
-       theme. --brand / --brand-2 / --brand-ink are NOT redefined here: see
-       the note in :root — identity does not follow the theme. */
-    --primary: 38 93% 58%;
-    --primary-foreground: 30 45% 10%;
-    --primary-emphasis: 38 95% 62%;
+    /* The brand fill does NOT lift on a dark canvas the way the old amber
+       did. #FF4848 already measures 5.48:1 against ink, so there is nothing
+       to fix, and shifting it would mean the primary button and the logo tile
+       beside it were two different reds. Its ink stays INK — white on red is
+       3.34:1 in either theme, so the theme cannot rescue it. */
+    --primary: 0 100% 64.1%;
+    --primary-foreground: 260 18% 9%;
+    /* Brand as INK on a dark ground has to go the other way from light mode:
+       RED-INK would be 2.3:1 here, so this lifts instead of darkening. */
+    --primary-emphasis: 0 100% 71%;
 
-    --secondary: 240 8% 15%;
-    --secondary-foreground: 0 0% 96%;
+    --secondary: 258 16% 17%;
+    --secondary-foreground: 0 0% 100%;
 
-    --accent: 32 42% 16%;
-    --accent-foreground: 38 95% 68%;
+    /* RED-DEEP #3A1414 — the dark-theme red tint fill. */
+    --accent: 0 48% 15%;
+    --accent-foreground: 0 100% 80%;
 
-    --destructive: 0 84% 68%;
-    --destructive-foreground: 0 60% 10%;
+    /* Danger inverts on ink: a light crimson fill under dark type, which is
+       also what makes it legible as TEXT on the ink ground (7.05:1) — the
+       token has to serve both roles.
+
+       Honest limitation: on this ground the lightness separation from
+       `--primary` collapses to 1.28:1, because both tokens have to be light
+       enough to read on ink and there is not room for two distinct light
+       reds. HUE is what separates them here (15°, crimson vs red), backed by
+       1.4.1's rule that colour is never the only signal. The test asserts the
+       hue split in both themes and the lightness split only where it is real,
+       rather than pretending dark mode has a margin it does not. */
+    --destructive: 345 92% 72%;
+    --destructive-foreground: 345 45% 12%;
 
     --success: 152 58% 55%;
     --success-foreground: 152 90% 8%;
@@ -196,9 +277,13 @@
     --verdict-duplicate: 28 95% 34%;
     --verdict-ink: 0 0% 100%;
 
-    --ring: 38 95% 62%;
+    /* On ink there is no need to darken the ring: the brand red itself is
+       5.48:1 against the page, so the focus indicator IS the brand colour. */
+    --ring: 0 100% 64.1%;
 
     --radius: 0.75rem;
+
+    --perforation: 0 100% 64.1% / 0.75;
 
     /* Same eight categorical hues, stepped for the dark surface (not a
        separate palette) — validator re-run with --mode dark, all 8 clear
@@ -211,7 +296,7 @@
     --chart-6: 17 70% 50%;
     --chart-7: 247 69% 72%;
     --chart-8: 0 72% 65%;
-    --chart-track: 240 8% 20%;
+    --chart-track: 258 15% 20%;
 
     /* --sidebar-* tokens are deliberately NOT redefined here: the console
        chrome stays visually identical in light and dark mode (see :root). */
@@ -230,6 +315,10 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    /* 390px is the narrowest device this app promises to work on, and the
+       promise is "zero horizontal overflow". A stray wide child is a layout
+       bug, but it should not also become a page that scrolls sideways. */
+    overflow-x: hidden;
   }
   ::selection {
     @apply bg-primary/25;
@@ -253,14 +342,31 @@
     @apply text-lg font-semibold tracking-tight text-foreground;
   }
 
+  /* Suite-wide 12px type floor. Tailwind's `text-xs` is 0.75rem = 12px, and
+     nothing in this app is allowed below it — a gate is read in a hurry, at
+     arm's length, often by someone who is not the person who set it up.
+     Declared here as the last line of defence for any raw `<small>` /
+     `<sup>` / `<sub>` a page reaches for, all of which the UA sets smaller. */
+  small,
+  sub,
+  sup,
+  figcaption {
+    font-size: max(0.75rem, 0.833em);
+  }
+
   /* Safety-net focus ring: every component in ui/ already carries its own
      focus-visible:ring-* treatment, but this keeps any plain <a>/<button>
      a page reaches for directly from ever rendering with no visible focus
      state (WCAG AA — focus must always be visible, never just the UA
-     default which some resets suppress). */
+     default which some resets suppress).
+
+     Two rings, not one: the red indicator plus a background-coloured spacer
+     underneath it, so the ring stays visible when the focused element is
+     ITSELF red (a primary button) as well as when it sits on paper. */
   :focus-visible {
     outline: 2px solid hsl(var(--ring));
     outline-offset: 2px;
+    box-shadow: 0 0 0 2px hsl(var(--background));
   }
 }
 
@@ -332,11 +438,16 @@
 }
 
 /* ── Ticket motifs ─────────────────────────────────────────────────────────
-   Cackle's mark is a ticket stub with a dashed tear-line — these three
-   utilities carry that idea into layout instead of just the logo. Intentionally
-   outside @layer (they set structural background-image, not a themeable
-   token) and used sparingly: hero/section seams and the odd card divider,
-   never as ambient decoration on every panel. */
+   Cackle's mark is a ticket stub with a dashed tear-line, and the product IS
+   a paper-simple object that keeps its meaning after you walk away from the
+   counter. These utilities carry that idea into layout instead of leaving it
+   in the logo. Intentionally outside @layer (they set structural
+   background-image and pseudo-elements, not themeable tokens).
+
+   The perforation is RED now — `--perforation` is the brand red at 0.4 alpha
+   on paper and 0.6 on ink, because the same alpha over a dark ground
+   disappears. Used sparingly: section seams, stub edges and the odd card
+   divider, never as ambient decoration on every panel. */
 
 /* A perforated "tear line" — a dashed rule with two punched circles at its
    ends, like the line you'd fold a real ticket stub along. `--notch` must be
@@ -344,7 +455,7 @@
    background right behind the rule); it defaults to the page background. */
 .ticket-perforation {
   position: relative;
-  border-top: 2px dashed hsl(var(--border));
+  border-top: 2px dashed hsl(var(--perforation));
 }
 .ticket-perforation::before,
 .ticket-perforation::after {
@@ -361,6 +472,38 @@
 }
 .ticket-perforation::after {
   right: -8px;
+}
+
+/* The same tear line running vertically — the seam between a ticket and its
+   stub. Pair with a two-column grid: content, seam, stub. */
+.ticket-perforation-y {
+  position: relative;
+  border-left: 2px dashed hsl(var(--perforation));
+}
+.ticket-perforation-y::before,
+.ticket-perforation-y::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: hsl(var(--notch, var(--background)));
+}
+.ticket-perforation-y::before {
+  top: -8px;
+}
+.ticket-perforation-y::after {
+  bottom: -8px;
+}
+
+/* A whole stub: a card with a punched notch bitten out of each side at the
+   tear line. `--notch-y` moves the notches to wherever the perforation sits
+   (default: two thirds down). Cheap — two radial gradients, no extra DOM. */
+.ticket-stub {
+  --notch-y: 66%;
+  background-image: radial-gradient(circle at left var(--notch-y), hsl(var(--notch, var(--background))) 9px, transparent 9.5px),
+    radial-gradient(circle at right var(--notch-y), hsl(var(--notch, var(--background))) 9px, transparent 9.5px);
 }
 
 /* A torn-edge seam between two stacked sections — a strip of triangular

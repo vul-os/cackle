@@ -21,15 +21,20 @@ module.exports = {
                 foreground: 'hsl(var(--foreground))',
                 primary: {
                     DEFAULT: 'hsl(var(--primary))',
+                    // INK, not white: white on the brand red is 3.34:1 and a
+                    // 14px button label is normal text. See index.css.
                     foreground: 'hsl(var(--primary-foreground))',
                     // Brand as INK. `text-primary` on a light surface is
-                    // 1.99:1 — use `text-primary-emphasis` for brand-coloured
+                    // 3.34:1 — use `text-primary-emphasis` for brand-coloured
                     // text, icons and rules. See the note in index.css.
                     emphasis: 'hsl(var(--primary-emphasis))',
                 },
-                // Fixed identity colours, theme-independent: the mark's amber
-                // and the logo tile's red. Chrome and states derive from the
-                // semantic tokens above, never from these.
+                // Fixed identity colours, theme-independent: the logo tile's
+                // RED, the INK that is the brand's third colour, and the white
+                // linework inside the mark itself. Chrome and states derive
+                // from the semantic tokens above, never from these.
+                // `brand-ink` is the MARK's white — graphics and display type
+                // on red only, never a control label.
                 brand: {
                     DEFAULT: 'hsl(var(--brand))',
                     2: 'hsl(var(--brand-2))',
