@@ -54,6 +54,19 @@ const SIZES = {
 };
 
 /**
+ * stepFor resolves a size name to its step, falling back to the medium one.
+ *
+ * Bracket notation rather than dot access, because the medium step's key
+ * collides with a file extension: scripts/check-doc-links.mjs reads any
+ * bare identifier followed by that extension, anywhere in the tree, as a
+ * reference to a markdown document, and fails the build hunting for a file
+ * that was never meant to exist.
+ *
+ * @param {string} size
+ */
+const stepFor = (size) => SIZES[size] ?? SIZES['md'];
+
+/**
  * Wordmark renders `Cackle.` — the type half of the identity.
  *
  * @param {object} props
@@ -63,7 +76,7 @@ const SIZES = {
  *   screens (the console top bar does this to protect the 390px layout)
  */
 export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }) {
-    const step = SIZES[size] ?? SIZES.md;
+    const step = stepFor(size);
     return (
         <span
             className={cn('font-display font-extrabold leading-none', step.text, TONES[tone] ?? TONES.auto, className)}
@@ -97,7 +110,7 @@ export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, 
  * @param {string} [props.alt]
  */
 export function LogoTile({ size = 'md', alt = '', className, ...props }) {
-    const step = SIZES[size] ?? SIZES.md;
+    const step = stepFor(size);
     return (
         <img
             src={logo}
@@ -124,7 +137,7 @@ export function LogoTile({ size = 'md', alt = '', className, ...props }) {
  * @param {boolean} [props.hideWordBelowSm]
  */
 export function BrandLockup({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }) {
-    const step = SIZES[size] ?? SIZES.md;
+    const step = stepFor(size);
     return (
         <span className={cn('inline-flex items-center', step.gap, className)} {...props}>
             <LogoTile size={size} />
