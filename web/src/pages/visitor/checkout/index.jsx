@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { useCart } from '@/context/use-cart';
 import { useAuth } from '@/context/use-auth';
 import Header from '@/pages/visitor/header';
+import Footer from '@/pages/visitor/landing/footer';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -11,6 +12,24 @@ import { orders as ordersApi, payments as paymentsApi } from '@/lib/api';
 import BillingForm from './billing-form';
 import OrderSummary from './order-summary';
 import PaymentRedirectPage from './redirect';
+import CheckoutSteps from './steps';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+
+// Deliberately permissive: this is a client-side sanity check that catches
+// an empty box and a missing @, not an attempt to decide what a valid
+// address looks like. The server is the authority; this exists so the buyer
+// finds out before the round trip.
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const Shell = ({ children }) => (
+    <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main id="main" className="flex-1 pt-16">
+            {children}
+        </main>
+        <Footer />
+    </div>
+);
 
 const CheckoutPage = () => {
     const navigate = useNavigate();
@@ -24,15 +43,32 @@ const CheckoutPage = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [redirectUrl, setRedirectUrl] = useState(null);
     const [billingDetails, setBillingDetails] = useState({ name: user?.name || '', email: user?.email || '' });
+    const [errors, setErrors] = useState({});
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setBillingDetails((prev) => ({ ...prev, [name]: value }));
+        // Clear the field's error as soon as it is touched — leaving it up
+        // while someone is fixing it reads as "still wrong".
+        setErrors((prev) => (prev[name] ? { ...prev, [name]: undefined } : prev));
+    };
+
+    const validate = () => {
+        const next = {};
+        if (!billingDetails.name.trim()) next.name = 'We need a name to put on the ticket.';
+        if (!billingDetails.email.trim()) next.email = 'We need an email to send the ticket to.';
+        else if (!looksLikeEmail(billingDetails.email)) next.email = "That doesn't look like an email address.";
+        setErrors(next);
+        return Object.keys(next).length === 0;
     };
 
     const handleCheckout = async () => {
-        if (!billingDetails.name.trim() || !billingDetails.email.trim()) {
-            toast({ title: 'Missing details', description: 'Please fill in your name and email.', variant: 'destructive' });
+        if (!validate()) {
+            // Move focus to the first bad field rather than only colouring
+            // it: on a phone the summary and the form are far apart.
+            const firstBad = ['name', 'email'].find((k) => document.getElementById(k) && !billingDetails[k].trim().length) || 'name';
+            document.getElementById(firstBad)?.focus();
+            document.getElementById(firstBad)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
 
@@ -83,47 +119,57 @@ const CheckoutPage = () => {
 
     if (!event) {
         return (
-            <>
-                <Header />
-                <div className="min-h-screen bg-background px-4 pt-24">
-                    <div className="mx-auto max-w-lg">
-                        <EmptyState
-                            icon={ShoppingCart}
-                            title="Nothing to check out"
-                            description="This event isn't in your cart (anymore)."
-                            action={<Button onClick={() => navigate('/cart')}>Back to cart</Button>}
-                        />
-                    </div>
+            <Shell>
+                <div className="mx-auto max-w-xl px-4 py-16 sm:py-24">
+                    <EmptyState
+                        icon={ShoppingCart}
+                        title="Nothing to check out"
+                        description="This event isn't in your cart any more — it may have been cleared, or already paid for."
+                        action={
+                            <div className="flex flex-wrap justify-center gap-3">
+                                <Button className={TAP_BUTTON} asChild>
+                                    <Link to="/cart">Back to cart</Link>
+                                </Button>
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                    <Link to="/orders">See my orders</Link>
+                                </Button>
+                            </div>
+                        }
+                    />
                 </div>
-            </>
+            </Shell>
         );
     }
 
     return (
-        <>
-            <Header />
-            <div className="min-h-screen bg-background pt-24">
-                <div className="container mx-auto px-4 py-8">
-                    <div className="mx-auto max-w-6xl">
-                        <Button variant="ghost" onClick={() => navigate('/cart')} className="mb-6">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Cart
-                        </Button>
+        <Shell>
+            <div className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
+                <CheckoutSteps current="details" className="mb-10" />
 
-                        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                            <BillingForm billingDetails={billingDetails} handleInputChange={handleInputChange} />
-                            <OrderSummary
-                                event={event}
-                                items={items}
-                                total={eventTotal(eventId)}
-                                isProcessing={isProcessing}
-                                onCheckout={handleCheckout}
-                            />
-                        </div>
-                    </div>
+                <div className="mb-8">
+                    <Button variant="ghost" className={`-ml-2 ${TAP_BUTTON}`} asChild>
+                        <Link to="/cart">
+                            <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+                            Back to cart
+                        </Link>
+                    </Button>
+                    <h1 className="mt-3 font-display text-display-sm font-extrabold tracking-tight sm:text-display-md">
+                        Check out
+                    </h1>
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px] lg:gap-8">
+                    <BillingForm billingDetails={billingDetails} handleInputChange={handleInputChange} errors={errors} />
+                    <OrderSummary
+                        event={event}
+                        items={items}
+                        total={eventTotal(eventId)}
+                        isProcessing={isProcessing}
+                        onCheckout={handleCheckout}
+                    />
                 </div>
             </div>
-        </>
+        </Shell>
     );
 };
 

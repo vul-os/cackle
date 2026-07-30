@@ -117,7 +117,7 @@ const Header = ({ className = '' }) => {
                     </div>
 
                     <div className="flex items-center gap-1 md:hidden">
-                        <CartDropdown isMobile />
+                        <CartDropdown />
                         <Button
                             variant="ghost"
                             size="icon"
