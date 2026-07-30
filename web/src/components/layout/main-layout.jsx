@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import SideNav from '../nav/side-nav';
 import TopBar from '../nav/top-bar';
 import PageTransition from '../motion/page-transition';
+import HonestyStrip from '../honesty/honesty-strip';
 
 const TOP_BAR_HEIGHT = '4rem';
 // Single source of truth for the expanded sidebar width. Both the desktop
@@ -79,6 +80,11 @@ const MainLayout = () => {
                             <PageTransition>
                                 <Outlet />
                             </PageTransition>
+                            {/* Mounted in the layout, not per page: see the
+                                note in blank-layout.jsx. It scrolls with the
+                                console content rather than pinning, so it
+                                never eats a phone's viewport at the gate. */}
+                            <HonestyStrip className="mt-8 rounded-xl border border-border" />
                         </div>
                         {isMobile && isExpanded && (
                             <div className="fixed inset-0 z-10 animate-fade-in bg-black/50" onClick={() => setIsExpanded(false)} />

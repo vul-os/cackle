@@ -1,14 +1,34 @@
 import React from 'react';
-import { CreditCard, ArrowRight, ShieldCheck, Clock3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Wallet, ShieldCheck, Landmark, FlaskConical } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import Footer from '@/pages/visitor/landing/footer.jsx';
 import Header from '@/pages/visitor/header.jsx';
-import PaymentCalculator from './payment-calculator';
+import { BUILD_STATUS_LABEL, NO_FEE_STATEMENT } from '@/components/honesty/claims';
 
-const RATES = [
-    { name: 'Local cards', description: 'South African-issued cards', fee: '2.9% + R1.00' },
-    { name: 'International cards', description: 'Non-South African cards', fee: '3.9% + R1.00' },
-];
+/**
+ * What this page used to be, and why none of it is here any more.
+ *
+ * It advertised "2% → 0.85% — the lowest fees in the market", a fee breakdown
+ * with a line item labelled "Our Fee (0.85%)", hardcoded ZAR Paystack card
+ * rates, South African VAT at 15%, PayShap, and "Powered by Paystack" stated
+ * as fact. Every one of those was invented. Checked against the code before
+ * rewriting:
+ *
+ *   - There is no fee anywhere. `grep -rn 'platform_fee|service_fee|our_fee|
+ *     application_fee|commission' internal/ cmd/ --include='*.go'` returns
+ *     nothing. Cackle has no billing, metering or fee-split code at all, so a
+ *     percentage it "charges" could not be collected even in principle.
+ *   - There is no privileged processor. `cmd/cackle/main.go` always registers
+ *     `manual`; `paystack` only appears if that deployment sets a secret, and
+ *     `stub` only under `--demo`. A default binary has no card processor.
+ *   - There is no privileged country or currency. Currency is per event, and
+ *     the wizard offers the full ISO list.
+ *
+ * So the honest page is a short one: what Cackle takes (nothing), what a
+ * processor may take (its business, not ours, and zero if you use `manual`),
+ * and what is not proven yet. No superlative, no rate table, no calculator.
+ */
 
 const PricingPage = () => {
     return (
@@ -16,75 +36,111 @@ const PricingPage = () => {
             <Header />
 
             <main className="flex-grow pt-24">
-                <div className="bg-gradient-to-r from-primary to-primary/80">
+                {/* On a `--primary` fill the only ink permitted by the palette
+                    rules is `--primary-foreground` (INK, 6.9:1). This band
+                    used `text-white` at 3.34:1 and `text-white/70` at ~2:1 —
+                    both below AA for the sizes involved. */}
+                <div className="bg-primary">
                     <div className="mx-auto max-w-5xl px-4 py-4">
-                        <div className="flex flex-wrap items-center justify-center gap-4 text-center">
-                            <div className="flex items-center">
-                                <span className="text-2xl font-bold text-white/70 line-through">2%</span>
-                                <ArrowRight className="mx-3 h-6 w-6 text-white" />
-                                <span className="text-3xl font-bold text-white">0.85%</span>
-                            </div>
-                            <div className="hidden h-8 w-px bg-white/30 sm:block" />
-                            <p className="text-lg font-medium text-white">The lowest fees in the market</p>
-                        </div>
+                        <p className="text-center text-lg font-semibold text-primary-foreground">
+                            Cackle takes 0% of what you sell.
+                        </p>
                     </div>
                 </div>
 
                 <div className="mx-auto max-w-5xl px-4 py-16">
                     <div className="mb-16 text-center">
-                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">Payment Solutions</span>
-                        <h1 className="mb-6 font-display text-4xl font-bold tracking-tight sm:text-5xl">Transparent Pricing</h1>
-                        <p className="mx-auto max-w-2xl text-lg text-muted-foreground">No surprises. See exactly what you pay per transaction.</p>
+                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">
+                            What this costs
+                        </span>
+                        <h1 className="mb-6 font-display text-4xl font-bold tracking-tight sm:text-5xl">
+                            Cackle has no fees
+                        </h1>
+                        <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
+                            {NO_FEE_STATEMENT} You run it yourself. The only money question left is what your own
+                            payment provider charges you — and that is your arrangement with them, not ours.
+                        </p>
                     </div>
 
-                    <Card className="mb-16">
-                        <CardContent className="p-8">
-                            <div className="mb-8 flex items-center gap-4">
-                                <div className="rounded-2xl bg-primary/10 p-4">
-                                    <CreditCard className="h-10 w-10 text-primary-emphasis" />
+                    <div className="mb-8 grid gap-8 md:grid-cols-2">
+                        <Card>
+                            <CardContent className="p-8">
+                                <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
+                                    <Wallet className="h-5 w-5" aria-hidden="true" />
+                                    <h2 className="text-xl font-bold text-foreground">What Cackle charges</h2>
                                 </div>
-                                <div>
-                                    <h3 className="text-2xl font-bold">Card Payments</h3>
-                                    <p className="text-muted-foreground">Powered by Paystack</p>
-                                </div>
-                            </div>
+                                <p className="mb-4 text-3xl font-bold">Nothing</p>
+                                <p className="leading-relaxed text-muted-foreground">
+                                    No per-ticket cut, no percentage, no monthly plan, no seat count. There is no
+                                    billing code in this software to charge you with. It is a program you run on your
+                                    own machine, and it stays out of the money entirely.
+                                </p>
+                            </CardContent>
+                        </Card>
 
-                            <div className="space-y-4">
-                                {RATES.map((rate) => (
-                                    <div key={rate.name} className="border-t border-border pt-4 first:border-t-0 first:pt-0">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <h4 className="mb-1 font-semibold">{rate.name}</h4>
-                                                <p className="text-sm text-muted-foreground">{rate.description}</p>
-                                            </div>
-                                            <span className="text-lg font-bold text-primary-emphasis">{rate.fee}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        <Card>
+                            <CardContent className="p-8">
+                                <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
+                                    <Landmark className="h-5 w-5" aria-hidden="true" />
+                                    <h2 className="text-xl font-bold text-foreground">
+                                        What your payment provider charges
+                                    </h2>
+                                </div>
+                                <p className="mb-4 text-3xl font-bold">Ask them</p>
+                                <p className="leading-relaxed text-muted-foreground">
+                                    Whatever you have agreed with whoever moves the money. It varies by processor, by
+                                    country and by currency, and it can change without Cackle knowing. Cackle does not
+                                    set that rate, does not see it, and does not add anything on top of it — so no
+                                    honest number can be printed on this page.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <Card className="mb-8">
+                        <CardContent className="p-8">
+                            <h2 className="mb-3 text-xl font-bold">
+                                Out of the box there is no processor at all
+                            </h2>
+                            <p className="mb-4 leading-relaxed text-muted-foreground">
+                                Cackle&apos;s default way of taking payment is called <code className="rounded bg-muted px-1.5 py-0.5 text-[0.9375rem] font-semibold">manual</code>:
+                                the money reaches you however it already does — bank transfer, cash at the door, an
+                                invoice, mobile money — and you mark the order paid. No payment account to open, no API
+                                key, no country requirement, and nobody takes a percentage, because no processor is in
+                                the loop.
+                            </p>
+                            <p className="leading-relaxed text-muted-foreground">
+                                If you would rather take cards or crypto, optional adapters plug in per deployment. No
+                                one of them is the default and none is bundled with the product&apos;s promises — which
+                                processors exist, and which are actually proven safe with real money today, is written
+                                down in <Link to="/docs" className="font-semibold text-primary-emphasis underline underline-offset-2">the docs</Link>.
+                            </p>
                         </CardContent>
                     </Card>
-
-                    <PaymentCalculator />
 
                     <Card>
                         <CardContent className="grid gap-8 p-8 md:grid-cols-2 md:gap-12">
                             <div>
                                 <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
-                                    <ShieldCheck className="h-5 w-5" />
-                                    <h3 className="text-xl font-bold text-foreground">Secure Payments</h3>
+                                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                                    <h2 className="text-xl font-bold text-foreground">Cackle never holds your funds</h2>
                                 </div>
                                 <p className="leading-relaxed text-muted-foreground">
-                                    All transactions run through verified payment partners with industry-standard encryption.
+                                    Money goes from the buyer to your payment provider to you, or straight to you under{' '}
+                                    <code className="rounded bg-muted px-1.5 py-0.5 text-[0.9375rem] font-semibold">manual</code>. Cackle
+                                    keeps the record of what was sold and admitted. It is never in the custody chain,
+                                    which is also why it can never take a cut.
                                 </p>
                             </div>
                             <div className="md:border-l md:border-border md:pl-12">
                                 <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
-                                    <Clock3 className="h-5 w-5" />
-                                    <h3 className="text-xl font-bold text-foreground">Cackle never holds your funds</h3>
+                                    <FlaskConical className="h-5 w-5" aria-hidden="true" />
+                                    <h2 className="text-xl font-bold text-foreground">{BUILD_STATUS_LABEL}</h2>
                                 </div>
                                 <p className="leading-relaxed text-muted-foreground">
-                                    Payouts settle directly through the payment provider — Cackle is never in the custody chain.
+                                    Payment adapters are unit-tested, not sandbox-verified, unless their documentation
+                                    says otherwise. Do not take real money through an adapter that has not been proven
+                                    against the real processor.
                                 </p>
                             </div>
                         </CardContent>
