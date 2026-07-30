@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
@@ -9,18 +9,56 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Ticket } from 'lucide-react';
 import { useAuthRedirect } from './auth-redirect';
+import SsoButtons from './sso-buttons';
+import { ssoMessageFor } from './sso';
 
 import festivalBackground from '/images/celebback.jpg';
 
 const SignIn = () => {
-    const { signIn } = useAuth();
+    const { signIn, refresh } = useAuth();
     const handleSuccessfulAuth = useAuthRedirect();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // A provider sign-in comes back to this page with ?sso=<reason>. The
+    // session, when there is one, arrives as a cookie — never in this URL,
+    // because a credential in a query string ends up in access logs, in
+    // Referer headers and in browser history.
+    //
+    // On success we re-read /api/auth/me and then hand off to the SAME
+    // redirect logic password sign-in uses, so both routes land the person in
+    // the same place. On anything else we show a plain sentence and leave the
+    // password form exactly where it was — it is what still works.
+    const ssoReason = searchParams.get('sso');
+    const ssoHandled = useRef(false);
+    const [ssoNotice, setSsoNotice] = useState(() => ssoMessageFor(ssoReason));
+
+    useEffect(() => {
+        if (!ssoReason || ssoHandled.current) return;
+        ssoHandled.current = true;
+        setSsoNotice(ssoMessageFor(ssoReason));
+        if (ssoReason !== 'ok') return;
+        setIsLoading(true);
+        refresh()
+            .then((session) => {
+                if (session?.user) {
+                    handleSuccessfulAuth();
+                    return;
+                }
+                setIsLoading(false);
+                setSsoNotice(ssoMessageFor('failed'));
+            })
+            .catch(() => {
+                setIsLoading(false);
+                setSsoNotice(ssoMessageFor('failed'));
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ssoReason]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -56,6 +94,12 @@ const SignIn = () => {
                             </Alert>
                         )}
 
+                        {ssoNotice && !error && (
+                            <Alert>
+                                <AlertDescription>{ssoNotice}</AlertDescription>
+                            </Alert>
+                        )}
+
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
@@ -81,7 +125,7 @@ const SignIn = () => {
                                     required
                                 />
                             </div>
-                            <Button type="submit" className="w-full" disabled={isLoading}>
+                            <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
                                 {isLoading ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -92,6 +136,12 @@ const SignIn = () => {
                                 )}
                             </Button>
                         </form>
+
+                        {/* Renders nothing unless this box's operator set one
+                            up. Below the password form on purpose: the
+                            password is the sign-in that works with no
+                            internet, and this one cannot. */}
+                        <SsoButtons disabled={isLoading} />
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-2 border-t border-border pt-6">
                         <Button variant="link" className="text-sm" onClick={() => navigate('/signup')} disabled={isLoading}>

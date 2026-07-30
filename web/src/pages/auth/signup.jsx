@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Ticket } from 'lucide-react';
 import { useAuthRedirect } from './auth-redirect';
+import SsoButtons from './sso-buttons';
 
 import festivalBackground from '/images/celebback.jpg';
 
@@ -100,7 +101,7 @@ const SignUp = () => {
                                     required
                                 />
                             </div>
-                            <Button type="submit" className="w-full" disabled={isLoading}>
+                            <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
                                 {isLoading ? (
                                     <>
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -111,6 +112,13 @@ const SignUp = () => {
                                 )}
                             </Button>
                         </form>
+
+                        {/* Renders nothing unless this box's operator set a
+                            provider up. A provider sign-in creates the
+                            account on first use, so it belongs here too —
+                            below the form, for the same reason it is below
+                            the form on the sign-in page. */}
+                        <SsoButtons disabled={isLoading} />
                     </CardContent>
                     <CardFooter className="border-t border-border pt-6">
                         <Button variant="link" className="w-full text-sm" onClick={() => navigate('/login')} disabled={isLoading}>
