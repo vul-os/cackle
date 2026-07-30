@@ -4,7 +4,7 @@ import { useTheme } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight, Plus } from 'lucide-react';
+import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight, Plus, Link2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const THEME_OPTIONS = [
@@ -111,6 +111,26 @@ const SettingsPage = () => {
                             <span>
                                 <span className="block font-medium">Payouts</span>
                                 <span className="block text-sm text-muted-foreground">Bank account and per-event payout totals</span>
+                            </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    {/* Sharing events with organisers you know. Deliberately
+                        described as "organisers you add" rather than anything
+                        that implies Cackle can find them for you — it cannot,
+                        and there is no directory of them anywhere. */}
+                    <button
+                        type="button"
+                        onClick={() => navigate('/admin/settings/peers')}
+                        className="flex w-full items-center justify-between p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                        <span className="flex items-center gap-3">
+                            <Link2 className="h-4 w-4 text-muted-foreground" />
+                            <span>
+                                <span className="block font-medium">Other organisers</span>
+                                <span className="block text-sm text-muted-foreground">
+                                    Organisers you add by hand, and what you share with each
+                                </span>
                             </span>
                         </span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />

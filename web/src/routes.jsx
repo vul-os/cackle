@@ -44,6 +44,10 @@ import PayoutsPage from './pages/organizers/payouts';
 import AcceptInvitePage from './pages/organizers/invite-accept';
 import ScannerPage from './pages/organizers/scanner';
 import SettingsPage from './pages/organizers/settings';
+// Settings ▸ Other organisers. Imported by its full path rather than through a
+// `settings/index` barrel, so it cannot become ambiguous with `settings.jsx`
+// above.
+import PeersPage from './pages/organizers/settings/peers';
 import PricingPage from './pages/organizers/pricing';
 
 const AppRoutes = () => {
@@ -256,6 +260,14 @@ const AppRoutes = () => {
                     element={
                         <ProtectedRoute>
                             <SettingsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/admin/settings/peers"
+                    element={
+                        <ProtectedRoute>
+                            <PeersPage />
                         </ProtectedRoute>
                     }
                 />
