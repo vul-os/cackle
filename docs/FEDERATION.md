@@ -10,8 +10,10 @@
 > want another organiser's programme on your page, you get their address
 > from them — the way you'd get a phone number — and type it in. And when
 > somebody buys a ticket for their event, they buy it from **their** box,
-> never yours. Most of this chapter describes a design. The section
-> headings say what is built and what is not.
+> never yours: a borrowed listing is a signpost, and clicking it sends the
+> buyer to that event's own page on the box that is running it. Most of
+> this chapter describes a design. The section headings say what is built
+> and what is not.
 
 Cackle's whole claim is that the thing at the door keeps working when the
 network does not, and that the thing running the event belongs to the
@@ -47,7 +49,9 @@ switch that publishes your programme to someone else's website.
 
 **3. Tickets are always bought from the publisher's own box.** This is
 the rule that keeps the model from collapsing. A borrowed listing carries
-a title, a time, a place, whose event it is, and a link. It carries no
+a title, a time, a place, whose event it is, and **a link to that event's
+own page on the publisher's box** (`/h/{event}` — one link per event;
+there is no per-organisation page to link to, see §3). It carries no
 price, no ticket type, and no checkout. A ticket is signed by the issuing
 organisation's key and verified at that organisation's gate against a
 pinned public key ([TICKET-FORMAT.md](TICKET-FORMAT.md)) — there is no
@@ -106,15 +110,32 @@ payments. [CLUSTERING.md](CLUSTERING.md) is the operator's guide to it,
 including the part where replication makes a cross-gate double admission
 **visible sooner and never prevents one**.
 
-### The public page
+### The public page — one EVENT, not one organisation
 
 `GET /h/{ref}` — registered on the root router in
-`internal/httpapi/deps.go`, handled in `page_handlers.go` — is the public,
-server-rendered, published-only page for one organisation's event. No
-script, its own stricter Content-Security-Policy, unauthenticated,
-drafts invisible. It is what a stranger sees, and it is already the shape
-a federated listing points at: **a link to the publisher's own box.** See
-[HOST-PAGES.md](HOST-PAGES.md).
+`internal/httpapi/deps.go`, handled by `handleHostPage` in
+`page_handlers.go` — is the public, server-rendered, no-script page with
+its own stricter Content-Security-Policy. Unauthenticated, and a draft is
+invisible to everyone but an admin of its own org.
+
+**`{ref}` is an event slug or event id, and the page is one event.**
+`handleHostPage` resolves it through `resolveViewableEvent` →
+`resolveEventRef` → `Events.GetBySlug` (falling back to `Events.Get` by
+id), then loads that event's page document, its ticket types and its
+gallery. See [HOST-PAGES.md](HOST-PAGES.md).
+
+This is worth stating flatly because the natural assumption is the other
+one: **there is no per-organisation public page anywhere in this repo.**
+No route renders "everything this organiser has on". The public listing
+API can be narrowed to one org — see §3 — but nothing server-renders a
+page for one.
+
+So the link-back target for a borrowed listing is **the publisher's own
+`/h/{event}`, one link per event**. That is enough for rule 3 of §1: a
+visitor who clicks a borrowed listing lands on the publisher's box, on
+the page that sells that event, issued by that org's key. What it does
+not give is a "see everything by this organiser" destination — see §3 for
+that gap, stated as a gap.
 
 ### The shared merge engine
 
@@ -163,27 +184,68 @@ module.
 
 ---
 
-## 3. Host display scoping and peer event feeds — check before you cite
+## 3. Host display scoping — BUILT — and peer event feeds — check before you cite
 
-Two pieces of work sit between "what exists today" and Phase 2:
+### Host display scoping — built
 
-- **Host display scoping** — making the public listing say *whose* box
-  this is, so a root page cannot read as a global marketplace when it is
-  one organiser's server.
-- **Opt-in peer event feeds** — letting an enrolled peer, and only an
-  enrolled peer whose operator has flipped a per-direction switch, list
-  this node's published events and be listed in return, over the peer
-  channel in §2.
+The public listing now says *whose* box this is, so a root page cannot
+read as a global marketplace when it is one organiser's server.
 
-Both were in flight in the same cycle as this chapter, which is exactly
+`CACKLE_HOST_SCOPE` (`internal/config`) takes three values:
+
+| value | what the listing shows |
+| --- | --- |
+| `own` | **the default** — the published events of every organisation on this box |
+| `single` | presents the box as ONE organisation, named by `CACKLE_HOST_ORG`; fails closed at startup if that org cannot be resolved |
+| `peers` | **accepted, and backed by nothing today** |
+
+`GET /api/events` answers with a `host` envelope naming the
+organisations whose events these are, and `GET /api/events?host=<org-slug>`
+narrows it to one of them. An out-of-scope org and a nonexistent one
+**404 identically** (`narrowToHostOrg` only ever matches against the
+already-scope-narrowed set, and both misses reach the same
+`no such organisation on this host`), so the parameter cannot be used to
+probe which orgs exist on a box. Both behaviours are tested —
+`TestHostScope_HostParamNarrowsToOneOrganisation` and
+`TestHostScope_HostParamOutOfScopeIs404` in `internal/httpapi`.
+
+> **`peers` does nothing yet, and the wire says so.**
+> `config.HostScope.IncludesPeerEvents()` returns **false for every
+> scope, `peers` included**, and `GET /api/events` reports
+> `"peers_included": false`. `peers` behaves exactly as `own`. It exists
+> as the single predicate the peer work has to flip, and as a name an
+> operator can set early — not as a working feature. Pinned by
+> `TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo`.
+
+### The gap: there is no per-organisation page
+
+`?host=<org-slug>` narrows an **API listing**. Nothing server-renders a
+public page for an organisation — §2. For federation that is a real gap,
+not a cosmetic one: rule 3 of §1 says a visitor must end up on the
+publisher's own box, and today the only thing to send them to is one
+event at a time. There is no "everything this organiser has on" page on
+either box to link to.
+
+**This chapter does not solve that, and nobody should read it as
+implying the page exists.** If per-organisation pages are built, they
+belong to whoever owns the host-page surface, and they are a prerequisite
+for a good federated listing rather than a part of federation itself.
+
+### Opt-in peer event feeds — check before you cite
+
+Letting an enrolled peer, and only an enrolled peer whose operator has
+flipped a per-direction switch, list this node's published events and be
+listed in return, over the peer channel in §2.
+
+This was in flight in the same cycle as this chapter, which is exactly
 the situation in which a design document starts telling comfortable
-lies. So this chapter makes **no claim about their state**. Check
+lies. So this chapter makes **no claim about its state**. Check
 [CHANGELOG.md](../CHANGELOG.md) for what landed and
 [API.md](API.md) for the routes that actually exist; if a route is not in
 API.md, assume it is not there. What this chapter *does* fix is the
-shape they must hold to: rules 2 and 3 of §1 — two independent switches,
-both defaulting to off, and a borrowed listing that links out rather than
-sells.
+shape it must hold to: rules 2 and 3 of §1 — two independent switches,
+both defaulting to off, and a borrowed listing that links out to the
+publisher's own event page rather than sells.
 
 ---
 
@@ -363,6 +425,8 @@ been written with ticketing in mind.
 | --- | --- | --- | --- |
 | Gate ↔ its own server | the operator | admission claims | **built** — [OFFLINE-GATES.md](OFFLINE-GATES.md) |
 | Node ↔ node, same operator | the operator | admission claims | **built** — [CLUSTERING.md](CLUSTERING.md) |
+| Naming whose box this is | the operator | — | **built** — `CACKLE_HOST_SCOPE`, §3 |
+| A public page per organisation | — | — | **not built** — §3, and federation wants it |
 | Node ↔ node, two operators | both, separately | published listings | see §3 — check [CHANGELOG.md](../CHANGELOG.md) |
 | Signed public feeds (§22) | the publisher | signed, servable feed objects | **not built**, and blocked in KOTVA — §4 |
 | Subscriptions & push (§25) | subscriber + publisher | subscription objects, hints | **not built**, spec early — §4 |
@@ -378,7 +442,7 @@ been written with ticketing in mind.
 - [OFFLINE-GATES.md](OFFLINE-GATES.md) — why the gate is a static binary
   with no network, and why nothing here may change that.
 - [HOST-PAGES.md](HOST-PAGES.md) — `GET /h/{ref}`, the published-only
-  public page a federated listing links to.
+  public page for one EVENT, which is what a federated listing links to.
 - [TICKET-FORMAT.md](TICKET-FORMAT.md) — why a ticket can only be issued
   by the organisation whose key signs it.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — where `internal/scan/substrate`
