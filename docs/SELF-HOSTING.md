@@ -98,6 +98,152 @@ Whatever you use, terminate TLS at the proxy and set `CACKLE_BASE_URL` to
 the public HTTPS URL — payment provider callbacks and every link Cackle
 generates are built from it.
 
+## Signing in with Google (optional, and off unless you turn it on)
+
+> **In plain English:** you and your staff can sign in to the admin side of
+> Cackle with a Google account instead of a password, if you want to. You
+> have to set it up yourself, it takes about five minutes in Google's
+> website, and **Cackle ships with it switched off**. If you never set it
+> up, nothing about Cackle changes and no button appears.
+>
+> **It has nothing to do with the door.** Scanning tickets never touches
+> this and never will — see [OFFLINE-GATES.md](OFFLINE-GATES.md). Password
+> sign-in also keeps working exactly as before, which matters, because
+> Google sign-in needs the internet and your box might not have it.
+
+### Before you decide
+
+Read these three things first. They are the whole trade.
+
+- **It needs the internet.** Signing in with Google means your browser goes
+  to Google and comes back. If your venue's connection is down, that
+  sign-in cannot work. **Your password still can.** Keep a password on at
+  least one account that can reach everything, and know it. This is not a
+  hypothetical — it is the situation Cackle was built for.
+- **The door does not care.** A scanner at the gate is not signing in to
+  Google, before the event or during it. It fetched what it needs and works
+  offline. Turning this on cannot change that, and there is a test that
+  fails if anyone ever wires it so it could.
+- **It has not been tested against the real Google.** See
+  [What is and is not verified](#what-is-and-is-not-verified) at the end of
+  this section. Read it before you rely on this for anything.
+
+### What you paste into Google
+
+1. Go to the **Google Cloud Console** → *APIs & Services* → *Credentials*.
+2. Create an **OAuth client ID**, application type **Web application**.
+3. Under **Authorised redirect URIs**, add exactly one URI. Take your
+   `CACKLE_BASE_URL` and add `/api/auth/oauth/google/callback` to the end:
+
+   | `CACKLE_BASE_URL` | The redirect URI you register |
+   |---|---|
+   | `https://tickets.example.com` | `https://tickets.example.com/api/auth/oauth/google/callback` |
+   | `https://tickets.example.com:8443` | `https://tickets.example.com:8443/api/auth/oauth/google/callback` |
+
+   It has to match **character for character** — `http` vs `https`, a
+   trailing slash, a different port, `www.` on the front: any of those and
+   Google refuses with a redirect-URI mismatch. That is Google being
+   strict on your behalf, and Cackle is equally strict at its end: it
+   builds this URI from `CACKLE_BASE_URL` alone and never from whatever
+   host header a request happened to arrive with, so nobody can talk your
+   box into sending the sign-in somewhere else.
+
+4. Google gives you a **client ID** and a **client secret**. The secret is a
+   password. Treat it like one — it goes in your environment, never in a
+   file you commit, and Cackle never writes it to a log.
+
+### What you set on the box
+
+```bash
+CACKLE_BASE_URL=https://tickets.example.com
+CACKLE_GOOGLE_CLIENT_ID=1234567890-abcdefg.apps.googleusercontent.com
+CACKLE_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
+```
+
+Both, or neither.
+
+- **Neither set** — the normal case, and the default. Google sign-in does
+  not exist on this box: the routes are not there, the sign-in page shows no
+  button, and Cackle makes no request to Google or to anyone else.
+- **Both set** — a "Continue with Google" button appears *below* the
+  password form on the sign-in and sign-up pages.
+- **Only one set** — Cackle refuses to start, and says which one is
+  missing. It does not quietly fall back to "off", because then you would
+  believe you had enabled something you hadn't and spend an afternoon
+  wondering where the button went.
+
+Restart Cackle after setting them.
+
+### What to expect
+
+- The button says **Continue with Google** and sits under the password
+  form. Pressing it sends you to Google, you pick an account, and you come
+  back signed in.
+- If something goes wrong you land back on the sign-in page with a plain
+  sentence saying what happened, and the password form right there. Cackle
+  never leaves you on an error page with no way forward.
+- **A Google account whose email address Google will not confirm is
+  refused**, with the message that you should use your password instead.
+  This one is deliberate and it is the most important rule in this section.
+  See below.
+- Someone signing in with Google for the first time gets an account with no
+  usable password. If they later need to sign in without Google, an operator
+  mints them a reset link with `cackle reset-password` (see
+  [GETTING-STARTED.md](GETTING-STARTED.md)).
+
+### Why an unconfirmed email address is refused
+
+When you sign in with Google, Google tells Cackle your email address. If
+Cackle already has an account with that address — one you made with a
+password — it attaches the two, so they are the same account. That is the
+convenient behaviour, and it is the one everybody expects.
+
+It is also the dangerous one. If Cackle accepted an address that the
+provider had not actually confirmed belongs to that person, then anyone able
+to get a provider to *claim* your address could sign in as you and own your
+organisation: your events, your attendee list, your payouts.
+
+So Cackle asks Google a second question — "have you confirmed this address
+belongs to them?" — and if the answer is anything other than yes, the
+sign-in is refused outright. Not downgraded, not turned into a separate
+account. Refused, with a message pointing at the password form.
+
+The other half of that, said plainly rather than buried: when Google *does*
+confirm the address, Cackle **does** treat that as proof and links to the
+existing password account. That is what "confirmed" means, and it is the
+reason this is limited to providers that make such a confirmation at all.
+
+### What it does with your session
+
+Nothing new. A Google sign-in produces exactly the same session a password
+sign-in produces: a row in Cackle's own database holding only a *hash* of
+the session token, and a cookie in your browser. Google's own token is read
+once to answer "who is this", and then discarded — it is never stored, never
+re-used, and never handed to your browser. There is no second login system
+here and no token in any URL.
+
+### What is and is not verified
+
+Using the same register as [PAYMENTS.md](PAYMENTS.md):
+
+**Unit-tested, NOT sandbox-verified.**
+
+- ✅ **Tested**: the protocol handling. Every security check — the CSRF
+  `state`, the OpenID `nonce`, the exact redirect URI, the issuer, the
+  audience, expiry, the confirmed-email rule, and that no credential reaches
+  a log line — has a test, and each of those tests has been deliberately
+  broken to prove it catches the thing it claims to.
+- ❌ **Not tested**: Google. No test in this repository has ever contacted
+  Google, and this code has never been run against a real Google Cloud OAuth
+  client. Every test answers from a local fake.
+
+What that means for you: the code handles the *documented* shape of Google's
+responses and fails closed on a bad one. It does not prove Google's live
+service behaves as documented, or that your particular client configuration
+works. **Try it before an event, not during one** — and keep a password on
+an account that can reach everything, so a surprise here is an
+inconvenience rather than a locked door.
+
 ## Backups
 
 `CACKLE_DB` is a single SQLite file — back it up like any other database
