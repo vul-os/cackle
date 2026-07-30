@@ -52,12 +52,21 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
             </div>
 
             <div className="flex items-center gap-2">
+                {/* Measured at 390px: this trigger is 220×36 — the width is
+                    fine, the height is not. `h-11` (44) replaces the
+                    default-size button's implicit 36 without touching the
+                    icon, label or chevron inside it, and needs no
+                    counteracting margin — the row centres it vertically
+                    inside the 64px top bar regardless of its height, so
+                    growing it does not shove anything sideways. Only visible
+                    when an account has more than one org, which is why a
+                    single-org measurement pass never catches it. */}
                 {orgs?.length > 1 && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
-                                className="gap-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                className="h-11 gap-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                             >
                                 <Building2 size={18} />
                                 <span className="max-w-[140px] truncate">{activeOrg?.name || 'Select org'}</span>
@@ -77,10 +86,18 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                     </DropdownMenu>
                 )}
 
+                {/* Both icon buttons below measured 36×36 — Button's `icon`
+                    size, unchanged, elsewhere in the app. `h-11 w-11` raises
+                    the hit area to 44×44 while the Sun/Moon/User glyphs keep
+                    their own `size` prop, so nothing about the drawn icon
+                    changes. `-mx-1` gives back the 4px each side that the
+                    larger box would otherwise add to the row, so the icons
+                    stay where they were relative to each other and to the
+                    account menu's edge instead of pushing outward. */}
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="-mx-1 h-11 w-11 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     aria-label="Toggle theme"
                 >
@@ -93,7 +110,7 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                className="-mx-1 h-11 w-11 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                 aria-label="Account menu"
                             >
                                 <User size={20} />

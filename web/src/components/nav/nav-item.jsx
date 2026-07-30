@@ -9,9 +9,19 @@ export const NavItem = ({ to, icon: Icon, text, isExpanded, end = false }) => {
             <NavLink
                 to={to}
                 end={end}
+                // Measured at 390px with the drawer open: 224×40 — the row
+                // spans the sidebar's width fine, but at 40 the height was
+                // 4px short of the 44px target gate staff need on a phone.
+                // `py-2.5` (10px top+bottom, 20+20=40 total with the 20px
+                // icon) becomes `py-3` (12px, 24+20=44) — the icon keeps its
+                // own `h-5 w-5` size, so only the row's own height grows, not
+                // the glyph inside it. No negative margin is needed here: a
+                // full-width row growing taller doesn't push anything
+                // sideways, it just gives four rows 16px more total height
+                // between them, which is the point.
                 className={({ isActive }) =>
                     cn(
-                        'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background',
+                        'relative flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background',
                         isActive
                             ? 'text-sidebar-primary-foreground'
                             : 'text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
