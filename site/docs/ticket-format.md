@@ -1,5 +1,16 @@
 # Ticket Format — the capability, and why offline verification works
 
+> **In plain English, and who needs to read the rest of this page:** a
+> Cackle ticket is a short piece of text (it's what's inside the QR code) —
+> a bit of information about the ticket plus a digital signature, the way a
+> wax seal proves a letter really came from whoever's ring made it. A
+> scanner can check that signature itself, with nothing else — no
+> database, no internet — which is the entire reason a gate keeps working
+> offline. **If you're setting up an event, you don't need to read past
+> this box** — see [GETTING-STARTED.md](GETTING-STARTED.md) instead. The
+> rest of this page is a byte-exact specification, for someone
+> implementing a verifier in another language or auditing the crypto.
+
 Read this before touching `internal/tickets`. This is the document that
 explains the one design decision that makes Cackle different from every
 other ticketing platform: **a gate can prove a ticket is real without ever

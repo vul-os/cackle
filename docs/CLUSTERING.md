@@ -1,5 +1,15 @@
 # Running More Than One Node
 
+> **In plain English:** this is for the case where you're running **two**
+> Cackle servers for the same event — say, a laptop at the venue and a
+> server in the cloud — and want them to compare notes on who's already
+> been let in. It's optional, off by default, and it only makes duplicate
+> admissions **visible sooner**, across more places; it does not make a
+> duplicate at two offline doors impossible — nothing can, and this page
+> says exactly why. Running a single Cackle server, which is what
+> [GETTING-STARTED.md](GETTING-STARTED.md) walks through, needs none of
+> this.
+
 Cackle can replicate its **admission ledger** between servers: a venue node and a
 cloud node, two venue nodes, a box-office laptop and the machine in the rack.
 Each one keeps admitting people whether or not the others are reachable, and when

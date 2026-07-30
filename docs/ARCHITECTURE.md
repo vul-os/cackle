@@ -1,5 +1,15 @@
 # Architecture
 
+> **In plain English, and who needs to read the rest of this page:** Cackle
+> is one program (written in Go) with a small database file (SQLite) and a
+> web interface built in. Nothing else to install, nothing else running.
+> Inside, it's organised as separate pieces with one job each — issuing
+> tickets, taking payments, running the gate scanner — so a bug in one
+> corner can't quietly reach into another. **If you're running an event,
+> you don't need this page** — see [GETTING-STARTED.md](GETTING-STARTED.md).
+> This is for a developer or a technical evaluator deciding whether to
+> build on Cackle or extend it.
+
 This is the binding contract for Cackle's structure — what goes where, and
 why. If you're changing anything structural, read this first.
 

@@ -1,5 +1,13 @@
 # Configuration
 
+> **In plain English:** everything you can configure is a single named
+> setting (an "environment variable"), not a config file to write by hand.
+> If you're just trying Cackle out, you don't need any of this —
+> [GETTING-STARTED.md](GETTING-STARTED.md) covers the two settings that
+> matter for a real event (`CACKLE_BASE_URL` and `CACKLE_KEY_PASSPHRASE`).
+> Come back here when you need the full list, or when someone technical is
+> setting this up for you and wants the reference table.
+
 Cackle is configured env-first. Every key is prefixed `CACKLE_`. Flags
 mirror the env vars for the same setting. No config file is required or
 supported — this is intentional, to keep the single-binary story simple.

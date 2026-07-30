@@ -1,9 +1,24 @@
 # Running a Gate With No Network
 
+> **In plain English:** this is the guide for whoever is actually standing
+> at the door with a scanner. Short version — download the event once, while
+> you still have signal, before doors open; after that, the scanner keeps
+> working with no wifi and no server, for the whole event. It quietly keeps
+> its own record of who it let in, and catches the server up once you're
+> back online. The one thing it genuinely can't do: if you run **two** doors
+> and both lose signal at the same time, it can't stop the same ticket being
+> used at both — it can only tell you afterwards. Read
+> ["What offline double-scan protection actually gives you"](#what-offline-double-scan-protection-actually-gives-you)
+> below before you staff an event around it. If you just want the fast
+> walkthrough with pictures, see
+> [GETTING-STARTED.md](GETTING-STARTED.md#9-before-doors-load-the-scanner).
+
 This is the operational guide for the thing Cackle is actually for: staffing
 a door with a scanner that keeps working after the venue's Wi-Fi, the
 server, or both, stop responding. The design is explained in
 [TICKET-FORMAT.md](TICKET-FORMAT.md); this document is about running it.
+
+<img src="screenshots/scanner-light.png" alt="The gate scanner screen: an event picker, a Download button to fetch the scan bundle, and a Scan button that unlocks once it's downloaded" width="720" />
 
 ## The shape of it
 

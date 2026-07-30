@@ -1,5 +1,14 @@
 # Self-Hosting
 
+> **In plain English:** this is the checklist for putting Cackle somewhere
+> other than your own laptop — a small server, a VPS, a box at the venue —
+> so it's reachable for a real event. It covers the parts that are easy to
+> get wrong: locking the machine down, backing up the right files (there
+> are two, and losing either one is bad in a different way), and what's
+> genuinely still missing if more than one door needs to share a server.
+> None of this is required to try Cackle out — see
+> [GETTING-STARTED.md](GETTING-STARTED.md) for that.
+
 Running Cackle for a real event, not just kicking the tyres with `--demo`.
 
 ## Docker

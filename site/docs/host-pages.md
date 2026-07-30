@@ -1,5 +1,16 @@
 # Host Pages — giving an organiser their own page, safely
 
+> **In plain English:** every event already gets a decent-looking page on
+> Cackle for free, no setup. This document is for two narrower cases: (1)
+> you want to customise that page's text and colours a bit without needing
+> your own website (a "host page document" — headings, paragraphs, a few
+> colours, no code), or (2) you already have a website and want to sell
+> tickets from it directly, using Cackle only as the backend. Most
+> organisers need neither and can skip this page entirely. It also explains
+> a deliberate limitation: **you cannot upload your own HTML or JavaScript**
+> for your event page, and the "why" is worth reading if that surprises
+> you.
+
 Read this before touching `internal/pages` or the page routes in
 `internal/httpapi`. It specifies a wire format and an API precisely enough to
 build a client from this document alone, and

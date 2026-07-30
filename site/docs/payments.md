@@ -1,5 +1,18 @@
 # Payments
 
+> **In plain English:** Cackle never touches your money. Money moves
+> directly between the buyer and you (the organiser) — either through a
+> real payment company (Stripe, Paystack, and about twenty others), or
+> through `manual`, Cackle's own always-available option where you just tell
+> it "this order got paid" (bank transfer, cash on the night, an invoice —
+> whatever actually happened) with no payment account or API key needed at
+> all. `manual` needs no verification because it makes no network call —
+> **every other option here has only been tested against a fake version of
+> that payment company, not the real thing, unless this page says
+> otherwise. Don't take real money through one that isn't marked verified.**
+> See [the walkthrough](GETTING-STARTED.md#6-sell-a-ticket-with-manual--no-payment-account-needed)
+> for `manual` end to end with screenshots.
+
 **Cackle never holds funds.** It creates orders, hands off to a payment
 provider (or the organiser, for `manual`) to actually move money between the
 buyer and the *organiser's own account*, and records what happened. There is

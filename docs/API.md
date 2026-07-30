@@ -1,5 +1,16 @@
 # HTTP API
 
+> **In plain English, and who needs to read the rest of this page:** this is
+> the reference for everything Cackle's own web interface asks the server
+> to do — create an event, sell a ticket, scan someone in — laid out as raw
+> requests and responses. You'd read this if you're building your own
+> website that sells tickets against Cackle directly (see
+> [HOST-PAGES.md](HOST-PAGES.md#worked-example-selling-a-ticket-from-your-own-site)
+> for a worked example of exactly that), writing a script, or auditing what
+> the server actually accepts. **If you're just running an event through
+> the built-in web pages, you don't need this** — see
+> [GETTING-STARTED.md](GETTING-STARTED.md).
+
 The contract the frontend (and any other client) codes against. All request
 and response bodies are JSON. Errors use a consistent shape and the correct
 HTTP status:
