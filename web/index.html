@@ -8,7 +8,11 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Cackle — events and ticketing that works even when the gate has no internet." />
-    <meta name="theme-color" content="#0b0a0d" />
+    <!-- INK, the brand's third colour: hsl(260 18% 9%) as index.css declares
+         it, which paints as #16131B. This is the browser chrome's colour on
+         Android and in installed-PWA title bars, so it has to BE the app's
+         ground rather than a near-black that is merely close to it. -->
+    <meta name="theme-color" content="#16131b" />
     <title>Cackle — events &amp; ticketing that works offline</title>
 
     <!-- Social preview card. Text-only (summary): no dedicated OG image asset
@@ -26,13 +30,15 @@
          strict script-src/style-src 'self' CSP and works fully offline. -->
     <link rel="preload" href="/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 
-    <!-- Matches the light-theme --background token in index.css so the
-         first paint (before the stylesheet + ThemeProvider apply) isn't a
-         flash of stark white against the app's actual background. -->
+    <!-- Matches the --background token in index.css exactly, in both themes,
+         so the first paint (before the stylesheet + ThemeProvider apply) is
+         not a flash of a colour the app never uses. Light is WHITE; dark is
+         INK, hsl(260 18% 9%) = #16131B. If index.css's --background moves,
+         these move with it. -->
     <style>
         html, body { background-color: #ffffff; }
         @media (prefers-color-scheme: dark) {
-            html, body { background-color: #0e0e12; }
+            html, body { background-color: #16131b; }
         }
     </style>
 </head>
