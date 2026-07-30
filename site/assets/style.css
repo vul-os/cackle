@@ -96,10 +96,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .nav{display:flex;align-items:center;gap:18px;height:64px}
 .brand{display:inline-flex;align-items:center;gap:11px;font-weight:800;letter-spacing:-.03em;font-size:19px;flex:none}
 .brand .tile{
-  width:31px;height:31px;border-radius:9px;background:var(--red);
-  display:grid;place-items:center;flex:none;box-shadow:0 4px 14px -5px rgba(255,72,72,.7);
+  width:31px;height:31px;border-radius:9px;display:block;flex:none;
+  box-shadow:0 4px 14px -5px rgba(255,72,72,.7);
 }
-.brand .tile svg{width:20px;height:20px;display:block}
 .brand .dot{color:var(--amber)}
 .nav-links{display:flex;align-items:center;gap:3px;margin-left:auto}
 .nav-links a{

@@ -9,7 +9,7 @@
 <meta name="color-scheme" content="dark light">
 <link rel="canonical" href="https://vulos.org/projects/cackle/">
 
-<link rel="icon" href="./assets/cackle-logo.svg" type="image/svg+xml">
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
 
 <!-- Open Graph. Absolute URLs are mandatory here — scrapers do not resolve
      relative paths — and they point at the deployed route, not at this file. -->
@@ -172,10 +172,9 @@ code,kbd,pre,.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-num
 .hdr-in{display:flex;align-items:center;gap:18px;height:64px}
 .brand{display:inline-flex;align-items:center;gap:11px;font-weight:800;letter-spacing:-.03em;font-size:19px;flex:none}
 .brand .tile{
-  width:31px;height:31px;border-radius:9px;background:var(--red);
-  display:grid;place-items:center;flex:none;box-shadow:0 4px 14px -5px rgba(255,72,72,.7);
+  width:31px;height:31px;border-radius:9px;display:block;flex:none;
+  box-shadow:0 4px 14px -5px rgba(255,72,72,.7);
 }
-.brand .tile svg{width:20px;height:20px;display:block}
 .brand .dot{color:var(--amber)}
 .secnav{display:flex;gap:3px;margin-left:auto;overflow:hidden}
 .secnav a{
@@ -509,12 +508,8 @@ pre .k{color:var(--amber-ink)}
 <header class="hdr">
   <div class="wrap hdr-in">
     <a class="brand" href="./index.html" aria-label="Cackle — home">
-      <span class="tile" aria-hidden="true">
-        <svg viewBox="0 0 128 128" fill="none" aria-hidden="true">
-          <line x1="22" y1="42" x2="106" y2="42" stroke="#fff" stroke-width="7" stroke-dasharray="13 13" stroke-linecap="round"/>
-          <path d="M40 76 Q64 106 88 76" stroke="#fff" stroke-width="13" stroke-linecap="round" fill="none"/>
-        </svg>
-      </span><span>Cackle<span class="dot">.</span></span>
+      <img class="tile" src="./assets/cackle-logo.svg" alt="" width="31" height="31">
+      <span>Cackle<span class="dot">.</span></span>
     </a>
     <nav class="secnav" id="secnav" aria-label="Sections">
       <a href="#how">How it works</a>
