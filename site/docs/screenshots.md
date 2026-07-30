@@ -1,5 +1,11 @@
 # Screenshots
 
+> **In plain English:** you don't need this page to *see* the screenshots —
+> they're already placed next to the step they illustrate throughout
+> [GETTING-STARTED.md](GETTING-STARTED.md) and the other chapters. This page
+> is for regenerating them (if you're a contributor changing the UI) and for
+> the full at-a-glance table of every surface captured, light and dark.
+
 Every screenshot in this repository — the README gallery and this page — is
 generated from the real, running application against seeded demo data.
 Nothing here is a mockup.

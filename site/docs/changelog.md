@@ -191,6 +191,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     "integer cents"; both were stale.
   - `CHANGELOG.md` referenced `0006_currency_minor_units.sql`, folded into
     the `0001_init.sql` baseline.
+  - `docs/GETTING-STARTED.md` told readers to "create your organisation and
+    event through the UI (or the API)". There is no organisation-creation
+    route or UI flow — `internal/auth.Service.Signup` only inserts a `User`
+    row, and `internal/httpapi` registers no `POST /api/orgs`. The rewritten
+    walkthrough says so plainly and gives the one-time database workaround
+    instead of describing a step that doesn't exist. See
+    [ROADMAP.md](ROADMAP.md#v1--ships-now) for the tracked gap.
 - The browser gate now **fails closed** when its local dedupe store errors,
   recording the scan `invalid` with the reason instead of throwing out of the
   decode handler and leaving the operator staring at an unchanged screen
