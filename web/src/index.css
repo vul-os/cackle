@@ -36,12 +36,13 @@
          INK   #14121A  hsl(260 18% 9%)    the third colour: body type, the
                                            dark ground, every structural line.
 
-       Amber (#F5A623) used to be `--brand`. It has been RETIRED, and not for
-       taste: it sat one hue-step away from `--verdict-duplicate`, the burnt
-       orange this product floods the whole screen with to say ALREADY
-       SCANNED. Brand chrome that looks like a gate warning is a safety
-       defect. Amber now appears in exactly two places — `--verdict-duplicate`
-       and `--warning` — and in both of them it means "stop and look".
+       `--brand` used to be an orange-yellow accent (see CHANGELOG). It has
+       been RETIRED, and not for taste: it sat about nine degrees of hue from
+       `--verdict-duplicate`, the burnt orange this product floods the whole
+       screen with to say ALREADY SCANNED. Brand chrome that looks like a gate
+       warning is a safety defect. That hue band now appears in exactly two
+       tokens — `--verdict-duplicate` and `--warning` — and in both of them it
+       means "stop and look", never "this is Cackle".
 
        `--brand` / `--brand-2` / `--brand-ink` are FIXED in both themes: they
        are identity, not surface, and a mark that changes colour with the OS
@@ -148,8 +149,8 @@
        instantly at a distance, and hue is never the only signal — every
        verdict also carries a distinct icon and an explicit word.
 
-       These values are FROZEN. The brand moved off amber precisely so that
-       `--verdict-duplicate`'s burnt orange has the screen to itself: amber
+       These values are FROZEN. The brand moved off the orange-yellow band
+       precisely so that `--verdict-duplicate` has it to itself: that colour
        on a gate now means one thing only, and it is not branding. */
     --verdict-admit: 150 70% 29%;
     --verdict-reject: 0 78% 46%;
@@ -231,7 +232,7 @@
     --card: 258 18% 12%;
     --card-foreground: 0 0% 100%;
 
-    /* The brand fill does NOT lift on a dark canvas the way the old amber
+    /* The brand fill does NOT lift on a dark canvas the way the old accent
        did. #FF4848 already measures 5.48:1 against ink, so there is nothing
        to fix, and shifting it would mean the primary button and the logo tile
        beside it were two different reds. Its ink stays INK — white on red is

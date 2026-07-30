@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 // no network is not in an error state.** It is the product working as designed.
 // A ticket is a signed capability; the gate verifies it against a key ring it
 // already has; the server's opinion is not part of the decision. Rendering that
-// situation in warning amber with a broken-cloud icon — which is what almost
+// situation in a warning colour with a broken-cloud icon — which is what almost
 // every offline-capable app does — teaches the operator to distrust exactly the
 // property they are relying on, and to go looking for a fix at the worst
 // possible moment.
@@ -36,7 +36,9 @@ export function ConnectionState({ online, pendingCount = 0, syncing = false, var
     const Icon = online ? Wifi : WifiOff;
 
     // On the gate's fixed dark surface the neutral treatment is a white wash;
-    // on ordinary themed pages it is the muted token. Neither is amber.
+    // on ordinary themed pages it is the muted token. Neither one reaches for
+    // --warning, and neither one is allowed to: on a Cackle screen the warning
+    // colour belongs to the gate verdict palette alone.
     const neutral =
         surface === 'gate'
             ? 'bg-white/10 text-white'

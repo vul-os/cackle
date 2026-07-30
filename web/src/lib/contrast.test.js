@@ -173,10 +173,12 @@ test('the shipped tokens are the brand colours the spec names', async (t) => {
         }
     });
 
-    await t.test('amber is gone from everything except the gate warning', () => {
-        // The retirement is the point: amber on a Cackle screen must mean
-        // "the gate is warning you" and nothing else. Amber lives at roughly
-        // h=25..40; assert no BRAND or CHROME token sits in that band.
+    await t.test('the retired orange-yellow band is gone from brand and chrome', () => {
+        // The retirement is the point: that colour on a Cackle screen must
+        // mean "the gate is warning you" and nothing else. It lives at
+        // roughly h=20..45 when saturated; assert that no BRAND or CHROME
+        // token sits anywhere in that band, in either theme. This is what
+        // stops the old accent creeping back in as "just an accent".
         const brandish = [
             '--brand',
             '--brand-2',
@@ -190,10 +192,10 @@ test('the shipped tokens are the brand colours the spec names', async (t) => {
         for (const themeName of ['light', 'dark']) {
             for (const name of brandish) {
                 const { h, s } = parseHsl(token(themes[themeName], name));
-                const isAmberBand = h >= 20 && h <= 45 && s > 0.35;
+                const isRetiredBand = h >= 20 && h <= 45 && s > 0.35;
                 assert.ok(
-                    !isAmberBand,
-                    `${name} (${themeName}) is h=${h} s=${s} — inside the retired amber band`,
+                    !isRetiredBand,
+                    `${name} (${themeName}) is h=${h} s=${s} — inside the retired accent band`,
                 );
             }
         }
@@ -444,9 +446,10 @@ test('palette invariants', async (t) => {
     });
 
     await t.test('"already scanned" is held clear of the brand red', () => {
-        // This pair is why amber was retired: while --brand WAS amber it sat
-        // ~9 degrees from the ALREADY-SCANNED flood. Red moves it to ~28, and
-        // the assertion stays so nobody drifts the brand back toward it.
+        // This pair is why the old accent was retired: while --brand was an
+        // orange-yellow it sat ~9 degrees from the ALREADY-SCANNED flood. Red
+        // moves it to ~28, and the assertion stays so nobody drifts the brand
+        // back toward it.
         // Compared as hue distance, which is the axis that actually confuses
         // them — contrast ratio would not catch this.
         const brandHue = parseHsl(token(themes.light, '--brand')).h;

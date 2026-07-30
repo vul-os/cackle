@@ -12,7 +12,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import Logo from '/cackle.svg';
+import { BrandLockup } from '@/components/brand/wordmark';
 
 const TopBar = ({ onMenuClick }) => {
     const { user, signOut, orgs, activeOrg, switchOrg } = useAuth();
@@ -22,21 +22,23 @@ const TopBar = ({ onMenuClick }) => {
         <nav className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-elevated sm:px-6">
             <div className="flex items-center gap-3">
                 <button
-                    className="rounded-md text-sidebar-foreground/80 transition-colors hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
+                    className="-m-1 rounded-md p-1 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
                     onClick={onMenuClick}
                     aria-label="Open navigation menu"
                 >
                     <Menu size={22} />
                 </button>
+                {/* The console chrome is a fixed ink shell in both themes, so
+                    the wordmark is pinned to its on-dark tone rather than
+                    following the page. Below sm only the tile draws — at
+                    390px the org switcher and the account menu need the
+                    width more than the word does. */}
                 <Link
                     to="/"
-                    className="flex items-center gap-2 rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
+                    aria-label="Cackle home"
+                    className="rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
                 >
-                    <img src={Logo} alt="" className="h-8 w-8" />
-                    <span className="font-display text-2xl font-black tracking-tight text-sidebar-foreground">
-                        <span className="sr-only sm:not-sr-only">cackle</span>
-                        <span className="text-primary-emphasis">.</span>
-                    </span>
+                    <BrandLockup size="md" tone="onDark" hideWordBelowSm />
                 </Link>
             </div>
 

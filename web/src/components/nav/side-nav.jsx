@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, CalendarDays, Settings, QrCode } from 'lucide-react';
 import { NavItem } from './nav-item';
+import { BrandLockup } from '@/components/brand/wordmark';
 
 const navItems = [
     { to: '/admin', icon: Home, text: 'Home', end: true },
@@ -21,6 +22,27 @@ const SideNav = ({ isExpanded, isMobile }) => {
                     ))}
                 </ul>
             </nav>
+
+            {/* The rail's foot. On mobile the drawer covers the top bar's
+                wordmark, so this is where the mark lives while the drawer is
+                open — and it is the same <BrandLockup> the top bar renders,
+                not a second drawing of it.
+
+                The seam above it is the ticket perforation: --notch is set to
+                the sidebar's own ground so the two punched circles read as
+                holes through the rail rather than as dots on it. */}
+            <div className="shrink-0 px-4 pb-5 pt-1">
+                <div
+                    className="ticket-perforation mb-4"
+                    style={{ '--notch': 'var(--sidebar-background)' }}
+                    aria-hidden="true"
+                />
+                <BrandLockup
+                    size="xs"
+                    tone="onDark"
+                    className={`transition-opacity duration-200 ${isExpanded ? 'opacity-70' : 'opacity-0'}`}
+                />
+            </div>
         </div>
     );
 };
