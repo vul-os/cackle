@@ -24,21 +24,25 @@ const FEATURED_COUNT = 3;
 // all events" below always covers the rest either way.
 const HOMEPAGE_EVENT_LIMIT = 12;
 
+// Plain language, because the person deciding whether to use this runs a
+// venue, not a distributed system. The signing scheme is true and it is
+// still on the site — one page down, in /docs, under "how it actually
+// works", where an engineer evaluating it will look for it.
 const HOW_IT_WORKS = [
     {
         icon: QrCode,
-        title: 'Buy a ticket',
-        description: 'Every ticket is a compact Ed25519-signed capability — it fits in a QR code and travels with you.',
+        title: 'They buy a ticket',
+        description: 'The ticket is a QR code that carries its own proof. It goes wherever the buyer goes — no app to install.',
     },
     {
         icon: WifiOff,
-        title: 'Gate goes offline',
-        description: 'Staff download a scan bundle once while online. From then on, the network is optional.',
+        title: 'You open the scanner once',
+        description: 'One tap while you still have signal downloads everything the door needs for the whole night. Then unplug.',
     },
     {
         icon: ShieldCheck,
-        title: 'Instant, offline admission',
-        description: 'The scanner verifies the signature locally and catches repeat scans at that gate — no venue server required.',
+        title: 'People get in',
+        description: 'The phone checks each ticket on the spot and catches repeats at that door. Nothing to ask, nobody to wait for.',
     },
 ];
 
@@ -173,7 +177,7 @@ const LandingPage = () => {
                         <div className="mx-auto mb-14 max-w-2xl text-center">
                             <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-emphasis">The whole flow</span>
                             <h2 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">How it works</h2>
-                            <p className="mt-2 text-muted-foreground">The gate is the whole product. Here&apos;s the flow, start to finish.</p>
+                            <p className="mt-2 text-muted-foreground">The door is the whole product. Here&apos;s the night, start to finish.</p>
                         </div>
 
                         {/* A dashed thread connects the three steps on wide screens — the

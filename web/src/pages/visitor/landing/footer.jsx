@@ -53,13 +53,12 @@ const Footer = () => (
                         Sell tickets online, then check them at the door with a phone that keeps working when the venue&apos;s
                         internet drops.
                     </p>
-                    {/* States a limitation, so it stays — in these words or
-                        stronger ones. A footer that quietly drops it is a
-                        page claiming more than the product does. */}
-                    <p className="mt-4 max-w-sm rounded-lg border border-border bg-background/60 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                        <span className="font-semibold text-foreground">Cackle is experimental and not production-ready.</span>{' '}
-                        Try it on a small night before you put a sold-out one through it.
-                    </p>
+                    {/* The experimental status and the cross-gate limit are
+                        NOT dropped here — they are stated one block below by
+                        <HonestyStrip>, which every route mounts and which
+                        scripts/check-app.mjs gates. Repeating them inside the
+                        footer as well printed the same warning twice on every
+                        page, which is how a warning stops being read. */}
                 </div>
 
                 <FooterColumn title="Platform" links={PLATFORM} />
