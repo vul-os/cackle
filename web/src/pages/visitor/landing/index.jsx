@@ -37,7 +37,7 @@ const HOW_IT_WORKS = [
     {
         icon: ShieldCheck,
         title: 'Instant, offline admission',
-        description: 'The scanner verifies the signature locally and blocks duplicates — no venue server required.',
+        description: 'The scanner verifies the signature locally and catches repeat scans at that gate — no venue server required.',
     },
 ];
 

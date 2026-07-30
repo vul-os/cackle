@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users, Image as ImageIcon, Copy, Receipt } from 'lucide-react';
+import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users, Image as ImageIcon, Copy, Receipt, Split } from 'lucide-react';
 
 export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmitting, onPublish, isPublishing, onDuplicate, isDuplicating }) => {
     return (
@@ -37,6 +37,15 @@ export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmi
                     <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/attendees`)} disabled={!editForm.id}>
                         <Users className="mr-2 h-4 w-4" />
                         Attendees
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={() => navigate(`/admin/events/${editForm.id}/admissions`)}
+                        disabled={!editForm.id}
+                        title="Cross-gate double admissions, detected after sync — never prevented"
+                    >
+                        <Split className="mr-2 h-4 w-4" />
+                        Admissions
                     </Button>
                     <Button variant="outline" onClick={() => navigate(`/admin/events/${editForm.id}/orders`)} disabled={!editForm.id}>
                         <Receipt className="mr-2 h-4 w-4" />

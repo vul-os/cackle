@@ -265,6 +265,19 @@ export const events = {
      */
     attendees: (id, params) => get(`/events/${id}/attendees`, params),
     /**
+     * GET /api/events/{id}/admission-conflicts — scanner-or-above auth. The
+     * after-the-fact record of every ticket more than one gate device
+     * admitted, because two partitioned gates cannot be stopped from doing
+     * that — only found out about it once their logs sync. Shape:
+     * { conflicts: [{ ticket_id, devices, extra_admissions, claims: [{
+     * device_id, gate_id, scanned_at, result, server_result?, note }] }],
+     * extra_admissions, algebra, engine, complete, caveat }. See
+     * pages/organizers/events/event/admission-reconciliation.js for how this
+     * is shaped for the screen, and docs/OFFLINE-GATES.md for what it does
+     * and does not claim.
+     */
+    admissionConflicts: (id) => get(`/events/${id}/admission-conflicts`),
+    /**
      * GET /api/events/{id}/orders — admin+ auth. Every order placed
      * against the event, most recent first: { orders: [{...,
      * marked_by, marked_at}] }. This is the organiser orders screen's
