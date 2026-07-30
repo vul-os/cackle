@@ -17,6 +17,19 @@
  * serves that directory as the wrapper route does and checks it too — which is
  * the only way to catch a link the collector rewrote into a 404.
  *
+ * # The overflow check measures elements, not the root
+ *
+ * This file used to assert `documentElement.scrollWidth <= clientWidth` and had
+ * printed `ok` at every breakpoint for its entire life. It could not do
+ * otherwise: index.html's `<section>`s carry `overflow:hidden`, and a clipped
+ * subtree adds nothing to any ancestor's scroll area — a 900px element planted
+ * inside `section#top` at 390px, and a 160-character unbreakable token 905px
+ * past the right edge, both passed. `scrollWidth` is also blind to leftward and
+ * `position:fixed` overflow by construction. measureOverflow() compares every
+ * rendered element's border box against the viewport instead, forgiving only
+ * genuine scroll containers, and overflowGateSelfTest() plants and removes both
+ * of those shapes on every run so an `ok` here means something again.
+ *
  * # Two checks here are about claims, not code
  *
  * This product's defining honesty is that a cross-gate double-scan is
@@ -81,12 +94,26 @@ if (existsSync(join(collectedDir, 'landing.html'))) {
 
 const BREAKPOINTS = [360, 768, 1440];
 
+// Layout is theme-dependent here: `:root[data-theme=light]` restyles chips and
+// the docs rail, and docs.html re-renders the current chapter on a theme
+// change. Measuring one theme measures half the page.
+const THEMES = ['dark', 'light'];
+
+// The overflow scan's coverage floor, per page, per measurement. The landing
+// renders ~730 elements and docs.html ~250 on its last chapter; a selector that
+// silently stopped matching, or a page that never finished rendering, would
+// report zero offenders out of zero elements and pass. A floor is what makes
+// "no element overflows" mean "many elements were looked at and none did".
+const MIN_ELEMENTS_MEASURED = { landing: 400, docs: 150 };
+
 // A run that dies early must FAIL, not pass by doing nothing. Every shape
 // contributes a fixed number of assertions, so a short count is itself a bug.
-const CHECKS_PER_PAGE = 5 + BREAKPOINTS.length; // requests, >=400, console, self-contained, images + breakpoints
+// Per page: requests, >=400, console, self-contained, images, the overflow
+// coverage floor, and one overflow assertion per breakpoint per theme.
+const CHECKS_PER_PAGE = 6 + BREAKPOINTS.length * THEMES.length;
 const CLAIM_CHECKS = 2;                          // landing only, per shape
 const DOCS_CHECKS = 1;                           // docs.html only: rail vs chapter table
-const SELF_TESTS = 2;                            // claim gate + brand-mark-provenance gate, both proving they still bite
+const SELF_TESTS = 3;                            // claim gate, brand-mark provenance, overflow gate — all proving they still bite
 const EXPECTED_CHECKS =
   SELF_TESTS + SHAPES.length * (2 * CHECKS_PER_PAGE + CLAIM_CHECKS + DOCS_CHECKS);
 
@@ -150,6 +177,127 @@ function collectExternal() {
     scan(rules);
   }
   return [...out];
+}
+
+/**
+ * Horizontal overflow, measured per element rather than from the root.
+ *
+ * This replaced `documentElement.scrollWidth <= clientWidth`, which was hollow
+ * on this site and provably so. Two independent reasons:
+ *
+ *  1. site/index.html wraps its content in `<section>`s that carry
+ *     `overflow:hidden` (they contain decorative blobs). A clipped subtree
+ *     contributes nothing to any ancestor's scroll area, so a 900px element
+ *     planted inside `section#top` at a 390px viewport left the root reporting
+ *     `scrollWidth 390 <= clientWidth 390` — `ok`. The most realistic defect of
+ *     all, an unbreakable 160-character token in a paragraph, rendered 905px
+ *     past the right edge and also printed `ok`.
+ *  2. `scrollWidth` cannot express LEFTWARD overflow at all. An element at
+ *     `left:-400px` is off-screen for every reader and adds nothing to
+ *     scrollWidth in an LTR document, so no root-based comparison can ever see
+ *     it. Same for `position:fixed`, which is outside the scroll area entirely.
+ *
+ * So: every rendered element's border box is compared against the viewport, in
+ * both directions. Two rules make it honest rather than merely noisy:
+ *
+ *  - ONLY a genuine scroll container (`overflow-x: auto|scroll`) forgives. Such
+ *    a container is an intentional, user-reachable sideways scroller — the
+ *    <pre> holding a long shell command, the box holding a base64 signature —
+ *    and its content is MEANT to be wider than the viewport. `hidden` and
+ *    `clip` are NOT forgiven: they silently destroy content, which is the bug
+ *    class this gate exists to find, not an affordance the reader can act on.
+ *  - The ancestor walk STOPS BEFORE `<body>`. body carries `overflow-x:hidden`
+ *    deliberately, so that a stray element cannot give a real reader a
+ *    horizontal scrollbar. Walking into it would mark every element on the page
+ *    "legitimately clipped" and rebuild exactly the hollow check being removed.
+ *
+ * `examined` is returned so the caller can assert a floor: a scan that looked
+ * at nothing must fail, not report that all zero elements behaved.
+ */
+function measureOverflow() {
+  const TOL = 0.5; // sub-pixel layout noise, not a real overhang
+  const vw = document.documentElement.clientWidth;
+  const name = (el) => el.tagName.toLowerCase() +
+    (el.id ? '#' + el.id : '') +
+    (typeof el.className === 'string' && el.className.trim()
+      ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '');
+
+  const offenders = [];
+  let examined = 0;
+  for (const el of document.querySelectorAll('body *')) {
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) continue; // not rendered — nothing to overflow
+    examined++;
+    if (r.right - vw <= TOL && -r.left <= TOL) continue;
+
+    let scroller = null;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const ox = getComputedStyle(a).overflowX;
+      if (ox === 'auto' || ox === 'scroll') { scroller = name(a); break; }
+    }
+    if (scroller) continue;
+
+    offenders.push(`${name(el)} spans ${Math.round(r.left)}…${Math.round(r.right)} ` +
+      `outside viewport 0…${vw}`);
+  }
+  return { vw, examined, offenders };
+}
+
+/**
+ * Proves the overflow scan above can go red, and goes green again when the
+ * cause is removed — both directions, on the real page, every run. Without
+ * this the scan's "ok" would be worth exactly what the old one's was.
+ *
+ * The plants are chosen to be the shapes the OLD check could not see: one
+ * inside a clipping `<section>`, and one pushed off the left edge.
+ */
+async function overflowGateSelfTest(pg) {
+  const bad = [];
+  const baseline = await pg.evaluate(measureOverflow);
+  if (baseline.offenders.length !== 0) {
+    bad.push(`baseline is not clean (${baseline.offenders.join('; ')}) — a plant proves nothing here`);
+  }
+  if (baseline.examined < MIN_ELEMENTS_MEASURED.landing) {
+    bad.push(`baseline examined only ${baseline.examined} elements`);
+  }
+
+  const plants = [
+    ['inside a clipping section', () => {
+      const host = document.querySelector('section') || document.body;
+      const d = document.createElement('div');
+      d.id = 'overflow-gate-selftest';
+      d.style.cssText = 'width:900px;height:24px';
+      host.appendChild(d);
+    }],
+    ['pushed off the left edge', () => {
+      const d = document.createElement('div');
+      d.id = 'overflow-gate-selftest';
+      d.style.cssText = 'position:absolute;left:-400px;top:0;width:300px;height:24px';
+      document.body.appendChild(d);
+    }],
+  ];
+  for (const [label, plant] of plants) {
+    await pg.evaluate(plant);
+    const red = await pg.evaluate(measureOverflow);
+    const named = red.offenders.some((o) => o.includes('#overflow-gate-selftest'));
+    if (!named) bad.push(`a planted element ${label} was NOT caught, or was not named`);
+    await pg.evaluate(() => document.getElementById('overflow-gate-selftest')?.remove());
+    const green = await pg.evaluate(measureOverflow);
+    if (green.offenders.length !== 0) {
+      bad.push(`removing the plant (${label}) did not clear the scan: ${green.offenders.join('; ')}`);
+    }
+  }
+  return bad;
+}
+
+/** Force the page into `want` and wait for it to settle. Returns what it got. */
+async function setTheme(pg, want) {
+  const current = () => pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  if (await current() !== want) {
+    await pg.evaluate(() => document.getElementById('themeBtn')?.click());
+    await pg.waitForTimeout(700); // docs.html re-renders the open chapter on a theme change
+  }
+  return current();
 }
 
 /** Every <img> that is in the DOM must have actually decoded. */
@@ -280,6 +428,7 @@ async function main() {
   const browser = await chromium.launch();
   const problems = [];
   let ran = 0;
+  let totalMeasured = 0; // element boxes compared against the viewport, all pages/viewports/themes
   const log = (...a) => { if (!quiet) console.log(...a); };
   const note = (ok, where, msg) => {
     ran++;
@@ -298,6 +447,27 @@ async function main() {
   const markProblems = brandMarkProvenanceCheck();
   note(markProblems.length === 0, 'brand mark provenance',
     `every mark-drawing generator parses brand/logo.svg instead of re-declaring it${markProblems.length ? ' — ' + markProblems.join('; ') : ''}`);
+
+  // Before any page is measured: prove the overflow scan still bites, on the
+  // real landing page, at the narrowest viewport it is asserted at. The check
+  // this replaced printed `ok` at every breakpoint for the entire life of the
+  // file, so nothing here is trusted until it has been shown to fail on demand.
+  log('overflow gate');
+  {
+    const srv = await serve(SHAPES[0].base, SHAPES[0].dir);
+    const ctx = await browser.newContext({ viewport: { width: BREAKPOINTS[0], height: 900 } });
+    const pg = await ctx.newPage();
+    await pg.goto(`http://127.0.0.1:${srv.address().port}${SHAPES[0].base}${SHAPES[0].entry}`,
+      { waitUntil: 'networkidle' });
+    await pg.setViewportSize({ width: BREAKPOINTS[0], height: 900 });
+    await pg.waitForTimeout(300);
+    const overflowProblems = await overflowGateSelfTest(pg);
+    note(overflowProblems.length === 0, 'overflow gate',
+      `catches a planted element a clipping section hides and one off the left edge, and clears when both are removed` +
+      `${overflowProblems.length ? ' — ' + overflowProblems.join('; ') : ''}`);
+    await ctx.close();
+    srv.close();
+  }
 
   for (const shape of SHAPES) {
     const server = await serve(shape.base, shape.dir);
@@ -406,15 +576,26 @@ async function main() {
         note(states, where, 'states the double-scan limit in plain words');
       }
 
+      const floor = page === shape.entry ? MIN_ELEMENTS_MEASURED.landing : MIN_ELEMENTS_MEASURED.docs;
+      let leastExamined = Infinity;
       for (const w of BREAKPOINTS) {
         await pg.setViewportSize({ width: w, height: 900 });
-        await pg.waitForTimeout(280);
-        const m = await pg.evaluate(() => ({
-          sw: document.documentElement.scrollWidth,
-          cw: document.documentElement.clientWidth,
-        }));
-        note(m.sw <= m.cw, where, `no horizontal scroll @${w} (scrollWidth ${m.sw} <= clientWidth ${m.cw})`);
+        for (const t of THEMES) {
+          const got = await setTheme(pg, t);
+          await pg.waitForTimeout(280);
+          const m = await pg.evaluate(measureOverflow);
+          leastExamined = Math.min(leastExamined, m.examined);
+          totalMeasured += m.examined;
+          note(m.offenders.length === 0 && got === t, where,
+            `nothing overflows @${w} ${t} (${m.examined} elements measured against a ${m.vw}px viewport)` +
+            `${got !== t ? ` — page would not switch to ${t}, it is ${got}` : ''}` +
+            `${m.offenders.length ? ' — ' + m.offenders.slice(0, 6).join('; ') +
+              (m.offenders.length > 6 ? ` (+${m.offenders.length - 6} more)` : '') : ''}`);
+        }
       }
+      // A scan that examined nothing would report no offenders and pass.
+      note(leastExamined >= floor, where,
+        `every overflow scan measured at least ${floor} elements (thinnest was ${leastExamined})`);
       await ctx.close();
     }
     server.close();
@@ -431,6 +612,8 @@ async function main() {
   }
   console.log(`\ncheck-site: ${ran} checks passed — ${relative(repoRoot, siteDir)}/ loads clean, ` +
     `fetches nothing off-origin, resolves at ${SHAPES.map((s) => s.name).join(' + ')}, ` +
+    `keeps ${totalMeasured} element boxes inside the viewport at ` +
+    `${BREAKPOINTS.join('/')}px in ${THEMES.join(' + ')}, ` +
     'and never claims a double-scan guarantee it cannot keep.');
 }
 
