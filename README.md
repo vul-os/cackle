@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/cackle-logo.svg" alt="Cackle" width="120" />
+<img src="brand/logo.svg" alt="Cackle" width="120" />
 
 # Cackle
 
@@ -265,6 +265,16 @@ npm run screenshots
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the
 dev-environment setup, branch conventions, and what we say yes and no to. See
 [SECURITY.md](SECURITY.md) to report a vulnerability.
+
+## Brand
+
+The mark in [`brand/`](brand/) is the source of truth. Every icon this repo
+ships — favicon, PWA and app icons, the mark in the README and on the site — is
+rendered from `brand/logo.svg` rather than redrawn, so there is one approved
+drawing and no second copy to drift.
+
+Copy it outward, never edit a derived copy, and never edit `brand/` to match
+something downstream.
 
 ## License
 
