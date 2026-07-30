@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useCart } from '@/context/use-cart';
 import { format } from 'date-fns';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 const CartDropdown = ({ isMobile = false }) => {
     const { itemsByEvent, itemCount, totalsByCurrency } = useCart();
@@ -60,7 +60,7 @@ const CartDropdown = ({ isMobile = false }) => {
                                                         {item.quantity}x {item.ticket_type.name}
                                                     </span>
                                                     <span className="font-medium">
-                                                        {formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}
+                                                        <Money minor={item.quantity * item.ticket_type.price_minor} currency={event.currency} />
                                                     </span>
                                                 </div>
                                             ))}
@@ -78,7 +78,7 @@ const CartDropdown = ({ isMobile = false }) => {
                             {Object.entries(totalsByCurrency).map(([currency, minor]) => (
                                 <div key={currency} className="flex justify-between">
                                     <span>Total{currency ? ` (${currency})` : ''}</span>
-                                    <span>{formatMoney(minor, currency)}</span>
+                                    <span><Money minor={minor} currency={currency} /></span>
                                 </div>
                             ))}
                         </div>

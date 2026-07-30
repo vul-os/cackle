@@ -27,7 +27,29 @@
     --font-sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
-    /* Cackle red — energetic, high-contrast, works on both themes */
+    /* ── Cackle's brand colours ───────────────────────────────────────────
+       `--brand` is #F5A623, the accent this product's own mini-site declares
+       in site/assets/style.css and the one the suite's design survey recorded
+       for cackle. The app used to run a red primary that matched nothing; it
+       now leads with the same amber the landing page does, and `--brand-2` is
+       that file's `--accent-2` — the #FF4848 of brand/logo.svg's tile.
+
+       These two are FIXED in both themes: they are identity, not surface, and
+       a mark that changes colour with the OS theme is not a mark. Everything
+       theme-dependent below is derived from them.
+
+       The measured reason there is a separate `--primary-emphasis`: #F5A623
+       on white is 1.99:1. It is a superb FILL and an unusable INK on a light
+       surface, so brand-coloured text, icons and the focus ring resolve to a
+       darkened amber in light mode and a lifted one in dark mode. Using
+       `--primary` for text on a light background is the one thing this palette
+       forbids, and contrast.test.js measures it rather than trusting anyone to
+       remember. */
+    --brand: 37.4 91.3% 54.9%;
+    --brand-2: 0 100% 64.1%;
+    /* The only text colour permitted on a `--brand` fill: 8.52:1. */
+    --brand-ink: 30 45% 10%;
+
     --background: 0 0% 100%;
     --foreground: 240 10% 8%;
 
@@ -38,30 +60,55 @@
     --popover-foreground: 240 10% 8%;
 
     --border: 240 6% 90%;
-    --input: 240 6% 88%;
+    --input: 240 5% 58%;
 
     --card: 0 0% 100%;
     --card-foreground: 240 10% 8%;
 
-    --primary: 355 85% 54%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 37.4 91.3% 54.9%;
+    --primary-foreground: 30 45% 10%;
+    /* Brand as INK — text, icons, the focus ring. Never interchangeable with
+       --primary; see the note above. */
+    --primary-emphasis: 30 92% 32%;
 
     --secondary: 240 5% 96%;
     --secondary-foreground: 240 10% 12%;
 
-    --accent: 355 85% 96%;
-    --accent-foreground: 355 70% 32%;
+    --accent: 38 96% 94%;
+    --accent-foreground: 30 92% 28%;
 
-    --destructive: 0 84% 55%;
+    --destructive: 0 74% 42%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 152 60% 36%;
+    --success: 152 65% 26%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 24 60% 12%;
+    --warning: 25 90% 34%;
+    --warning-foreground: 0 0% 100%;
 
-    --ring: 355 85% 54%;
+    /* ── Gate verdict palette ─────────────────────────────────────────────
+       The three answers a scanner gives, and the most important colours in
+       the product. They are their own tokens rather than reuses of
+       success/destructive/warning because they are used one way only — as a
+       full-bleed flood behind a white glyph and a white word, read at arm's
+       length, outdoors, in a hurry.
+
+       Deliberately DARK saturated fills rather than the bright ones a
+       scanner UI usually reaches for. Bright green with white text measures
+       around 2:1 and glares in direct sun; these carry white at 6.3–7.3:1
+       and stay legible with the screen washed out. Hue still separates them
+       instantly at a distance, and hue is never the only signal — every
+       verdict also carries a distinct icon and an explicit word.
+
+       `--verdict-duplicate` is a burnt orange, held well away from
+       `--brand`'s amber on purpose: "already scanned" is a state, the brand
+       is not, and the two must never be mistaken for each other. */
+    --verdict-admit: 150 70% 29%;
+    --verdict-reject: 0 78% 46%;
+    --verdict-duplicate: 28 95% 34%;
+    --verdict-ink: 0 0% 100%;
+
+    --ring: 30 92% 40%;
 
     --radius: 0.75rem;
 
@@ -87,12 +134,18 @@
        stays auditable and consistent between light/dark mode. */
     --sidebar-background: 240 12% 6%;
     --sidebar-foreground: 0 0% 96%;
+    /* 0.6 alpha over the sidebar measures 7.25:1 — the alpha is composited
+       before it is scored, because measuring a translucent token as if it
+       were opaque reports a number no eye ever receives. See lib/contrast.js. */
     --sidebar-muted-foreground: 0 0% 100% / 0.6;
     --sidebar-border: 0 0% 100% / 0.1;
     --sidebar-accent: 0 0% 100% / 0.1;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-primary: 355 85% 54% / 0.2;
-    --sidebar-primary-foreground: 0 0% 100%;
+    /* The active nav item's brand wash. Its FOREGROUND is what has to be
+       legible, so the wash stays a low-alpha amber tint and the label on top
+       is the lifted brand ink, not white-on-amber. */
+    --sidebar-primary: 37.4 91.3% 54.9% / 0.16;
+    --sidebar-primary-foreground: 38 95% 68%;
   }
 
   .dark {
@@ -106,30 +159,44 @@
     --popover-foreground: 0 0% 96%;
 
     --border: 240 8% 18%;
-    --input: 240 8% 20%;
+    --input: 240 6% 46%;
 
     --card: 240 10% 9%;
     --card-foreground: 0 0% 96%;
 
-    --primary: 355 90% 61%;
-    --primary-foreground: 0 0% 100%;
+    /* The brand fill lifts very slightly on a dark canvas so it reads as the
+       same amber rather than a muddier one; its ink stays the near-black
+       `--brand-ink`, because a white-on-amber button is 1.99:1 in either
+       theme. --brand / --brand-2 / --brand-ink are NOT redefined here: see
+       the note in :root — identity does not follow the theme. */
+    --primary: 38 93% 58%;
+    --primary-foreground: 30 45% 10%;
+    --primary-emphasis: 38 95% 62%;
 
     --secondary: 240 8% 15%;
     --secondary-foreground: 0 0% 96%;
 
-    --accent: 355 55% 18%;
-    --accent-foreground: 355 90% 78%;
+    --accent: 32 42% 16%;
+    --accent-foreground: 38 95% 68%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84% 68%;
+    --destructive-foreground: 0 60% 10%;
 
-    --success: 152 55% 45%;
+    --success: 152 58% 55%;
     --success-foreground: 152 90% 8%;
 
-    --warning: 40 92% 55%;
-    --warning-foreground: 24 60% 10%;
+    --warning: 32 92% 58%;
+    --warning-foreground: 25 80% 10%;
 
-    --ring: 355 90% 61%;
+    /* The verdict floods do NOT lighten in dark mode. A gate runs the same
+       screen at dusk and at noon, and the operator's answer must not change
+       shade with a theme toggle they never touched. */
+    --verdict-admit: 150 70% 29%;
+    --verdict-reject: 0 78% 46%;
+    --verdict-duplicate: 28 95% 34%;
+    --verdict-ink: 0 0% 100%;
+
+    --ring: 38 95% 62%;
 
     --radius: 0.75rem;
 
@@ -218,6 +285,19 @@
     font-family: var(--font-sans);
     letter-spacing: -0.02em;
   }
+
+  /* Tabular figures for money and counts.
+     The shipped Figtree binary really does carry `tnum` (its GSUB feature
+     list is ccmp/dnom/frac/kern/locl/mark/mkmk/numr/pnum/rvrn/tnum) — but it
+     also carries `pnum`, and proportional figures are what a "1" renders as
+     by default. So this has to be asked for explicitly; it is not free.
+     `lnum` pins lining figures, and `calt` is switched off because
+     contextual alternates are free to re-space a digit run and undo exactly
+     the fixed advance width this exists to guarantee. */
+  .tnum {
+    font-variant-numeric: tabular-nums lining-nums;
+    font-feature-settings: 'tnum' 1, 'lnum' 1, 'calt' 0;
+  }
   .text-balance {
     text-wrap: balance;
   }
@@ -234,8 +314,21 @@
    @layer system — this screen has its own visual language (it's a kiosk
    surface, not a form) and must stay legible at arm's length in daylight. */
 .scanner-surface {
-  background: radial-gradient(120% 120% at 50% -10%, hsl(var(--primary) / 0.18), transparent 60%),
+  background: radial-gradient(120% 120% at 50% -10%, hsl(var(--brand) / 0.18), transparent 60%),
     hsl(var(--background));
+}
+
+/* The gate's own chrome. The scan screen is a fixed dark surface in both
+   themes — not a themed page — because it is read outdoors and a light flood
+   behind a camera preview is glare. Tokenised rather than hardcoded
+   `bg-zinc-950` so it stays auditable alongside everything else. */
+.gate-surface {
+  --gate-bg: 240 14% 5%;
+  --gate-ink: 0 0% 100%;
+  --gate-ink-muted: 0 0% 78%;
+  --gate-hairline: 0 0% 100% / 0.14;
+  background: hsl(var(--gate-bg));
+  color: hsl(var(--gate-ink));
 }
 
 /* ── Ticket motifs ─────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ function useCurrencyOptions() {
 
 const Section = ({ icon: Icon, title, children }) => (
     <div className="space-y-4 border-t border-border pt-6 first:border-t-0 first:pt-0">
-        <div className="flex items-center gap-2 text-primary">
+        <div className="flex items-center gap-2 text-primary-emphasis">
             <Icon className="h-4 w-4" />
             <h2 className="text-sm font-medium text-foreground">{title}</h2>
         </div>

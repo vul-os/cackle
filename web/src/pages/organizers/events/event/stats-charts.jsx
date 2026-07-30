@@ -1,6 +1,6 @@
 import React from 'react';
-import { formatMoney } from '@/lib/money';
 import { cn } from '@/lib/utils';
+import { Money } from '@/components/ui/money';
 
 // Fixed-order categorical hues for ticket-type identity (see index.css for
 // the validated HSL values + the dataviz six-check notes). ORDER is the
@@ -73,7 +73,7 @@ export function TicketTypeBreakdown({ byType = [], currency }) {
                                     <span className="tabular-nums">{sold}</span>
                                     {t.quantity_total ? <span className="tabular-nums"> / {t.quantity_total}</span> : null} sold
                                     {' · '}
-                                    {formatMoney(t.revenue_minor ?? 0, currency)}
+                                    <Money minor={t.revenue_minor ?? 0} currency={currency} />
                                 </span>
                             </div>
                             <div className="h-3 w-full overflow-hidden rounded-full bg-chart-track">

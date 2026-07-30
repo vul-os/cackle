@@ -1,9 +1,16 @@
 package config
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+
+	"github.com/vul-os/cackle/internal/store/keyvault"
 )
 
 func TestFirstNonEmpty(t *testing.T) {
@@ -156,5 +163,248 @@ func TestLoad_ShortSecretRejected(t *testing.T) {
 	t.Setenv(envDB, filepath.Join(t.TempDir(), "x.db"))
 	if _, err := Load(Flags{}); err == nil {
 		t.Error("Load accepted a <16-char session secret; want an error")
+	}
+}
+
+// --- event-key material ---------------------------------------------------
+
+// clearKeyEnv removes every key-material variable. It uses os.Unsetenv rather
+// than t.Setenv(k, "") — which is how the rest of this file spells "unset" —
+// because for THIS group of variables an empty value is a deliberate error and
+// not a synonym for absent. See resolveKeySource.
+func clearKeyEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{envKeyPassphrase, envKeyPassphraseFile, envKeyFile} {
+		if old, ok := os.LookupEnv(k); ok {
+			t.Cleanup(func() { os.Setenv(k, old) })
+		} else {
+			t.Cleanup(func() { os.Unsetenv(k) })
+		}
+		os.Unsetenv(k)
+	}
+}
+
+func TestResolveKeySource_AbsentIsNotAnError(t *testing.T) {
+	clearKeyEnv(t)
+
+	src, origin, err := resolveKeySource()
+	if err != nil {
+		t.Fatalf("resolveKeySource with nothing set: %v", err)
+	}
+	if src.Valid() {
+		t.Fatal("no key material configured, but a valid Source came back")
+	}
+	if origin != "" {
+		t.Fatalf("origin = %q, want empty", origin)
+	}
+
+	// Load must also succeed: refusing belongs to cmd/cackle, which can name
+	// the operation being refused. What Load must NOT do is invent material.
+	isolateEnv(t)
+	clearKeyEnv(t)
+	cfg, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err != nil {
+		t.Fatalf("Load with no key material: %v", err)
+	}
+	if cfg.HasKeySource() {
+		t.Fatal("Load fabricated key material out of nothing")
+	}
+	if cfg.KeySourceOrigin != "" {
+		t.Fatalf("KeySourceOrigin = %q, want empty", cfg.KeySourceOrigin)
+	}
+}
+
+// TestResolveKeySource_BlankIsAnError is the config-level half of the
+// blank-passphrase lesson: an operator who writes CACKLE_KEY_PASSPHRASE= in a
+// compose file believes they configured a passphrase. Silently reading that as
+// "no encryption configured" is how a plaintext path stays alive.
+func TestResolveKeySource_BlankIsAnError(t *testing.T) {
+	for _, name := range []string{envKeyPassphrase, envKeyPassphraseFile, envKeyFile} {
+		for _, val := range []string{"", "   ", "\t"} {
+			t.Run(name+"/"+strconv.Quote(val), func(t *testing.T) {
+				clearKeyEnv(t)
+				t.Setenv(name, val)
+
+				_, _, err := resolveKeySource()
+				if err == nil {
+					t.Fatalf("%s=%q was accepted", name, val)
+				}
+				if !strings.Contains(err.Error(), name) {
+					t.Fatalf("error does not name the variable: %v", err)
+				}
+				if !strings.Contains(err.Error(), "set but empty") {
+					t.Fatalf("error does not explain the problem: %v", err)
+				}
+			})
+		}
+	}
+}
+
+// TestResolveKeySource_AmbiguityIsAnError: resolving two configured sources by
+// precedence would mean a deployment is unlocked by material its operator
+// believes is unused, and a later rotation would target the wrong one.
+func TestResolveKeySource_AmbiguityIsAnError(t *testing.T) {
+	clearKeyEnv(t)
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "keyfile")
+	if err := os.WriteFile(keyPath, []byte("0123456789abcdef0123456789abcdef"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envKeyPassphrase, "a-perfectly-good-passphrase")
+	t.Setenv(envKeyFile, keyPath)
+
+	_, _, err := resolveKeySource()
+	if err == nil {
+		t.Fatal("two configured key sources were accepted")
+	}
+	for _, want := range []string{envKeyPassphrase, envKeyFile, "exactly one"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not mention %q", err, want)
+		}
+	}
+}
+
+func TestResolveKeySource_Passphrase(t *testing.T) {
+	clearKeyEnv(t)
+	t.Setenv(envKeyPassphrase, "correct horse battery staple")
+
+	src, origin, err := resolveKeySource()
+	if err != nil {
+		t.Fatalf("resolveKeySource: %v", err)
+	}
+	if !src.Valid() || src.Kind() != keyvault.KindPassphrase {
+		t.Fatalf("kind = %q valid = %v", src.Kind(), src.Valid())
+	}
+	if origin != envKeyPassphrase {
+		t.Fatalf("origin = %q, want %q", origin, envKeyPassphrase)
+	}
+}
+
+func TestResolveKeySource_ShortPassphraseRefused(t *testing.T) {
+	clearKeyEnv(t)
+	t.Setenv(envKeyPassphrase, "hunter2")
+
+	if _, _, err := resolveKeySource(); err == nil {
+		t.Fatal("a 7-character passphrase was accepted for the crown jewels")
+	} else if !errors.Is(err, keyvault.ErrWeakSource) {
+		t.Fatalf("error = %v, want keyvault.ErrWeakSource", err)
+	}
+}
+
+func TestResolveKeySource_PassphraseFileTrimsTrailingNewline(t *testing.T) {
+	clearKeyEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "passphrase")
+	// A trailing newline is what every editor and `echo` leaves behind; it must
+	// not become part of the passphrase, or the operator's documented secret
+	// would not open their own database.
+	if err := os.WriteFile(path, []byte("a-file-based-passphrase\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envKeyPassphraseFile, path)
+
+	src, origin, err := resolveKeySource()
+	if err != nil {
+		t.Fatalf("resolveKeySource: %v", err)
+	}
+	if origin != envKeyPassphraseFile {
+		t.Fatalf("origin = %q", origin)
+	}
+
+	// Derive from both and compare: the file-sourced Source must equal the
+	// literal passphrase without the newline.
+	params := keyvault.KDFParams{Name: keyvault.KDFArgon2id, Salt: []byte("0123456789abcdef"), Time: 1, Memory: 8, Lanes: 1}
+	fromFile, err := src.DeriveKEK(params)
+	if err != nil {
+		t.Fatalf("DeriveKEK: %v", err)
+	}
+	literal, err := keyvault.Passphrase("a-file-based-passphrase")
+	if err != nil {
+		t.Fatalf("Passphrase: %v", err)
+	}
+	fromLiteral, err := literal.DeriveKEK(params)
+	if err != nil {
+		t.Fatalf("DeriveKEK: %v", err)
+	}
+	if !bytes.Equal(fromFile, fromLiteral) {
+		t.Fatal("the trailing newline changed the derived key")
+	}
+}
+
+func TestResolveKeySource_Keyfile(t *testing.T) {
+	clearKeyEnv(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "keyfile")
+	if err := os.WriteFile(path, bytes.Repeat([]byte{0xa5}, 32), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envKeyFile, path)
+
+	src, origin, err := resolveKeySource()
+	if err != nil {
+		t.Fatalf("resolveKeySource: %v", err)
+	}
+	if src.Kind() != keyvault.KindKeyfile {
+		t.Fatalf("kind = %q, want %q", src.Kind(), keyvault.KindKeyfile)
+	}
+	if origin != envKeyFile {
+		t.Fatalf("origin = %q", origin)
+	}
+}
+
+func TestResolveKeySource_UnreadableFileIsAnError(t *testing.T) {
+	for _, name := range []string{envKeyPassphraseFile, envKeyFile} {
+		t.Run(name, func(t *testing.T) {
+			clearKeyEnv(t)
+			missing := filepath.Join(t.TempDir(), "nope")
+			t.Setenv(name, missing)
+
+			_, _, err := resolveKeySource()
+			if err == nil {
+				t.Fatal("a missing key material file was accepted")
+			}
+			if !strings.Contains(err.Error(), missing) {
+				t.Fatalf("error does not name the path: %v", err)
+			}
+		})
+	}
+}
+
+func TestResolveKeySource_ShortKeyfileRefused(t *testing.T) {
+	clearKeyEnv(t)
+	path := filepath.Join(t.TempDir(), "keyfile")
+	if err := os.WriteFile(path, []byte("too short"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(envKeyFile, path)
+
+	if _, _, err := resolveKeySource(); !errors.Is(err, keyvault.ErrWeakSource) {
+		t.Fatalf("error = %v, want keyvault.ErrWeakSource", err)
+	}
+}
+
+// TestConfigNeverRendersKeyMaterial: Config is passed around and is exactly the
+// sort of struct that ends up in a debug log line.
+func TestConfigNeverRendersKeyMaterial(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	const secret = "a-very-secret-operator-passphrase"
+	t.Setenv(envKeyPassphrase, secret)
+
+	cfg, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.HasKeySource() {
+		t.Fatal("key material was configured but Config does not report it")
+	}
+	for _, rendered := range []string{
+		fmt.Sprintf("%v", cfg),
+		fmt.Sprintf("%+v", cfg),
+		fmt.Sprintf("%#v", *cfg),
+	} {
+		if strings.Contains(rendered, secret) {
+			t.Fatalf("Config rendering leaks the passphrase: %s", rendered)
+		}
 	}
 }

@@ -160,6 +160,22 @@
 // the poisoning direction that matters: HLC walls are monotonic
 // non-decreasing, so one far-future claim, once folded, out-ranks every honest
 // claim in every later comparison and can never come back down.
+//
+// # Server-to-server replication
+//
+// Two Cackle servers exchange ops over the transport in peerauth.go and
+// internal/httpapi's `/api/sync` routes: `Fold` mints the envelope a peer
+// receives, `VerifyOp` is how the receiving node checks one on its own before
+// anything is stored, and `IngestVerified` merges it. `internal/store`'s
+// `sync_op` table is the durable log the transport pages through. See
+// docs/CLUSTERING.md.
+//
+// Replication does not change what is achievable, and this is the sentence to
+// keep: it makes a cross-gate double admission VISIBLE SOONER and on MORE
+// NODES. It still cannot prevent one. The gates that produced the duplicate
+// could not see each other at the moment of the scan, and nothing that happens
+// afterwards — no merge rule, no transport, no number of nodes — reaches back to
+// that moment.
 package substrate
 
 import (
@@ -187,9 +203,9 @@ import (
 //
 // It is versioned and it is checked rather than assumed, because two replicas
 // that merge under different total orders converge to different states and
-// both report success. Cackle has no peer handshake yet — there is no
-// server-to-server transport — so today this constant's only job is to be the
-// name the handshake will carry when there is one.
+// both report success. It travels on every `/api/sync` response, and a peer
+// answering with a name this node does not speak is refused rather than merged
+// on the hope that the rules match.
 const AlgebraName = "dmtap-sync-v0"
 
 // SkewRefusalCode is the §12 registry code the engine returns when an op's HLC
@@ -272,11 +288,13 @@ type Options struct {
 // author — so a durable node identity would be key material to protect on an
 // internet-facing host in exchange for no property anybody reads.
 //
-// It is NOT sufficient for a server-to-server mesh. Two Cackle instances
-// exchanging admission claims need stable, mutually-known node keys, because
-// then the author IS load-bearing: it is how a replica decides whether an
-// envelope came from a peer it trusts. That transport does not exist, and this
-// function must not be mistaken for it being close to existing.
+// It is NOT sufficient for a server-to-server mesh, and must never be used for
+// one. Two Cackle instances exchanging admission claims need stable,
+// mutually-known node keys, because then the author IS load-bearing: it is how a
+// replica decides whether an envelope came from a peer whose key an operator
+// pinned. An op minted under an ephemeral key is unattributable by
+// construction — every peer would refuse it, and correctly. Replication uses
+// NewSigner over the durable identity in `store.NodeIdentity`.
 //
 // What survives an ephemeral identity, verified rather than assumed (see
 // TestEphemeralSignerProducesStableClaims): op IDs differ between folds,
@@ -291,6 +309,26 @@ func NewEphemeralSigner() (kotvasync.Signer, error) {
 	_, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("substrate: generating an ephemeral identity: %w", err)
+	}
+	return kotvasync.InMemorySigner{PrivateKey: priv}, nil
+}
+
+// NewSigner wraps a node's durable Ed25519 identity as a Signer.
+//
+// This is the identity replication runs under: the key a peer's operator pinned
+// by hand, and the key every op this node publishes is signed by. Unlike
+// NewEphemeralSigner, the author it produces is load-bearing — it is what makes
+// a claim attributable to a node another operator decided to trust.
+//
+// The key stays on the Go side of the WebAssembly boundary; the engine receives
+// a signature and never a seed (see kotvasync.Signer's doc for why that is not a
+// stylistic choice). The size check is here rather than at first use because a
+// short key produces signatures that verify nowhere, and the useful place to
+// learn that is at startup rather than mid-round on a peer's ingest path.
+func NewSigner(priv ed25519.PrivateKey) (kotvasync.Signer, error) {
+	if len(priv) != ed25519.PrivateKeySize {
+		return nil, fmt.Errorf("substrate: node private key is %d bytes, want %d",
+			len(priv), ed25519.PrivateKeySize)
 	}
 	return kotvasync.InMemorySigner{PrivateKey: priv}, nil
 }
@@ -538,6 +576,130 @@ func (l *Ledger) Fold(a scan.QueuedAdmission, receiverNow, now time.Time) (Recor
 	return Record{ID: hex.EncodeToString(id), Cose: cose}, nil
 }
 
+// VerifiedOp is one peer's envelope after it has been checked on its own
+// merits, and before anything has been stored or merged.
+//
+// It exists because a replicated admission must be trusted for what it PROVES,
+// not for the connection it arrived over. An authenticated transport says "this
+// enrolled peer sent me these bytes"; it says nothing about whether the bytes
+// are a well-formed, correctly-signed, in-namespace claim, and a transport that
+// conflated the two would let one compromised peer inject anything at all.
+type VerifiedOp struct {
+	// ID is the §4.1 content address, lowercase hex. Two nodes that hold the
+	// same envelope agree on it, which is what makes storage idempotent.
+	ID string
+	// Author is the §3 author: the node key that signed this op, lowercase hex.
+	// The caller decides whether that key is one an operator pinned — this
+	// package verifies the signature, it does not decide who is trusted.
+	Author string
+	// EventID is the §7 namespace, equal to this Ledger's event.
+	EventID string
+	// Claim is the admission claim, read out of the VERIFIED envelope rather
+	// than out of anything a peer asserted alongside it.
+	Claim scan.QueuedAdmission
+	// Cose is the envelope exactly as received. It is the replicable unit and it
+	// is stored and forwarded byte for byte — re-encoding it would change its
+	// content address and break every other node's idempotency.
+	Cose []byte
+}
+
+// VerifyOp checks one envelope completely, and merges nothing.
+//
+// Everything that can refuse an op is applied here: the signature (0x0A02), the
+// structure and causality (0x0A03), the namespace (§7), the op kind, the
+// element/op stamp agreement, and this package's own future-claim bound. What is
+// NOT applied is the engine's §3 skew check, which needs the receiver clock a
+// merge is performed against — that happens in IngestVerified.
+//
+// Split out from Ingest so a transport can verify, then decide whether the
+// author is a key its operator pinned, then merge — in that order, with nothing
+// stored until all three pass. A node that merged first and checked provenance
+// afterwards would have already accepted the claim.
+func (l *Ledger) VerifyOp(cose []byte, now time.Time) (VerifiedOp, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.verifyOpLocked(cose, now)
+}
+
+func (l *Ledger) verifyOpLocked(cose []byte, now time.Time) (VerifiedOp, error) {
+	// Decode from the VERIFIED bytes: VerifySignedOp returns the op payload the
+	// signature actually covers, so nothing below reads a field a peer could
+	// have set outside the signature's reach.
+	raw, err := l.in.VerifySignedOp(cose)
+	if err != nil {
+		l.refused++
+		return VerifiedOp{}, err
+	}
+	sop, err := l.in.DecodeOp(raw)
+	if err != nil {
+		l.refused++
+		return VerifiedOp{}, fmt.Errorf("substrate: decoding a verified claim: %w", err)
+	}
+	if sop.NS != l.ns {
+		// §7: a claim about another event's door is not this replica's to
+		// merge, and coercing it into this namespace would put an admission
+		// for one event into another event's audit.
+		l.refused++
+		return VerifiedOp{}, fmt.Errorf("substrate: claim is in namespace %q, not %q", sop.NS, l.ns)
+	}
+	if sop.Kind != l.setAdd {
+		l.refused++
+		return VerifiedOp{}, fmt.Errorf(
+			"substrate: claim has op kind %d, which Cackle does not model", sop.Kind)
+	}
+	a, err := l.claimOf(sop)
+	if err != nil {
+		l.refused++
+		return VerifiedOp{}, err
+	}
+	if a.ScannedAt.After(now.Add(l.maxSkew)) {
+		l.refused++
+		return VerifiedOp{}, fmt.Errorf("%w: %s is more than %s ahead of %s (ticket %s, device %s)",
+			ErrFutureClaim, a.ScannedAt.UTC(), l.maxSkew, now.UTC(), a.TicketID, a.DeviceID)
+	}
+	id, err := l.in.OpID(raw)
+	if err != nil {
+		l.refused++
+		return VerifiedOp{}, fmt.Errorf("substrate: addressing a verified claim: %w", err)
+	}
+	return VerifiedOp{
+		ID:      hex.EncodeToString(id),
+		Author:  sop.HLC.Author,
+		EventID: sop.NS,
+		Claim:   a,
+		Cose:    cose,
+	}, nil
+}
+
+// IngestVerified merges an op that VerifyOp already checked, and reports whether
+// it was new to this replica.
+//
+// receiverNow is the clock reading the engine's §3 skew check is measured
+// against; see the package doc on why a replayed claim makes that check vacuous
+// and what VerifyOp applies instead.
+func (l *Ledger) IngestVerified(v VerifiedOp, receiverNow time.Time) (bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if v.EventID != l.ns {
+		l.refused++
+		return false, fmt.Errorf("substrate: verified claim is in namespace %q, not %q", v.EventID, l.ns)
+	}
+	if len(v.Cose) == 0 {
+		l.refused++
+		return false, errors.New("substrate: verified claim carries no envelope")
+	}
+	fresh, err := l.eng.IngestSigned(v.Cose, msOf(receiverNow))
+	if err != nil {
+		l.refused++
+		return false, err
+	}
+	if fresh {
+		l.ingested++
+	}
+	return fresh, nil
+}
+
 // Ingest admits a claim authored by another replica, from the envelope that
 // replica minted, and reports whether it was new.
 //
@@ -545,57 +707,23 @@ func (l *Ledger) Fold(a scan.QueuedAdmission, receiverNow, now time.Time) (Recor
 // (0x0A03), the namespace (§7), this package's own future-claim bound and the
 // engine's skew check (SkewRefusalCode) are all applied before any state is
 // touched, so a refused claim leaves this replica exactly as it was.
+//
+// It does NOT check who authored the op — that is a trust decision, and this
+// package has no pin store. A caller replicating between servers must use
+// VerifyOp, check the author against its enrolled peers, and then
+// IngestVerified; internal/httpapi's sync routes do exactly that.
 func (l *Ledger) Ingest(cose []byte, receiverNow, now time.Time) (scan.QueuedAdmission, bool, error) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
-
-	// Decode before ingest so a refusal can still name the claim, and so what
-	// this returns is read out of the VERIFIED envelope rather than out of
-	// whatever a peer claimed alongside it.
-	raw, err := l.in.VerifySignedOp(cose)
+	v, err := l.verifyOpLocked(cose, now)
+	l.mu.Unlock()
 	if err != nil {
-		l.refused++
 		return scan.QueuedAdmission{}, false, err
 	}
-	sop, err := l.in.DecodeOp(raw)
+	fresh, err := l.IngestVerified(v, receiverNow)
 	if err != nil {
-		l.refused++
-		return scan.QueuedAdmission{}, false, fmt.Errorf("substrate: decoding a verified claim: %w", err)
-	}
-	if sop.NS != l.ns {
-		// §7: a claim about another event's door is not this replica's to
-		// merge, and coercing it into this namespace would put an admission
-		// for one event into another event's audit.
-		l.refused++
-		return scan.QueuedAdmission{}, false,
-			fmt.Errorf("substrate: claim is in namespace %q, not %q", sop.NS, l.ns)
-	}
-	if sop.Kind != l.setAdd {
-		l.refused++
-		return scan.QueuedAdmission{}, false,
-			fmt.Errorf("substrate: claim has op kind %d, which Cackle does not model", sop.Kind)
-	}
-	a, err := l.claimOf(sop)
-	if err != nil {
-		l.refused++
 		return scan.QueuedAdmission{}, false, err
 	}
-	if a.ScannedAt.After(now.Add(l.maxSkew)) {
-		l.refused++
-		return scan.QueuedAdmission{}, false,
-			fmt.Errorf("%w: %s is more than %s ahead of %s (ticket %s, device %s)",
-				ErrFutureClaim, a.ScannedAt.UTC(), l.maxSkew, now.UTC(), a.TicketID, a.DeviceID)
-	}
-
-	fresh, err := l.eng.IngestSigned(cose, msOf(receiverNow))
-	if err != nil {
-		l.refused++
-		return scan.QueuedAdmission{}, false, err
-	}
-	if fresh {
-		l.ingested++
-	}
-	return a, fresh, nil
+	return v.Claim, fresh, nil
 }
 
 // Claims returns every surviving claim for one ticket, union-merged, in a

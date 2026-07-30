@@ -22,6 +22,7 @@ import { ArrowLeft, Receipt, CheckCircle2, XCircle, Loader2 } from 'lucide-react
 import { events as eventsApi, orders as ordersApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import { toast } from '@/components/ui/use-toast';
+import { Money } from '@/components/ui/money';
 
 // Every status orders.Order.Status can be (see internal/orders/orders.go).
 function statusBadge(status) {
@@ -144,7 +145,7 @@ const EventOrdersPage = () => {
             </Button>
 
             <div className="mb-6 flex items-center gap-3">
-                <Receipt className="h-8 w-8 text-primary" />
+                <Receipt className="h-8 w-8 text-primary-emphasis" />
                 <div className="min-w-0">
                     <h1 className="font-display text-3xl font-bold">Orders</h1>
                     {event && <p className="truncate text-sm text-muted-foreground">{event.title}</p>}
@@ -194,7 +195,7 @@ const EventOrdersPage = () => {
                                             <TableCell className="font-mono text-xs">{order.provider}</TableCell>
                                             <TableCell>{statusBadge(order.status)}</TableCell>
                                             <TableCell className="text-right tabular-nums">
-                                                {formatMoney(order.total_minor, order.currency || currency)}
+                                                <Money minor={order.total_minor} currency={order.currency || currency} />
                                             </TableCell>
                                             <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                                                 {order.created_at ? format(new Date(order.created_at), 'PP p') : '—'}

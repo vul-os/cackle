@@ -4,6 +4,7 @@ import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced } from '@
 import { scan as scanApi } from '@/lib/api';
 import { useOnline } from '@/lib/use-online';
 import { uuid } from '@/lib/utils';
+import { decideAdmission } from '@/lib/scan-decision';
 
 const DEVICE_ID_KEY = 'cackle_device_id';
 
@@ -14,25 +15,6 @@ export function getDeviceId() {
         localStorage.setItem(DEVICE_ID_KEY, id);
     }
     return id;
-}
-
-function describeError(err) {
-    switch (err?.code) {
-        case 'malformed':
-            return 'Malformed ticket';
-        case 'unsupported_version':
-            return 'Unsupported ticket version';
-        case 'bad_signature':
-            return 'Invalid signature — tampered or wrong event';
-        case 'not_yet_valid':
-            return 'Ticket not valid yet';
-        case 'expired':
-            return 'Ticket expired';
-        case 'unknown_kid':
-            return 'Unknown signing key';
-        default:
-            return err?.message || 'Invalid ticket';
-    }
 }
 
 /**
@@ -151,64 +133,20 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
             if (!eventId || busy.current) return;
             busy.current = true;
             try {
-                let payload;
-                let error;
-                try {
-                    payload = verifyWithRing(token, keyRing, new Date());
-                } catch (err) {
-                    error = err;
-                }
-
-                let result;
-                let note = null;
-                let holderName = null;
-                let ticketId = null;
-
-                if (error) {
-                    result = 'invalid';
-                    note = describeError(error);
-                } else if (payload.eid !== eventId) {
-                    result = 'wrong_event';
-                    note = 'Ticket belongs to a different event';
-                    ticketId = payload.tid;
-                    holderName = payload.nm;
-                } else if (ticketIndexPresent && !ticketIndexSet.has(payload.tid)) {
-                    // Signature verifies, right event — but not in the
-                    // authoritative index the gate downloaded, e.g. because
-                    // it was refunded after issuance (or the whole event was
-                    // cancelled, leaving an empty-but-authoritative index).
-                    // Mirrors Go's scan.DecideWithBundle: reject as invalid,
-                    // and (like any Invalid result) never record a ticket id.
-                    result = 'invalid';
-                    note = 'Ticket revoked or not issued for this event';
-                } else if (admittedIndexSet.has(payload.tid)) {
-                    // Signature verifies, right event, not revoked — but the
-                    // server already had an admission for it when this bundle
-                    // was built, i.e. another gate let this ticket through.
-                    // This is the only way a disconnected gate ever learns
-                    // that. Mirrors Go's DecideWithBundle.
-                    ticketId = payload.tid;
-                    holderName = payload.nm;
-                    result = 'duplicate';
-                    note = 'Ticket already admitted at another gate';
-                } else {
-                    try {
-                        const already = await wasAdmitted(eventId, payload.tid);
-                        ticketId = payload.tid;
-                        holderName = payload.nm;
-                        result = already ? 'duplicate' : 'admitted';
-                    } catch (err) {
-                        // The local dedupe store itself failed (storage
-                        // evicted, quota, a browser in a weird private mode).
-                        // Fail CLOSED, exactly like Go's
-                        // scan.admitOrDuplicate: refuse rather than risk
-                        // admitting a ticket twice because we could not
-                        // check. Like any invalid result this records no
-                        // ticket id.
-                        result = 'invalid';
-                        note = `Local dedupe check failed: ${err?.message || err}`;
-                    }
-                }
+                // The verdict itself lives in lib/scan-decision.js — pure,
+                // effects injected, and exhaustively tested there rather than
+                // only reachable through a camera. Nothing about the ordering
+                // or the fail-closed behaviour changed in moving it.
+                const { result, note, ticketId, holderName } = await decideAdmission({
+                    token,
+                    eventId,
+                    keyRing,
+                    ticketIndexSet,
+                    ticketIndexPresent,
+                    admittedIndexSet,
+                    verify: verifyWithRing,
+                    wasAdmitted,
+                });
 
                 let record;
                 try {

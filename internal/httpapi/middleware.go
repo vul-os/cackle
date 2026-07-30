@@ -51,8 +51,12 @@ func corsOptions(baseURL string) cors.Options {
 		origins = []string{baseURL}
 	}
 	return cors.Options{
-		AllowedOrigins:   origins,
-		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
+		AllowedOrigins: origins,
+		// PUT belongs here: two routes use it (PUT /api/orgs/{id}/bank-account
+		// and PUT /api/events/{id}/page) and neither was reachable from a
+		// cross-origin client — the only deployment where CORS applies at all
+		// — because the preflight named a method this list did not.
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 		AllowedHeaders:   []string{"Content-Type", "Authorization", csrfHeaderName},
 		ExposedHeaders:   []string{"X-Request-ID"},
 		AllowCredentials: true,

@@ -251,7 +251,7 @@ const BankAccountCard = () => {
                         {state.account && !editing && (
                             <div className="flex items-center justify-between rounded-lg border border-border p-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="rounded-full bg-primary/10 p-2 text-primary">
+                                    <div className="rounded-full bg-primary/10 p-2 text-primary-emphasis">
                                         <ShieldCheck className="h-4 w-4" />
                                     </div>
                                     <div>
@@ -334,7 +334,7 @@ const PayoutsPage = () => {
     return (
         <div className="mx-auto max-w-4xl space-y-6">
             <div className="flex items-center gap-3">
-                <Banknote className="h-8 w-8 text-primary" />
+                <Banknote className="h-8 w-8 text-primary-emphasis" />
                 <div>
                     <h1 className="font-display text-3xl font-bold">Payouts</h1>
                     {activeOrg && <p className="text-sm text-muted-foreground">{activeOrg.name}</p>}

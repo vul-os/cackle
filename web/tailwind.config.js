@@ -22,6 +22,26 @@ module.exports = {
                 primary: {
                     DEFAULT: 'hsl(var(--primary))',
                     foreground: 'hsl(var(--primary-foreground))',
+                    // Brand as INK. `text-primary` on a light surface is
+                    // 1.99:1 — use `text-primary-emphasis` for brand-coloured
+                    // text, icons and rules. See the note in index.css.
+                    emphasis: 'hsl(var(--primary-emphasis))',
+                },
+                // Fixed identity colours, theme-independent: the mark's amber
+                // and the logo tile's red. Chrome and states derive from the
+                // semantic tokens above, never from these.
+                brand: {
+                    DEFAULT: 'hsl(var(--brand))',
+                    2: 'hsl(var(--brand-2))',
+                    ink: 'hsl(var(--brand-ink))',
+                },
+                // The three answers a gate gives. Fills only, always under
+                // `text-verdict-ink`, never re-used for ordinary chrome.
+                verdict: {
+                    admit: 'hsl(var(--verdict-admit))',
+                    reject: 'hsl(var(--verdict-reject))',
+                    duplicate: 'hsl(var(--verdict-duplicate))',
+                    ink: 'hsl(var(--verdict-ink))',
                 },
                 secondary: {
                     DEFAULT: 'hsl(var(--secondary))',

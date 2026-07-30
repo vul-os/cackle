@@ -150,6 +150,33 @@ Deleting an event's chosen cover image (`events.cover_image_id`) via
 `DELETE /api/images/{id}` clears that reference automatically at the
 database level — no separate call needed.
 
+## Host pages
+
+```
+GET    /h/{slugOrID}                public HTML page, published events only
+GET    /api/events/{id}/page        public → {page:{document,is_default,url,updated_at}}
+PUT    /api/events/{id}/page        admin+ auth — the request body IS the document
+DELETE /api/events/{id}/page        admin+ auth — reverts to the default page
+```
+
+Every event has a page from the moment it is created, built from its own
+record with zero configuration. A host can replace it with a **document**:
+structured, typed blocks carrying plain text plus a constrained theme —
+never HTML, never CSS, never a template. `PUT` validates against a closed
+vocabulary and answers `400 invalid_request` with a message naming the
+exact JSON path at fault; the rendered page is served with its own,
+far stricter CSP (`script-src 'none'`, `form-action 'none'`,
+`connect-src 'none'`, plus a sandbox) than the rest of the app.
+
+A host who would rather build the page themselves does not need any of
+this: `GET /api/events/{slug}` plus the order routes below are enough to
+sell a ticket entirely from their own site.
+
+[HOST-PAGES.md](HOST-PAGES.md) has the format, the reasoning for refusing
+host-authored HTML, the multi-tenancy rules, and the ticket-purchase flow
+as a worked example. [`host-page-vectors.json`](host-page-vectors.json) is
+the frozen conformance corpus.
+
 ## Categories
 
 ```

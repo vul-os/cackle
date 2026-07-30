@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/vul-os/cackle/internal/store/keyvault"
 )
 
 // Config is the fully-resolved runtime configuration for a Cackle process.
@@ -39,6 +41,120 @@ type Config struct {
 	// internal/media and internal/httpapi's image handlers). Defaults to a
 	// "media" directory beside the SQLite database file.
 	MediaDir string
+
+	// KeySource is the operator-supplied material that unlocks the event
+	// signing keys in the database (internal/store/keyvault). It is opaque:
+	// there is no accessor that yields the passphrase back, so it cannot be
+	// logged or serialised even by accident.
+	//
+	// The zero value means NO key material is configured. That is not a mode
+	// of operation — it is the state in which cmd/cackle refuses to start
+	// anything that would need a private key. There is deliberately no
+	// default, no generated-and-persisted file (as with SessionSecret) and no
+	// fallback: a signing key that protects every ticket for every event must
+	// be unlocked by a human decision, not by a convenience path that a
+	// future reader would find already in place and assume was considered.
+	KeySource keyvault.Source
+
+	// KeySourceOrigin names the environment variable KeySource came from, for
+	// boot log lines and error messages. Empty when none is configured. Safe
+	// to log — it is a variable name, never a value.
+	KeySourceOrigin string
+}
+
+// Key-material environment variables. Exactly one may be set; see
+// resolveKeySource.
+const (
+	envKeyPassphrase     = "CACKLE_KEY_PASSPHRASE"
+	envKeyPassphraseFile = "CACKLE_KEY_PASSPHRASE_FILE"
+	envKeyFile           = "CACKLE_KEY_FILE"
+)
+
+// HasKeySource reports whether operator key material was configured.
+func (c *Config) HasKeySource() bool {
+	return c != nil && c.KeySource.Valid()
+}
+
+// resolveKeySource turns the environment into a keyvault.Source.
+//
+// Rules, each of which exists to close a way this could silently do nothing:
+//
+//   - Nothing set: no Source, NO error. Absence is reported to the caller as
+//     absence; it is cmd/cackle's job to refuse to start, with a message that
+//     can name the specific operation being refused.
+//   - Set but empty (`CACKLE_KEY_PASSPHRASE=`): an ERROR, not absence.
+//     os.LookupEnv can tell these apart and they mean different things — an
+//     empty value is an operator who believes they configured a passphrase.
+//     Treating it as "unset" is precisely the blank-passphrase-silently-
+//     accepted failure this whole change exists to avoid.
+//   - More than one set: an ERROR. Resolving the ambiguity by precedence
+//     would mean a deployment could be unlocked by material its operator
+//     thinks is unused, and rotation would silently target the wrong one.
+//   - A file that cannot be read: an ERROR naming the path.
+func resolveKeySource() (keyvault.Source, string, error) {
+	type candidate struct {
+		env   string
+		value string
+	}
+	var set []candidate
+	for _, name := range []string{envKeyPassphrase, envKeyPassphraseFile, envKeyFile} {
+		v, ok := os.LookupEnv(name)
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(v) == "" {
+			return keyvault.Source{}, "", fmt.Errorf("%s is set but empty; unset it or give it a value (a blank passphrase is refused, never treated as 'no encryption')", name)
+		}
+		set = append(set, candidate{env: name, value: v})
+	}
+
+	switch len(set) {
+	case 0:
+		return keyvault.Source{}, "", nil
+	case 1:
+	default:
+		names := make([]string, 0, len(set))
+		for _, c := range set {
+			names = append(names, c.env)
+		}
+		return keyvault.Source{}, "", fmt.Errorf("%s are all set; exactly one source of event-key material may be configured", strings.Join(names, ", "))
+	}
+
+	c := set[0]
+	switch c.env {
+	case envKeyPassphrase:
+		src, err := keyvault.Passphrase(c.value)
+		if err != nil {
+			return keyvault.Source{}, "", fmt.Errorf("%s: %w", c.env, err)
+		}
+		return src, c.env, nil
+
+	case envKeyPassphraseFile:
+		raw, err := os.ReadFile(c.value)
+		if err != nil {
+			return keyvault.Source{}, "", fmt.Errorf("%s: read %s: %w", c.env, c.value, err)
+		}
+		// A passphrase file is a text file; a trailing newline from an editor
+		// or a shell redirect is not part of the passphrase.
+		src, err := keyvault.Passphrase(strings.TrimRight(string(raw), "\r\n"))
+		if err != nil {
+			return keyvault.Source{}, "", fmt.Errorf("%s (%s): %w", c.env, c.value, err)
+		}
+		return src, c.env, nil
+
+	case envKeyFile:
+		raw, err := os.ReadFile(c.value)
+		if err != nil {
+			return keyvault.Source{}, "", fmt.Errorf("%s: read %s: %w", c.env, c.value, err)
+		}
+		src, err := keyvault.Keyfile(raw)
+		if err != nil {
+			return keyvault.Source{}, "", fmt.Errorf("%s (%s): %w", c.env, c.value, err)
+		}
+		return src, c.env, nil
+	}
+
+	return keyvault.Source{}, "", fmt.Errorf("config: unhandled key material variable %q", c.env)
 }
 
 // Flags carries CLI flag values, mirroring the environment variables below.
@@ -126,6 +242,18 @@ func Load(f Flags) (*Config, error) {
 		return nil, errors.New("config: session secret too short (must be at least 16 characters)")
 	}
 	cfg.SessionSecret = secret
+
+	// Event-key material. A misconfiguration here is fatal at Load; a total
+	// ABSENCE is not, because "no key material" is a legitimate configuration
+	// for a process that only serves gates read-only, and because refusing
+	// with a message about the specific thing being refused is cmd/cackle's
+	// job (see requireKeyVault there).
+	keySrc, keyOrigin, err := resolveKeySource()
+	if err != nil {
+		return nil, fmt.Errorf("config: event key material: %w", err)
+	}
+	cfg.KeySource = keySrc
+	cfg.KeySourceOrigin = keyOrigin
 
 	return cfg, nil
 }

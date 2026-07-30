@@ -11,7 +11,9 @@
     "notices": "bash scripts/gen-notices.sh",
     "docs:sync": "node scripts/sync-docs.mjs",
     "docs:check": "node scripts/sync-docs.mjs --check",
-    "docs:links": "node scripts/check-doc-links.mjs"
+    "docs:links": "node scripts/check-doc-links.mjs",
+    "site:check": "node scripts/check-site.mjs",
+    "site:og": "node scripts/make-og-card.mjs"
   },
   "devDependencies": {
     "playwright": "^1.55.0"

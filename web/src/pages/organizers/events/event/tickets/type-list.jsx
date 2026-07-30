@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Edit2, Trash2, Ticket } from 'lucide-react';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 function saleWindowLabel(tt) {
     if (!tt.sales_start || !tt.sales_end) return null;
@@ -41,7 +41,7 @@ const TicketTypeItem = memo(({ ticketType, currency, onEdit, onDelete }) => {
                         )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        {formatMoney(ticketType.price_minor, currency)} · max {ticketType.max_per_order ?? 10} per order
+                        <Money minor={ticketType.price_minor} currency={currency} /> · max {ticketType.max_per_order ?? 10} per order
                     </p>
                     {ticketType.description && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{ticketType.description}</p>}
 

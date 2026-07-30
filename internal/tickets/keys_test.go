@@ -1,7 +1,10 @@
 package tickets
 
 import (
+	"bytes"
 	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -233,5 +236,47 @@ func TestEndToEnd_GenerateIssueVerifyViaRing(t *testing.T) {
 		t.Fatalf("expected tampered token to be rejected")
 	} else if !errors.Is(err, ErrBadSignature) && !errors.Is(err, ErrMalformed) {
 		t.Fatalf("expected ErrBadSignature or ErrMalformed, got %v", err)
+	}
+}
+
+// TestIssuerKeyNeverMarshalsPrivateKey pins the `json:"-"` on
+// IssuerKey.PrivateKey. The tag was `private_key,omitempty`, which would have
+// serialised the event's signing key out of any handler that happened to
+// marshal one — and would have looked entirely innocuous at the call site.
+func TestIssuerKeyNeverMarshalsPrivateKey(t *testing.T) {
+	k, err := GenerateIssuerKey("01J8ZK8T0M8N0P0Q0R0S0T0U0E")
+	if err != nil {
+		t.Fatalf("GenerateIssuerKey: %v", err)
+	}
+
+	blob, err := json.Marshal(k)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if bytes.Contains(blob, k.PrivateKey) {
+		t.Fatalf("marshalled IssuerKey contains the raw private key: %s", blob)
+	}
+	if bytes.Contains(blob, k.PrivateKey.Seed()) {
+		t.Fatalf("marshalled IssuerKey contains the private key seed: %s", blob)
+	}
+	// Base64 in either alphabet, in case a future tag change re-encodes it.
+	for name, enc := range map[string]string{
+		"std":       base64.StdEncoding.EncodeToString(k.PrivateKey),
+		"rawurl":    base64.RawURLEncoding.EncodeToString(k.PrivateKey),
+		"seed-std":  base64.StdEncoding.EncodeToString(k.PrivateKey.Seed()),
+		"seed-rawu": base64.RawURLEncoding.EncodeToString(k.PrivateKey.Seed()),
+	} {
+		if bytes.Contains(blob, []byte(enc)) {
+			t.Fatalf("marshalled IssuerKey contains the private key (%s-encoded): %s", name, blob)
+		}
+	}
+	if bytes.Contains(blob, []byte("private_key")) {
+		t.Fatalf("marshalled IssuerKey still has a private_key field: %s", blob)
+	}
+
+	// The public half must still be there — this is not a test that the type
+	// serialises nothing.
+	if !bytes.Contains(blob, []byte(base64.StdEncoding.EncodeToString(k.PublicKey))) {
+		t.Fatalf("marshalled IssuerKey lost its public key: %s", blob)
 	}
 }

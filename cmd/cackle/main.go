@@ -102,6 +102,14 @@ func run(args []string, stdout, stderr *os.File) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Unlock the event-key vault and finish the data half of migration 0003
+	// before serving anything. This must happen before the HTTP server starts:
+	// a process that cannot sign a ticket must not accept an order, and a
+	// database still holding plaintext keys must not be served at all.
+	if err := openKeyVault(ctx, st, cfg, logger); err != nil {
+		return err
+	}
+
 	authSvc := auth.NewService(st)
 	eventsSvc := events.New(st)
 

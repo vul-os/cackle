@@ -171,7 +171,7 @@ const ScannerPage = () => {
     return (
         <div className="mx-auto max-w-3xl">
             <div className="mb-8 flex items-center gap-3">
-                <QrCode className="h-8 w-8 text-primary" />
+                <QrCode className="h-8 w-8 text-primary-emphasis" />
                 <div>
                     <h1 className="font-display text-3xl font-bold">Gate Scanner</h1>
                     <p className="text-muted-foreground">Download a scan bundle once, then admit guests with the network unplugged.</p>

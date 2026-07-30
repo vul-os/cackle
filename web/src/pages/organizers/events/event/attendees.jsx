@@ -59,7 +59,7 @@ function statusBadge(row) {
 const StatTile = ({ icon: Icon, label, value }) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-5">
-            <div className="rounded-xl bg-primary/10 p-3 text-primary">
+            <div className="rounded-xl bg-primary/10 p-3 text-primary-emphasis">
                 <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -192,7 +192,7 @@ const EventAttendeesPage = () => {
             </Button>
 
             <div className="mb-6 flex items-center gap-3">
-                <Users className="h-8 w-8 text-primary" />
+                <Users className="h-8 w-8 text-primary-emphasis" />
                 <div className="min-w-0">
                     <h1 className="font-display text-3xl font-bold">Attendees</h1>
                     {!summaryLoading && !summaryError && event && (

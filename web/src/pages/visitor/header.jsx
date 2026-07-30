@@ -63,7 +63,7 @@ const Header = ({ className = '' }) => {
                 <div className="flex h-16 items-center justify-between">
                     <a href="/" className="flex items-center gap-2">
                         <img src={Logo} alt="Cackle" className="h-9 w-9" />
-                        <span className="font-display text-2xl font-black tracking-tight text-primary">cackle</span>
+                        <span className="font-display text-2xl font-black tracking-tight text-primary-emphasis">cackle</span>
                     </a>
 
                     <div className="hidden items-center gap-2 md:flex">

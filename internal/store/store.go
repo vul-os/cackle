@@ -30,6 +30,12 @@ var ErrNotFound = errors.New("store: not found")
 // Store wraps the database connection pool and exposes typed query methods.
 type Store struct {
 	db *sql.DB
+	// keys holds the unwrapped event-key vault, or nothing. A freshly
+	// opened Store is LOCKED: it can read every public key in the database
+	// (so scan bundles and key rings work with no key material at all) but
+	// cannot create, read or use a single private signing key until
+	// UnlockKeyVault succeeds. See keyvault_db.go.
+	keys keyVaultState
 }
 
 // Open opens (creating if necessary) the SQLite database at path and applies

@@ -20,7 +20,7 @@ const statusVariant = {
 const StatTile = ({ icon: Icon, label, value }) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-5">
-            <div className="rounded-xl bg-primary/10 p-3 text-primary">
+            <div className="rounded-xl bg-primary/10 p-3 text-primary-emphasis">
                 <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -139,7 +139,7 @@ const HomePage = () => {
         <div className="mx-auto max-w-6xl">
             <div className="mb-8">
                 <div className="mb-2 flex items-center gap-3">
-                    <Ticket className="h-8 w-8 text-primary" />
+                    <Ticket className="h-8 w-8 text-primary-emphasis" />
                     <h1 className="font-display text-3xl font-bold sm:text-4xl">{activeOrg?.name ?? 'Your events'}</h1>
                 </div>
                 <p className="text-muted-foreground">Manage events, sell tickets, and run the gate — all from here.</p>

@@ -139,7 +139,7 @@ const EventsPage = () => {
         <div className="mx-auto max-w-6xl">
             <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <Calendar className="h-8 w-8 text-primary" />
+                    <Calendar className="h-8 w-8 text-primary-emphasis" />
                     <div>
                         <h1 className="font-display text-3xl font-bold">Events</h1>
                         {activeOrg && <p className="text-sm text-muted-foreground">{activeOrg.name}</p>}

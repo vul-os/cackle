@@ -13,14 +13,22 @@ import (
 )
 
 // IssuerKey is one event's Ed25519 signing key, as stored server-side
-// (in `event_keys`). The private key is only ever held by the issuing
+// (in `event_keys`, where the private half is encrypted at rest — see
+// internal/store/keyvault). The private key is only ever held by the issuing
 // server (or, for delegated issuance, a sub-issuer holding an allocation —
 // see internal/scan). Scanners only ever see the public half, via KeyRing.
 type IssuerKey struct {
-	KID        string             `json:"kid"`
-	EventID    string             `json:"event_id"`
-	PublicKey  ed25519.PublicKey  `json:"public_key"`
-	PrivateKey ed25519.PrivateKey `json:"private_key,omitempty"`
+	KID       string            `json:"kid"`
+	EventID   string            `json:"event_id"`
+	PublicKey ed25519.PublicKey `json:"public_key"`
+	// PrivateKey is explicitly NOT serialisable. It was `private_key,omitempty`,
+	// which meant any handler that ever marshalled an IssuerKey — a debug
+	// endpoint, a log line, an admin JSON dump — would have emitted the signing
+	// key for the event straight over the wire, and nothing about the call site
+	// would have looked wrong. Nothing does that today; `json:"-"` is what keeps
+	// that true tomorrow. If you need to transport a key, transport the public
+	// half in a KeyRing.
+	PrivateKey ed25519.PrivateKey `json:"-"`
 	CreatedAt  time.Time          `json:"created_at"`
 	RevokedAt  *time.Time         `json:"revoked_at,omitempty"`
 }

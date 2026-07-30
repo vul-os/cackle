@@ -26,7 +26,7 @@ const WizardStepper = ({ steps, currentStep, maxStepReached, onStepClick }) => {
                             className={cn(
                                 'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors',
                                 isCurrent && 'border-primary bg-primary text-primary-foreground',
-                                !isCurrent && isComplete && 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20',
+                                !isCurrent && isComplete && 'border-primary/40 bg-primary/10 text-primary-emphasis hover:bg-primary/20',
                                 !isCurrent && !isComplete && 'border-border text-muted-foreground',
                                 !isClickable && 'cursor-not-allowed opacity-60',
                             )}

@@ -7,9 +7,21 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/vul-os/cackle/internal/store/keyvault"
 )
 
 func openTestStore(t *testing.T) *Store {
+	t.Helper()
+	st := openLockedTestStore(t)
+	unlockTestVault(t, st)
+	return st
+}
+
+// openLockedTestStore opens a store WITHOUT supplying key material, i.e. in
+// the state a real deployment is in when the operator has configured no
+// passphrase. Tests that assert the fail-closed behaviour use this.
+func openLockedTestStore(t *testing.T) *Store {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cackle.db")
@@ -19,6 +31,23 @@ func openTestStore(t *testing.T) *Store {
 	}
 	t.Cleanup(func() { st.Close() })
 	return st
+}
+
+// testKeyfile is fixed key material for tests. It is a KEYFILE rather than a
+// passphrase so the KDF is HKDF and not Argon2id — a 64 MiB derivation per
+// test store would dominate the suite's runtime for no coverage gain. The
+// passphrase/Argon2id path has its own dedicated tests.
+var testKeyfile = []byte("cackle-test-event-key-material-32b!!")
+
+func unlockTestVault(t *testing.T, st *Store) {
+	t.Helper()
+	src, err := keyvault.Keyfile(testKeyfile)
+	if err != nil {
+		t.Fatalf("keyvault.Keyfile: %v", err)
+	}
+	if err := st.UnlockKeyVault(context.Background(), src); err != nil {
+		t.Fatalf("UnlockKeyVault: %v", err)
+	}
 }
 
 func TestMigrateRunsCleanTwice(t *testing.T) {

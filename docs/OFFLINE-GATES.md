@@ -292,6 +292,15 @@ always needed:
   communication.
 - Read `admission-conflicts` after the event, and again after any late-syncing
   device finally checks in. The number can only grow as more logs arrive.
+- **If you run more than one server, replicate them** — see
+  [CLUSTERING.md](CLUSTERING.md). A venue node and a cloud node can exchange
+  admission claims, which makes a duplicate visible on both instead of only on
+  whichever node the gate happened to reach, and carries a ticket admitted at one
+  node down to the *other* node's gates in their next bundle. It narrows the
+  window for the same reason re-pulling a bundle does. It does **not** close it:
+  replication is still afterwards, and the two gates still could not see each
+  other at the moment of the scan. Nothing about running more nodes makes a
+  cross-gate double admission preventable.
 
 **Revocation while offline works the same way, for the same reason.** A
 gate rejects a refunded or voided ticket only if it was already refunded
@@ -356,6 +365,8 @@ view exactly as stale as it was.
   verification contract this whole guide depends on.
 - [API.md](API.md) — full request/response shapes for `scan-bundle`,
   `/api/scan`, and `/api/scan/sync`.
+- [CLUSTERING.md](CLUSTERING.md) — replicating the admission ledger between
+  servers, and exactly how little that changes about the guarantee above.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — where `internal/scan` sits in the
   wider system.
 - [SELF-HOSTING.md](SELF-HOSTING.md) — running the server yourself, including

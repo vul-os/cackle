@@ -26,17 +26,17 @@ const OUR_FEE_RATE = 0.0085;
 const PAYMENT_METHODS = {
     card: {
         name: 'Card Payments',
-        icon: <CreditCardIcon className="h-4 w-4 text-primary" />,
+        icon: <CreditCardIcon className="h-4 w-4 text-primary-emphasis" />,
         feeCalculation: (tickets, price) => tickets * price * 0.029 + tickets * 1,
     },
     cash: {
         name: 'Cash Payments',
-        icon: <BanknoteIcon className="h-4 w-4 text-primary" />,
+        icon: <BanknoteIcon className="h-4 w-4 text-primary-emphasis" />,
         feeCalculation: (tickets, price) => tickets * price * 0.039 + tickets * 6,
     },
     payshap: {
         name: 'PayShap',
-        icon: <WalletIcon className="h-4 w-4 text-primary" />,
+        icon: <WalletIcon className="h-4 w-4 text-primary-emphasis" />,
         feeCalculation: (tickets) => tickets * 7.5,
     },
 };
@@ -79,7 +79,7 @@ const PaymentCalculator = () => {
     return (
         <div className="mb-16">
             <div className="mb-12 text-center">
-                <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary">Fee Calculator</span>
+                <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">Fee Calculator</span>
                 <h2 className="mb-4 font-display text-3xl font-bold tracking-tight">Estimate your fees</h2>
                 <p className="mx-auto max-w-2xl text-muted-foreground">See what a real event would cost, transparently.</p>
             </div>
@@ -88,7 +88,7 @@ const PaymentCalculator = () => {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Calculator className="h-5 w-5 text-primary" />
+                            <Calculator className="h-5 w-5 text-primary-emphasis" />
                             Event Details
                         </CardTitle>
                     </CardHeader>
@@ -111,7 +111,7 @@ const PaymentCalculator = () => {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Percent className="h-5 w-5 text-primary" />
+                            <Percent className="h-5 w-5 text-primary-emphasis" />
                             Payment Distribution
                         </CardTitle>
                     </CardHeader>
@@ -148,7 +148,7 @@ const PaymentCalculator = () => {
                     <div className="grid grid-cols-2 gap-4">
                         <div className="rounded-lg bg-primary/10 p-4">
                             <h4 className="mb-1 text-sm font-medium text-muted-foreground">Our Fee (0.85%)</h4>
-                            <p className="text-2xl font-bold text-primary">{formatZar(ourFee)}</p>
+                            <p className="text-2xl font-bold text-primary-emphasis">{formatZar(ourFee)}</p>
                         </div>
                         {distributionData.map((m) => (
                             <div key={m.id} className="rounded-lg bg-muted p-4">
@@ -169,7 +169,7 @@ const PaymentCalculator = () => {
                         </div>
                         <div className="flex items-center justify-between border-t border-border pt-2">
                             <span className="text-lg font-bold">Total Fees</span>
-                            <span className="text-lg font-bold text-primary">{formatZar(total)}</span>
+                            <span className="text-lg font-bold text-primary-emphasis">{formatZar(total)}</span>
                         </div>
                     </div>
                 </CardContent>

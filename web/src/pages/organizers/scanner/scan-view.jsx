@@ -1,34 +1,118 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import QrScanner from 'qr-scanner';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Wifi,
-    WifiOff,
-    ShieldCheck,
-    Copy,
-    Ban,
-    RefreshCw,
-    Camera,
-    ChevronLeft,
-    Keyboard,
-    UploadCloud,
-} from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Camera, ChevronLeft, Keyboard, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConnectionState, SyncState } from '@/components/ui/connection-state';
 import useScanEngine from './use-scan-engine';
+import { verdictFor, verdictHoldMs, describeDuplicate } from './verdict';
 
-const RESULT_STYLE = {
-    admitted: { bg: 'bg-emerald-500', ring: 'ring-emerald-400', icon: ShieldCheck, label: 'ADMITTED' },
-    duplicate: { bg: 'bg-amber-500', ring: 'ring-amber-400', icon: Copy, label: 'ALREADY SCANNED' },
-    invalid: { bg: 'bg-rose-600', ring: 'ring-rose-500', icon: Ban, label: 'INVALID' },
-    wrong_event: { bg: 'bg-rose-600', ring: 'ring-rose-500', icon: Ban, label: 'WRONG EVENT' },
-};
+// The gate.
+//
+// Every decision on this screen is downstream of one sentence: it is used on a
+// phone, held at arm's length, outdoors, in bad light, at speed, by somebody
+// with a queue in front of them and possibly no network. That is not a
+// degraded mode to be handled — it is the design centre.
+//
+// What that produced:
+//
+//  - FIXED DARK SURFACE, both themes. A light UI behind a camera preview is
+//    glare. The verdict colours are pinned too (see index.css), so the answer
+//    never changes shade because of a theme toggle nobody touched.
+//
+//  - THE VERDICT IS THE WHOLE SCREEN. Not a toast, not a row — a full-bleed
+//    flood with a 96px glyph and a verb. It is readable without focusing on it.
+//
+//  - NO ROUND TRIP, EVER. `useScanEngine` verifies the capability locally
+//    against the cached key ring. There is no request between the scan and the
+//    answer, and there is nothing on this screen that waits for one.
+//
+//  - OFFLINE IS NOT AN ERROR STATE. See components/ui/connection-state.jsx.
+//
+//  - COLOUR IS NEVER THE ONLY SIGNAL — icon, word and haptic pattern all
+//    differ per verdict. See ./verdict.js.
+//
+//  - BIG TARGETS. Everything tappable here is at least 56px, comfortably over
+//    the 44px WCAG 2.5.5 floor, because the person using it may be wearing
+//    gloves and is definitely not looking carefully.
 
-const TALLY_TILES = [
-    { key: 'admitted', label: 'Admitted', color: 'text-emerald-400' },
-    { key: 'duplicate', label: 'Duplicate', color: 'text-amber-400' },
-    { key: 'invalid', label: 'Invalid', color: 'text-rose-400', combineWith: 'wrong_event' },
-];
+/** Minimum tap target on this screen. Gloves, cold, speed. */
+const TAP = 'min-h-[56px] min-w-[56px]';
+
+/**
+ * TallyTile is one of the three running counts.
+ *
+ * Deliberately labelled as THIS gate's numbers. Scan history is per-device
+ * until it reconciles, and an organiser who reads a single gate's tally as the
+ * event total will be wrong by however many people came through the other
+ * doors. Saying so costs one line.
+ */
+function TallyTile({ value, label, tone }) {
+    const toneClass = {
+        admit: 'text-emerald-300',
+        duplicate: 'text-orange-300',
+        reject: 'text-red-300',
+    }[tone];
+
+    return (
+        <div className="bg-transparent px-2 py-3 text-center">
+            <div className={`tnum text-3xl font-black leading-none sm:text-4xl ${toneClass}`}>{value}</div>
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-white/60">{label}</div>
+        </div>
+    );
+}
+
+/**
+ * VerdictFlood is the answer, full screen.
+ *
+ * `aria-live="assertive"` because this is the one thing on the page worth
+ * interrupting a screen reader for, and because a gate may well be operated by
+ * somebody using VoiceOver with the screen off in bright sun.
+ */
+function VerdictFlood({ result, onDismiss, reduceMotion }) {
+    const verdict = verdictFor(result.result);
+    const Icon = verdict.icon;
+    const duplicate = result.result === 'duplicate' ? describeDuplicate(result.note) : null;
+
+    return (
+        <motion.div
+            key={result.id}
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={reduceMotion ? { opacity: 1 } : { opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.12 }}
+            // Tapping anywhere clears it. On a moving queue the operator's
+            // hand is already on the screen; making them find a button to get
+            // back to the camera costs a second per person.
+            onClick={onDismiss}
+            role="alertdialog"
+            aria-live="assertive"
+            aria-label={verdict.label}
+            className={`absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 px-6 text-center text-verdict-ink ${verdict.surface}`}
+        >
+            <motion.div
+                initial={reduceMotion ? false : { scale: 0.7 }}
+                animate={{ scale: 1 }}
+                transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 260, damping: 18 }}
+            >
+                <Icon className="h-24 w-24" strokeWidth={2.5} aria-hidden="true" />
+            </motion.div>
+
+            <p className="font-display text-3xl font-black leading-tight tracking-tight sm:text-5xl">{verdict.label}</p>
+
+            {result.holder_name && <p className="text-xl font-semibold sm:text-2xl">{result.holder_name}</p>}
+
+            {duplicate ? (
+                <p className="max-w-sm text-base font-medium">{duplicate.detail}</p>
+            ) : (
+                result.note && <p className="max-w-sm text-base font-medium">{result.note}</p>
+            )}
+
+            <p className="mt-2 text-sm font-semibold uppercase tracking-wide opacity-80">Tap to scan the next one</p>
+        </motion.div>
+    );
+}
 
 const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId, onExit }) => {
     const videoRef = useRef(null);
@@ -36,7 +120,8 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
     const [cameraError, setCameraError] = useState(null);
     const [manualOpen, setManualOpen] = useState(false);
     const [manualValue, setManualValue] = useState('');
-    const [showFlash, setShowFlash] = useState(false);
+    const [flooding, setFlooding] = useState(false);
+    const reduceMotion = useReducedMotion();
 
     const { online, tally, pendingCount, lastResult, isSyncing, syncNow, handleDecode } = useScanEngine({
         eventId: event.id,
@@ -47,10 +132,25 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
         gateId,
     });
 
+    // Show the verdict, buzz, and clear it after its own hold time. Admissions
+    // clear fast (the queue is moving); refusals linger long enough to be read.
     useEffect(() => {
         if (!lastResult) return;
-        setShowFlash(true);
-        const timer = setTimeout(() => setShowFlash(false), lastResult.result === 'admitted' ? 1100 : 1800);
+        setFlooding(true);
+
+        const verdict = verdictFor(lastResult.result);
+        // Haptics are progressive enhancement: absent on iOS Safari, present
+        // on most Android gate phones, and never the only channel.
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+            try {
+                navigator.vibrate(verdict.vibrate);
+            } catch {
+                // A browser that exposes vibrate but refuses it is not a
+                // reason to stop admitting people.
+            }
+        }
+
+        const timer = setTimeout(() => setFlooding(false), verdictHoldMs(lastResult.result));
         return () => clearTimeout(timer);
     }, [lastResult]);
 
@@ -83,111 +183,155 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleManualSubmit = (e) => {
-        e.preventDefault();
-        if (manualValue.trim()) {
-            handleDecode(manualValue.trim());
-            setManualValue('');
-        }
-    };
+    // A camera that will not start is a real failure — it is the input device.
+    // Manual entry opens automatically so the gate keeps working instead of
+    // presenting a dead end.
+    useEffect(() => {
+        if (cameraError) setManualOpen(true);
+    }, [cameraError]);
 
-    const flash = lastResult && showFlash ? RESULT_STYLE[lastResult.result] : null;
+    const handleManualSubmit = useCallback(
+        (e) => {
+            e.preventDefault();
+            const value = manualValue.trim();
+            if (!value) return;
+            handleDecode(value);
+            setManualValue('');
+        },
+        [manualValue, handleDecode],
+    );
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950 text-white">
-            {/* Status bar */}
-            <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3">
-                <Button variant="ghost" size="sm" onClick={onExit} className="text-white/70 hover:bg-white/10 hover:text-white">
-                    <ChevronLeft className="mr-1 h-5 w-5" />
+        <div className="gate-surface fixed inset-0 z-50 flex flex-col">
+            {/* ── Bar ─────────────────────────────────────────────────────── */}
+            <header className="flex items-center justify-between gap-2 border-b border-white/15 px-2 py-2">
+                <Button
+                    variant="ghost"
+                    onClick={onExit}
+                    className={`${TAP} px-3 text-white hover:bg-white/15 hover:text-white`}
+                >
+                    <ChevronLeft className="mr-1 h-6 w-6" aria-hidden="true" />
                     Exit
                 </Button>
-                <div className="min-w-0 flex-1 truncate text-center text-sm font-medium text-white/70">{event.title}</div>
-                <div
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                        online ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
-                    }`}
-                >
-                    {online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
-                    {online ? 'Online' : 'Offline'}
+
+                <div className="min-w-0 flex-1 text-center">
+                    <p className="truncate text-sm font-semibold text-white">{event.title}</p>
+                    <p className="truncate text-xs text-white/60">{gateId}</p>
                 </div>
-            </div>
 
-            {/* Tally */}
-            <div className="grid grid-cols-3 gap-px bg-white/10">
-                {TALLY_TILES.map(({ key, label, color, combineWith }) => {
-                    const value = tally[key] + (combineWith ? tally[combineWith] || 0 : 0);
-                    return (
-                        <div key={key} className="bg-zinc-950 px-2 py-4 text-center">
-                            <div className={`text-4xl font-black tabular-nums sm:text-5xl ${color}`}>{value}</div>
-                            <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-white/50">{label}</div>
-                        </div>
-                    );
-                })}
-            </div>
+                <ConnectionState online={online} surface="gate" className="shrink-0" />
+            </header>
 
-            {/* Camera */}
+            {/* ── This gate's running count ───────────────────────────────── */}
+            <section aria-label="Counts for this gate" className="border-b border-white/15">
+                <div className="grid grid-cols-3 divide-x divide-white/15">
+                    <TallyTile value={tally.admitted} label="Admitted" tone="admit" />
+                    <TallyTile value={tally.duplicate} label="Already in" tone="duplicate" />
+                    <TallyTile value={tally.invalid + (tally.wrong_event || 0)} label="Refused" tone="reject" />
+                </div>
+                <p className="px-3 pb-2 text-center text-[11px] text-white/50">
+                    This gate only. Other gates keep their own count until everything syncs.
+                </p>
+            </section>
+
+            {/* ── Camera + verdict ────────────────────────────────────────── */}
             <div className="relative flex-1 overflow-hidden bg-black">
                 <video ref={videoRef} className="absolute inset-0 h-full w-full object-cover" muted playsInline />
 
+                {!cameraError && !flooding && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                        <div className="h-56 w-56 rounded-3xl border-4 border-white/70 shadow-[0_0_0_100vmax_rgba(0,0,0,0.45)]" />
+                    </div>
+                )}
+
                 {cameraError && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950 p-6 text-center">
-                        <Camera className="h-10 w-10 text-white/40" />
-                        <p className="font-medium">Camera unavailable</p>
-                        <p className="max-w-xs text-sm text-white/60">{cameraError}</p>
-                        <p className="text-sm text-white/60">Use manual entry below instead.</p>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black p-6 text-center">
+                        <Camera className="h-12 w-12 text-white/50" aria-hidden="true" />
+                        <p className="text-lg font-semibold text-white">Camera unavailable</p>
+                        <p className="max-w-xs text-sm text-white/70">{cameraError}</p>
+                        <p className="max-w-xs text-sm text-white/70">
+                            Type or paste the ticket code below — it is checked exactly the same way.
+                        </p>
                     </div>
                 )}
 
                 <AnimatePresence>
-                    {flash && (
-                        <motion.div
-                            key={lastResult.id}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.15 }}
-                            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 ${flash.bg}/95 px-6 text-center backdrop-blur-sm`}
-                        >
-                            <motion.div initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}>
-                                <flash.icon className="h-24 w-24 text-white drop-shadow" strokeWidth={2.5} />
-                            </motion.div>
-                            <p className="text-3xl font-black tracking-tight text-white sm:text-4xl">{flash.label}</p>
-                            {lastResult.holder_name && <p className="text-lg font-medium text-white/90">{lastResult.holder_name}</p>}
-                            {lastResult.note && <p className="max-w-sm text-sm text-white/80">{lastResult.note}</p>}
-                        </motion.div>
+                    {flooding && lastResult && (
+                        <VerdictFlood
+                            result={lastResult}
+                            reduceMotion={reduceMotion}
+                            onDismiss={() => setFlooding(false)}
+                        />
                     )}
                 </AnimatePresence>
             </div>
 
-            {/* Footer controls */}
-            <div className="space-y-3 border-t border-white/10 p-4">
+            {/* ── Controls ────────────────────────────────────────────────── */}
+            <footer className="space-y-3 border-t border-white/15 p-3">
                 {manualOpen && (
                     <form onSubmit={handleManualSubmit} className="flex gap-2">
+                        <label htmlFor="manual-token" className="sr-only">
+                            Ticket code
+                        </label>
                         <Input
+                            id="manual-token"
                             autoFocus
                             value={manualValue}
                             onChange={(e) => setManualValue(e.target.value)}
-                            placeholder="Paste capability token..."
-                            className="border-white/20 bg-white/10 text-white placeholder:text-white/40"
+                            placeholder="cackle.…"
+                            autoCapitalize="none"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            className={`${TAP} border-white/30 bg-white/10 text-base text-white placeholder:text-white/50`}
                         />
-                        <Button type="submit">Check</Button>
+                        <Button type="submit" className={TAP}>
+                            Check
+                        </Button>
                     </form>
                 )}
-                <div className="flex items-center justify-between gap-2 text-sm text-white/60">
-                    <button onClick={() => setManualOpen((v) => !v)} className="flex items-center gap-1.5 hover:text-white">
-                        <Keyboard className="h-4 w-4" />
-                        {manualOpen ? 'Hide manual entry' : 'Enter code manually'}
-                    </button>
-                    <button
-                        onClick={syncNow}
-                        disabled={!online || isSyncing || pendingCount === 0}
-                        className="flex items-center gap-1.5 disabled:opacity-40"
+
+                <div className="flex items-center justify-between gap-3">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setManualOpen((v) => !v)}
+                        className={`${TAP} px-3 text-white hover:bg-white/15 hover:text-white`}
                     >
-                        {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
-                        {pendingCount > 0 ? `${pendingCount} pending sync` : 'Synced'}
-                    </button>
+                        {manualOpen ? (
+                            <X className="mr-2 h-5 w-5" aria-hidden="true" />
+                        ) : (
+                            <Keyboard className="mr-2 h-5 w-5" aria-hidden="true" />
+                        )}
+                        {manualOpen ? 'Close' : 'Type a code'}
+                    </Button>
+
+                    {/* Sync runs by itself — on reconnect and after every scan
+                        — so this is not a step the operator has to remember.
+                        It becomes a button only when there is genuinely
+                        something to retry and a connection to retry it on;
+                        otherwise it is a plain status line, because a
+                        permanently tappable "sync now" invites the belief that
+                        admitting depends on it. It does not. */}
+                    {online && pendingCount > 0 && !isSyncing ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={syncNow}
+                            className={`${TAP} px-3 text-white hover:bg-white/15 hover:text-white`}
+                        >
+                            <SyncState pendingCount={pendingCount} syncing={false} surface="gate" />
+                            <span className="ml-2 underline underline-offset-4">Send now</span>
+                        </Button>
+                    ) : (
+                        <SyncState pendingCount={pendingCount} syncing={isSyncing} surface="gate" />
+                    )}
                 </div>
-            </div>
+
+                <p className="flex items-center justify-center gap-1.5 text-center text-[11px] leading-snug text-white/50">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    Each ticket is checked against this event&apos;s signing keys, on this phone.
+                </p>
+            </footer>
         </div>
     );
 };

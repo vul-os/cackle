@@ -8,7 +8,7 @@ import Header from '@/pages/visitor/header';
 import { format } from 'date-fns';
 import { EmptyState } from '@/components/ui/empty-state';
 import { REDIRECT_STORAGE_KEY } from '@/pages/auth/auth-redirect';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 const CartPage = () => {
     const { itemsByEvent, itemCount, updateQuantity, removeItem, eventTotal } = useCart();
@@ -96,7 +96,7 @@ const CartPage = () => {
                                                 <div className="flex-1">
                                                     <h3 className="font-medium">{item.ticket_type.name}</h3>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {formatMoney(item.ticket_type.price_minor, event.currency)} each
+                                                        <Money minor={item.ticket_type.price_minor} currency={event.currency} /> each
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center gap-3">
@@ -120,7 +120,7 @@ const CartPage = () => {
                                                         </Button>
                                                     </div>
                                                     <div className="w-24 text-right font-medium">
-                                                        {formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}
+                                                        <Money minor={item.quantity * item.ticket_type.price_minor} currency={event.currency} />
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -137,7 +137,7 @@ const CartPage = () => {
                                         <div className="flex items-center justify-between p-4">
                                             <div>
                                                 <p className="text-sm text-muted-foreground">Subtotal</p>
-                                                <p className="text-xl font-bold">{formatMoney(subtotal, event.currency)}</p>
+                                                <p className="text-xl font-bold"><Money minor={subtotal} currency={event.currency} /></p>
                                             </div>
                                             <Button onClick={() => handleCheckout(eventId)} disabled={loading}>
                                                 Checkout this event

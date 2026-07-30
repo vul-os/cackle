@@ -13,6 +13,9 @@ supported — this is intentional, to keep the single-binary story simple.
 | `CACKLE_MEDIA_DIR` | `--media-dir` | `<db dir>/media` | Directory uploaded event images are stored under. Defaults to a `media` folder beside the database file. Must be writable and should be included in backups alongside the database. |
 | `CACKLE_BASE_URL` | `--base-url` | derived from `--addr` (e.g. `http://localhost:8080`) | The public URL Cackle is reachable at. Used to build links in emails and payment provider callback URLs. Defaults to a localhost URL derived from the listen address, which is fine for local development — but set this to your real domain before taking payments, or the payment callback round-trip points at localhost and breaks. |
 | `CACKLE_SESSION_SECRET` | — | auto-generated, persisted | Secret used to sign session tokens. If unset, Cackle generates one on first boot and persists it to a `.cackle_session_secret` file (mode `0600`) beside the database file, so subsequent restarts don't invalidate every session. Set it explicitly in any multi-instance deployment so all instances share one secret. |
+| `CACKLE_KEY_PASSPHRASE` | — | **none — required** | Operator passphrase (minimum 12 characters) that unlocks the event signing keys, which are encrypted at rest. Cackle **refuses to start** without key material: there is no plaintext mode and no generated fallback. Set exactly one of this, `CACKLE_KEY_PASSPHRASE_FILE` or `CACKLE_KEY_FILE` — setting two is an error, and setting one to an empty value is an error rather than "unset". Back it up separately from `CACKLE_DB`; losing it means that database can never issue another ticket (already-issued tickets and every gate keep working). See [SELF-HOSTING.md](SELF-HOSTING.md#configuring-the-key-material). |
+| `CACKLE_KEY_PASSPHRASE_FILE` | — | — | Path to a file holding the passphrase instead of putting it in the environment, where `docker inspect` and `/proc/<pid>/environ` can read it. A single trailing newline is ignored. |
+| `CACKLE_KEY_FILE` | — | — | Path to a file of 32+ random bytes used as key material instead of a passphrase: `head -c 32 /dev/urandom > /etc/cackle/keyfile && chmod 600 /etc/cackle/keyfile`. |
 | `CACKLE_PAYMENT_PROVIDERS` | — | unset (every registered provider enabled) | Comma-separated allowlist of optional payment providers for this deployment, e.g. `manual,stripe,paystack`. `manual` cannot be disabled and is always enabled regardless of this variable. See [PAYMENTS.md](PAYMENTS.md). |
 | `CACKLE_DEMO` | `--demo` | `false` | Boot with a fully seeded demo organisation, event, ticket types, and the `stub` payment provider. Zero setup, meant for evaluation, screenshots, and local development — not for anything real. |
 
@@ -37,8 +40,11 @@ a default, never committed, never logged. A few examples (see
 
 - **Restart required for all of the above.** Cackle reads configuration once
   at startup; there is no live-reload.
-- **`CACKLE_DB` is the entire state of a Cackle instance.** Back it up like
-  you mean it — see [SELF-HOSTING.md](SELF-HOSTING.md#backups).
+- **`CACKLE_DB` is *almost* the entire state of a Cackle instance.** It is no
+  longer sufficient on its own: event signing keys inside it are encrypted, so a
+  restore needs the database *and* the key material above — backed up
+  **separately**, or the archive holds both the lock and the key. Back both up
+  like you mean it — see [SELF-HOSTING.md](SELF-HOSTING.md#backups).
 - **`--demo` and real provider secrets don't mix well on purpose.** Demo
   mode uses the `stub` provider regardless of what else is configured, so
   you can't accidentally run a real event against seeded demo data.

@@ -48,7 +48,7 @@ function Hero({ query, onSearch }) {
                                 key={label}
                                 className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-white/70 backdrop-blur-sm"
                             >
-                                <Icon className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                                <Icon className="h-3.5 w-3.5 text-primary-emphasis" aria-hidden="true" />
                                 {label}
                             </span>
                         ))}

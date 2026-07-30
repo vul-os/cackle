@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
-import { visibleTicketTypes, remainingFor, priceFromMinor, formatMoney } from './ticket-utils';
+import { visibleTicketTypes, remainingFor, priceFromMinor } from './ticket-utils';
+import { Money } from '@/components/ui/money';
 
 /**
  * The event page's primary conversion surface: an inline (not modal) ticket
@@ -46,7 +47,7 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
         <Card id="ticket-panel" className={cn('overflow-hidden', className)}>
             <CardHeader className="pb-5">
                 <CardTitle className="flex items-center gap-2 font-display text-lg">
-                    <Ticket className="h-4 w-4 text-primary" aria-hidden="true" />
+                    <Ticket className="h-4 w-4 text-primary-emphasis" aria-hidden="true" />
                     Tickets
                 </CardTitle>
             </CardHeader>
@@ -80,7 +81,7 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
                                                 <h3 className="font-medium leading-tight">{t.name}</h3>
-                                                <p className="mt-0.5 text-sm text-muted-foreground">{formatMoney(t.price_minor, event?.currency)}</p>
+                                                <p className="mt-0.5 text-sm text-muted-foreground"><Money minor={t.price_minor} currency={event?.currency} /></p>
                                                 {t.description && <p className="mt-1 text-xs text-muted-foreground">{t.description}</p>}
                                                 {soldOut ? (
                                                     <p className="mt-1.5 text-xs font-semibold text-destructive">Sold out</p>
@@ -123,7 +124,7 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
 
                         <div className="flex items-center justify-between border-t border-border pt-4 font-medium">
                             <span>Total</span>
-                            <span data-testid="ticket-total">{formatMoney(total, event?.currency)}</span>
+                            <span data-testid="ticket-total"><Money minor={total} currency={event?.currency} /></span>
                         </div>
 
                         <Button onClick={handleAddToCart} disabled={totalQuantity === 0} className="w-full" size="lg">
@@ -161,7 +162,7 @@ export const MobileStickyCta = ({ event, ticketTypes = [] }) => {
                     <p className="text-xs text-muted-foreground">{soldOut ? 'Sold out' : 'From'}</p>
                     {!soldOut && (
                         <p className="truncate font-display text-lg font-bold">
-                            {price === null ? 'TBA' : price === 0 ? 'Free' : formatMoney(price, event?.currency)}
+                            {price === null ? 'TBA' : price === 0 ? 'Free' : <Money minor={price} currency={event?.currency} />}
                         </p>
                     )}
                 </div>

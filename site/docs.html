@@ -4,25 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cackle docs</title>
-<meta name="description" content="Cackle documentation">
-<link rel="icon" href="./assets/cackle-logo.svg">
+<meta name="description" content="Cackle documentation — the ticket format, running a gate with no network, clustering, payments, configuration and self-hosting.">
+<meta name="theme-color" content="#0B0B0D">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" href="./assets/cackle-logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./assets/style.css">
+<!-- Theme resolved before first paint, from the SAME key the landing writes,
+     so following "Docs" out of a light-themed landing does not flash into a
+     dark page and stay there. -->
+<script>
+(function(){try{var s=localStorage.getItem('cackle-site-theme');
+document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'));
+}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
+</script>
 <script src="./assets/vendor/marked.umd.js"></script>
 <script src="./assets/vendor/mermaid.min.js"></script>
 </head>
 <body>
+<a class="skip" href="#content">Skip to the chapter</a>
 <header class="site-header"><div class="wrap nav">
-    <a class="brand" href="./index.html"><span class="tile"><img src="./assets/cackle-logo.svg" alt="Cackle logo"></span>Cackle</a>
-    <div class="nav-spacer"></div>
-    <nav class="nav-links">
-      <a href="./index.html#features">Features</a>
-      <a href="./docs.html">Docs</a>
-      <a href="https://github.com/vul-os/cackle" target="_blank" rel="noopener">GitHub</a>
-    </nav>
-    <a class="vulos-badge" href="https://vulos.org" target="_blank" rel="noopener" title="Part of Vulos">
-      <img src="./assets/vulos-logo.png" alt="Vulos">Part of Vulos
+    <a class="brand" href="./index.html" aria-label="Cackle — home">
+      <span class="tile" aria-hidden="true">
+        <svg viewBox="0 0 128 128" fill="none" aria-hidden="true">
+          <line x1="22" y1="42" x2="106" y2="42" stroke="#fff" stroke-width="7" stroke-dasharray="13 13" stroke-linecap="round"/>
+          <path d="M40 76 Q64 106 88 76" stroke="#fff" stroke-width="13" stroke-linecap="round" fill="none"/>
+        </svg>
+      </span><span>Cackle<span class="dot">.</span></span>
     </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="./index.html#how">How it works</a>
+      <a href="./index.html#status">Status</a>
+      <a href="./docs.html">Docs</a>
+    </nav>
+    <div class="nav-act">
+      <a class="ghlink" href="https://github.com/vul-os/cackle" target="_blank" rel="noopener"><span>GitHub</span>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.84 1.18 3.1 0 4.43-2.69 5.4-5.25 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>
+      </a>
+      <button class="iconbtn" id="themeBtn" type="button" aria-label="Switch theme" title="Switch theme">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
   </div></header>
+<hr class="perf">
 <div class="wrap docs-shell">
   <aside class="docs-nav">
     <div class="label">Cackle docs</div>
@@ -31,7 +55,9 @@
         <a data-slug="architecture" href="#architecture">Architecture</a>
         <a data-slug="ticket-format" href="#ticket-format">Ticket format</a>
         <a data-slug="offline-gates" href="#offline-gates">Offline gates</a>
+        <a data-slug="clustering" href="#clustering">Clustering</a>
         <a data-slug="api" href="#api">API</a>
+        <a data-slug="host-pages" href="#host-pages">Host pages</a>
         <a data-slug="payments" href="#payments">Payments</a>
         <a data-slug="configuration" href="#configuration">Configuration</a>
         <a data-slug="self-hosting" href="#self-hosting">Self-hosting</a>
@@ -45,11 +71,11 @@
   </main>
 </div>
 <footer class="site-footer"><div class="wrap foot">
-    <div class="left"><img src="./assets/vulos-logo.png" alt="Vulos"> <span>Part of <a href="https://vulos.org" target="_blank" rel="noopener" style="color:var(--text)">Vulos</a> — the open, self-hostable web OS &amp; app suite.</span></div>
+    <div class="left"><img src="./assets/vulos-logo.png" alt="Vulos"> <span>Part of <a href="https://vulos.org" target="_blank" rel="noopener" style="color:var(--t2)">Vulos</a> — the open, self-hostable web OS &amp; app suite.</span></div>
     <div class="links">
+      <a href="./index.html">Home</a>
       <a href="./docs.html">Docs</a>
       <a href="https://github.com/vul-os/cackle" target="_blank" rel="noopener">GitHub</a>
-      <a href="../LICENSE">License</a>
       <a href="https://vulos.org" target="_blank" rel="noopener">vulos.org</a>
     </div>
   </div></footer>
@@ -67,7 +93,9 @@ const DOCS = [
   {"slug":"architecture","title":"Architecture","path":"./docs/architecture.md","base":"docs/"},
   {"slug":"ticket-format","title":"Ticket format","path":"./docs/ticket-format.md","base":"docs/"},
   {"slug":"offline-gates","title":"Offline gates","path":"./docs/offline-gates.md","base":"docs/"},
+  {"slug":"clustering","title":"Clustering","path":"./docs/clustering.md","base":"docs/"},
   {"slug":"api","title":"API","path":"./docs/api.md","base":"docs/"},
+  {"slug":"host-pages","title":"Host pages","path":"./docs/host-pages.md","base":"docs/"},
   {"slug":"payments","title":"Payments","path":"./docs/payments.md","base":"docs/"},
   {"slug":"configuration","title":"Configuration","path":"./docs/configuration.md","base":"docs/"},
   {"slug":"self-hosting","title":"Self-hosting","path":"./docs/self-hosting.md","base":"docs/"},
@@ -121,8 +149,34 @@ function rewriteLinks(root, doc){
 const bySlug = Object.fromEntries(DOCS.map(d=>[d.slug,d]));
 const content = document.getElementById('content');
 const crumb = document.getElementById('crumb');
+const root = document.documentElement;
+function theme(){ return root.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+
 let mermaidReady = false;
-try { mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'loose', themeVariables:{ fontFamily:'var(--sans)' } }); mermaidReady = true; } catch(e){}
+// Mermaid's palette is baked in at initialize() time, so it follows the page
+// theme rather than being pinned dark under a light stylesheet. Switching the
+// theme re-initialises and re-renders the current chapter (see themeBtn).
+function initMermaid(){
+  try {
+    mermaid.initialize({
+      startOnLoad:false, securityLevel:'loose',
+      theme: theme() === 'light' ? 'neutral' : 'dark',
+      themeVariables:{ fontFamily:'var(--sans)' },
+    });
+    mermaidReady = true;
+  } catch(e){ mermaidReady = false; }
+}
+initMermaid();
+
+document.getElementById('themeBtn').addEventListener('click', ()=>{
+  const next = theme() === 'light' ? 'dark' : 'light';
+  root.setAttribute('data-theme', next);
+  try { localStorage.setItem('cackle-site-theme', next); } catch(e){}
+  const m = document.querySelector('meta[name=theme-color]');
+  if (m) m.setAttribute('content', next === 'light' ? '#FBFAF8' : '#0B0B0D');
+  initMermaid();
+  load(current());
+});
 
 if (window.marked && marked.setOptions) marked.setOptions({ gfm:true, breaks:false });
 
@@ -153,11 +207,18 @@ async function load(slug){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const md = await res.text();
     content.innerHTML = marked.parse(md);
+    // Chapters are mirrored verbatim from docs/ and the repo root, so their
+    // image paths are REPO-relative ("docs/assets/cackle-logo.svg",
+    // "docs/screenshots/hero.png"). This page is served from site/, where the
+    // same files live at "assets/" and "screenshots/" — so an un-rewritten
+    // src resolves to site/docs/assets/… and 404s. Both directories are
+    // mirrored, so both are rewritten; anything else relative is left alone
+    // and will show as a broken image rather than being silently hidden.
     content.querySelectorAll('img').forEach(img=>{
       const s=img.getAttribute('src')||'';
-      if(/^https?:/i.test(s)) return;
-      const m=s.match(/(?:\.\.\/)*(?:docs\/)?screenshots\/(.+)$/);
-      if(m) img.setAttribute('src','screenshots/'+m[1]);
+      if(/^(https?:|data:|\/)/i.test(s)) return;
+      const m=s.match(/(?:\.\.\/)*(?:docs\/)?(screenshots|assets)\/(.+)$/);
+      if(m) img.setAttribute('src',m[1]+'/'+m[2]);
     });
     rewriteLinks(content, doc);
     content.querySelectorAll('a[href^="http"]').forEach(a=>{a.target='_blank';a.rel='noopener';});

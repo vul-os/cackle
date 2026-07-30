@@ -63,7 +63,7 @@ const EventImagesPage = () => {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5 text-primary" />
+                        <ImageIcon className="h-5 w-5 text-primary-emphasis" />
                         {state.event?.title ?? 'Images'}
                     </CardTitle>
                     <CardDescription>

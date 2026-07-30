@@ -63,6 +63,17 @@ func (s *Store) CreateEventWithKey(ctx context.Context, e *Event, k *EventKey) e
 	}
 	k.EventID = e.ID
 
+	// Seal the issuer private key BEFORE opening the transaction: with no
+	// key material configured this fails with ErrKeyVaultLocked and no event
+	// row is written either. An event without a signing key must not exist,
+	// and neither must a signing key that is not encrypted at rest — so with
+	// a locked vault the only correct outcome is that event creation
+	// refuses, loudly, having changed nothing.
+	sealedKey, sealedNonce, err := s.sealPrivateKey(k.ID, k.EventID, k.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("store: create event: seal issuer key: %w", err)
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store: create event: begin: %w", err)
@@ -82,9 +93,9 @@ func (s *Store) CreateEventWithKey(ctx context.Context, e *Event, k *EventKey) e
 	}
 
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO event_keys (id, event_id, public_key, private_key, created_at, revoked_at)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		k.ID, k.EventID, []byte(k.PublicKey), []byte(k.PrivateKey), timeToText(k.CreatedAt), nullTimeToText(k.RevokedAt),
+		INSERT INTO event_keys (id, event_id, public_key, sealed_private_key, sealed_nonce, created_at, revoked_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		k.ID, k.EventID, []byte(k.PublicKey), sealedKey, sealedNonce, timeToText(k.CreatedAt), nullTimeToText(k.RevokedAt),
 	); err != nil {
 		return fmt.Errorf("store: create event issuer key: %w", err)
 	}

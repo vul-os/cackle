@@ -12,7 +12,7 @@ import { TicketTypeBreakdown, RatioMeter } from './stats-charts';
 const StatTile = ({ icon: Icon, label, value, sub }) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-emphasis">
                 <Icon className="h-5 w-5" aria-hidden="true" />
             </div>
             <div className="min-w-0">
@@ -77,7 +77,7 @@ const EventStatsPage = () => {
             </Button>
 
             <div className="mb-8 flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary-emphasis">
                     <Gauge className="h-6 w-6" aria-hidden="true" />
                 </div>
                 <div className="min-w-0">

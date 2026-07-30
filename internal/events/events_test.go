@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vul-os/cackle/internal/store"
+	"github.com/vul-os/cackle/internal/store/keyvault"
 	"github.com/vul-os/cackle/internal/tickets"
 )
 
@@ -17,6 +18,19 @@ func openTestStore(t *testing.T) *store.Store {
 	st, err := store.Open(filepath.Join(dir, "cackle.db"))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
+	}
+
+	// Event signing keys are encrypted at rest (internal/store/keyvault): a
+	// freshly opened Store is LOCKED and refuses to create or use one. Tests
+	// supply fixed key material explicitly — there is no plaintext mode for a
+	// test to fall back to, and a test that quietly took one would be exactly
+	// the reason the plaintext mode survived as long as it did.
+	kvSrc, err := keyvault.Keyfile([]byte("cackle-test-event-key-material-32b!!"))
+	if err != nil {
+		t.Fatalf("keyvault.Keyfile: %v", err)
+	}
+	if err := st.UnlockKeyVault(context.Background(), kvSrc); err != nil {
+		t.Fatalf("unlock event key vault: %v", err)
 	}
 	t.Cleanup(func() { st.Close() })
 	return st

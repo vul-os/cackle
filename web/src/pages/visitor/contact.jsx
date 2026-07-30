@@ -10,12 +10,12 @@ import { toast } from '@/components/ui/use-toast';
 
 const ContactIconBlock = ({ icon: Icon, title, description, link, linkText }) => (
     <div className="flex gap-x-6 py-6">
-        <Icon className="mt-1 h-6 w-6 flex-shrink-0 text-primary" />
+        <Icon className="mt-1 h-6 w-6 flex-shrink-0 text-primary-emphasis" />
         <div className="grow">
             <h3 className="font-bold">{title}</h3>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             {link && (
-                <a className="mt-2 inline-flex items-center gap-x-2 text-sm font-medium text-primary hover:underline" href={link}>
+                <a className="mt-2 inline-flex items-center gap-x-2 text-sm font-medium text-primary-emphasis hover:underline" href={link}>
                     {linkText}
                 </a>
             )}
@@ -43,7 +43,7 @@ const ContactPage = () => {
             <main className="min-h-screen bg-background pt-16">
                 <section className="mx-auto max-w-5xl px-4 py-12">
                     <div className="mb-12 text-center">
-                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary">Get in Touch</span>
+                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">Get in Touch</span>
                         <h1 className="mb-4 font-display text-4xl font-bold">Contact Us</h1>
                         <p className="mx-auto max-w-2xl text-muted-foreground">Questions about an event, a refund, or selling tickets? We're here.</p>
                     </div>

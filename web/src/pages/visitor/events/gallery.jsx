@@ -81,7 +81,7 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
                 role="img"
                 aria-label={`${title} — no image available`}
             >
-                <Calendar className="h-20 w-20 text-primary/40" aria-hidden="true" />
+                <Calendar className="h-20 w-20 text-primary-emphasis/40" aria-hidden="true" />
             </div>
         );
     }

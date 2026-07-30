@@ -1,0 +1,241 @@
+{{- /*
+The host page template.
+
+Rules this file follows, and which a reviewer should check it still follows:
+
+  1. NO <script>, anywhere, of any kind. The page has no behaviour.
+  2. NO reference to any origin but this one. No <link rel=stylesheet>, no
+     webfont, no analytics beacon, no remote image. The only subresources are
+     /media/{id} images from this event's own gallery.
+  3. Every host value is a plain {{ pipeline }} in its real context. There is
+     no template.HTML/CSS/URL cast in internal/pages, so html/template's
+     contextual escaper applies to all of them without exception.
+  4. NO inline style="" attribute. Every declaration lives in the single
+     nonce-carrying <style> element below, so the response's CSP can be
+     style-src 'nonce-...' with no 'unsafe-inline' at all.
+  5. No logic beyond ranging and branching on booleans already decided in Go
+     (see render.go's view type). Security decisions do not belong in a
+     template.
+*/ -}}
+<!doctype html>
+<html{{if .Lang}} lang="{{.Lang}}"{{end}} dir="{{.Dir}}" class="{{.FontClass}} {{.CornClass}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<style nonce="{{.Nonce}}">
+:root {
+  --hp-bg: #fbfbfd;
+  --hp-surface: #ffffff;
+  --hp-text: #17171b;
+  --hp-muted: #5c5c68;
+  --hp-accent: #2f4bd4;
+  --hp-accent-text: #ffffff;
+  --hp-radius: 10px;
+  --hp-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+{{/* Host colours. Emitted only when set, so an unset field keeps the default
+     above rather than producing an empty declaration. These are the only host
+     values anywhere in a CSS context; Validate has already constrained each to
+     six hex digits, and html/template's CSS escaper is the second gate. */}}
+:root {
+{{- with .Theme}}
+{{- if .Background}}
+  --hp-bg: {{.Background}};
+{{- end}}
+{{- if .Surface}}
+  --hp-surface: {{.Surface}};
+{{- end}}
+{{- if .Text}}
+  --hp-text: {{.Text}};
+{{- end}}
+{{- if .Muted}}
+  --hp-muted: {{.Muted}};
+{{- end}}
+{{- if .Accent}}
+  --hp-accent: {{.Accent}};
+{{- end}}
+{{- if .AccentText}}
+  --hp-accent-text: {{.AccentText}};
+{{- end}}
+{{- end}}
+}
+.font-system { --hp-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif; }
+.font-serif  { --hp-font: Georgia, "Times New Roman", "Noto Serif", serif; }
+.font-mono   { --hp-font: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono", monospace; }
+.corn-sharp { --hp-radius: 0px; }
+.corn-soft  { --hp-radius: 10px; }
+.corn-round { --hp-radius: 22px; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--hp-bg);
+  color: var(--hp-text);
+  font-family: var(--hp-font);
+  font-size: 17px;
+  line-height: 1.6;
+}
+.wrap { max-width: 46rem; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+header.masthead { margin-bottom: 2rem; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.75rem); line-height: 1.15; margin: 0 0 .5rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.5rem; line-height: 1.25; margin: 2.25rem 0 .75rem; }
+h3 { font-size: 1.15rem; line-height: 1.3; margin: 1.75rem 0 .5rem; }
+p { margin: 0 0 1rem; overflow-wrap: break-word; }
+.summary { color: var(--hp-muted); font-size: 1.125rem; margin: 0; }
+.block { margin: 0 0 1.5rem; }
+.notice {
+  border: 1px solid var(--hp-accent);
+  border-radius: var(--hp-radius);
+  padding: .85rem 1rem;
+  margin: 0 0 1.75rem;
+  font-weight: 600;
+}
+.card {
+  background: var(--hp-surface);
+  border: 1px solid color-mix(in srgb, var(--hp-text) 12%, transparent);
+  border-radius: var(--hp-radius);
+  padding: 1rem 1.15rem;
+}
+.detail-grid { display: grid; gap: .75rem 1.5rem; grid-template-columns: minmax(6rem, max-content) 1fr; }
+.detail-grid dt { color: var(--hp-muted); font-size: .9rem; }
+.detail-grid dd { margin: 0; }
+figure { margin: 0 0 1.5rem; }
+figure img { display: block; width: 100%; height: auto; border-radius: var(--hp-radius); }
+figcaption { color: var(--hp-muted); font-size: .9rem; margin-top: .5rem; }
+ul.links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem .75rem; }
+ul.links a, a { color: var(--hp-accent); }
+.tickets { display: grid; gap: .75rem; margin: 0 0 1.25rem; }
+.ticket { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: baseline; justify-content: space-between; }
+.ticket .name { font-weight: 600; }
+.ticket .desc { color: var(--hp-muted); font-size: .95rem; flex-basis: 100%; margin: 0; }
+.price { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.price .cur { color: var(--hp-muted); font-size: .85em; }
+.soldout { color: var(--hp-muted); text-decoration: line-through; }
+.cta {
+  display: inline-block;
+  background: var(--hp-accent);
+  color: var(--hp-accent-text);
+  border-radius: var(--hp-radius);
+  padding: .7rem 1.4rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.faq { margin: 0; }
+.faq dt { font-weight: 600; margin-top: 1rem; }
+.faq dd { margin: .25rem 0 0; color: var(--hp-muted); }
+hr.divider { border: 0; border-top: 1px solid color-mix(in srgb, var(--hp-text) 15%, transparent); margin: 2rem 0; }
+footer.colophon { margin-top: 3rem; color: var(--hp-muted); font-size: .85rem; }
+@media (max-width: 30rem) {
+  .detail-grid { grid-template-columns: 1fr; gap: .25rem; }
+  .detail-grid dd { margin-bottom: .5rem; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <h1>{{.Title}}</h1>
+  {{- if .Summary}}
+  <p class="summary">{{.Summary}}</p>
+  {{- end}}
+</header>
+
+{{- if .Cancelled}}
+<p class="notice">{{.Labels.Cancelled}}</p>
+{{- end}}
+
+{{range .Blocks}}
+{{- if eq .Kind "heading"}}
+{{- /* Branched explicitly rather than interpolating a tag name: html/template
+       refuses an action in a tag-name position, and rightly so — the set of
+       tags this can emit is visible right here, and it is two. */ -}}
+{{if eq .Level 3}}<h3>{{.Text}}</h3>{{else}}<h2>{{.Text}}</h2>{{end}}
+
+{{- else if eq .Kind "text"}}
+<div class="block">
+  {{- range .Paragraphs}}
+  <p>{{.}}</p>
+  {{- end}}
+</div>
+
+{{- else if eq .Kind "image"}}
+<figure>
+  <img src="/media/{{.Image.ID}}" alt="{{.Alt}}"
+       {{- if gt .Image.Width 0}} width="{{.Image.Width}}"{{end}}
+       {{- if gt .Image.Height 0}} height="{{.Image.Height}}"{{end}} loading="lazy" decoding="async">
+</figure>
+
+{{- else if eq .Kind "links"}}
+<ul class="links block">
+  {{- range .Links}}
+  <li><a href="{{.Href}}" rel="nofollow noopener noreferrer ugc">{{.Label}}</a></li>
+  {{- end}}
+</ul>
+
+{{- else if eq .Kind "faq"}}
+<dl class="faq block">
+  {{- range .Items}}
+  <dt>{{.Question}}</dt>
+  <dd>{{.Answer}}</dd>
+  {{- end}}
+</dl>
+
+{{- else if eq .Kind "details"}}
+<div class="card block">
+  <dl class="detail-grid">
+    {{- if .When.Known}}
+    <dt>{{$.Labels.When}}</dt>
+    <dd>
+      <time datetime="{{.When.StartISO}}">{{.When.StartText}}</time>
+      {{- if .When.EndText}} &ndash; <time datetime="{{.When.EndISO}}">{{.When.EndText}}</time>{{end}}
+      <span class="cur">{{.When.ZoneText}}</span>
+    </dd>
+    {{- end}}
+    {{- if .Where.Known}}
+    <dt>{{$.Labels.Where}}</dt>
+    <dd>
+      {{- if .Where.VenueName}}{{.Where.VenueName}}{{end}}
+      {{- if and .Where.VenueName .Where.Address}}<br>{{end}}
+      {{- if .Where.Address}}{{.Where.Address}}{{end}}
+    </dd>
+    {{- end}}
+  </dl>
+</div>
+
+{{- else if eq .Kind "tickets"}}
+<section class="block">
+  <h2>{{$.Labels.Tickets}}</h2>
+  <div class="tickets">
+    {{- range .Tickets}}
+    <div class="card ticket">
+      <span class="name{{if .SoldOut}} soldout{{end}}">{{.Name}}</span>
+      <span class="price">
+        {{- if .SoldOut}}{{$.Labels.SoldOut}}
+        {{- else if .Free}}{{.Price}}
+        {{- else}}{{.Price}} <span class="cur">{{.Currency}}</span>{{end -}}
+      </span>
+      {{- if .Description}}<p class="desc">{{.Description}}</p>{{end}}
+    </div>
+    {{- end}}
+  </div>
+  {{- if .CTAHref}}
+  <a class="cta" href="{{.CTAHref}}">{{$.Labels.GetTickets}}</a>
+  {{- end}}
+</section>
+
+{{- else if eq .Kind "divider"}}
+<hr class="divider">
+{{- end}}
+{{end}}
+
+<footer class="colophon">
+  <p>{{.Title}}</p>
+</footer>
+
+</div>
+</body>
+</html>

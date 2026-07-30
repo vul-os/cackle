@@ -26,6 +26,7 @@ import (
 	"github.com/vul-os/cackle/internal/orders"
 	"github.com/vul-os/cackle/internal/orgs"
 	"github.com/vul-os/cackle/internal/payments"
+	"github.com/vul-os/cackle/internal/scan/substrate"
 	"github.com/vul-os/cackle/internal/store"
 )
 
@@ -68,9 +69,15 @@ type server struct {
 	deps        Deps
 	webhookSeen *memorySeenStore
 	// ledgers lazily compiles the shared DMTAP sync engine on first use, once
-	// per process. Only the cross-gate reconciliation report reaches it; the
-	// admission path never does. See reconcile_handlers.go.
+	// per process. Only the cross-gate reconciliation report and the
+	// server-to-server sync routes reach it; the admission path never does. See
+	// reconcile_handlers.go and sync_handlers.go.
 	ledgers ledgerCompiler
+	// syncNonces refuses a replayed peer request inside the window in which its
+	// timestamp is still fresh. Process-wide, because a peer's nonce must be
+	// spent once for this node and not once per handler. See
+	// internal/scan/substrate/peerauth.go.
+	syncNonces *substrate.NonceCache
 }
 
 func (s *server) log() *slog.Logger {
@@ -86,7 +93,7 @@ func New(deps Deps) http.Handler {
 	if deps.Logger == nil {
 		deps.Logger = slog.Default()
 	}
-	s := &server{deps: deps, webhookSeen: newMemorySeenStore()}
+	s := &server{deps: deps, webhookSeen: newMemorySeenStore(), syncNonces: substrate.NewNonceCache()}
 
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
@@ -142,6 +149,15 @@ func New(deps Deps) http.Handler {
 			r.Post("/{id}/images", s.requireUser(s.handleUploadImage))
 			r.Get("/{id}/payouts", s.requireUser(s.handleEventPayouts))
 			r.Get("/{id}/orders", s.requireUser(s.handleListEventOrders))
+
+			// Host pages (docs/HOST-PAGES.md). GET is public and
+			// published-only, exactly like the rendered page at /h/{ref} —
+			// it is what a host fetches to render their event on their own
+			// site. PUT/DELETE are admin+ on the event's org, the same bar
+			// as editing the event itself.
+			r.Get("/{id}/page", s.handleGetEventPage)
+			r.Put("/{id}/page", s.requireUser(s.handlePutEventPage))
+			r.Delete("/{id}/page", s.requireUser(s.handleDeleteEventPage))
 		})
 
 		r.Get("/categories", s.handleListCategories)
@@ -195,6 +211,34 @@ func New(deps Deps) http.Handler {
 		// request, so 10/sec sustained per IP is far more headroom than a real
 		// gate needs even with every scanner behind one venue NAT.
 		r.With(rateLimit(scanLimiter)).Post("/scan/sync", s.requireUser(s.handleScanSync))
+
+		// Server-to-server replication of the admission ledger. Two groups of
+		// routes with two entirely separate credentials, and mixing them up is
+		// not possible: /ops is authenticated by a PINNED NODE KEY signing each
+		// request (no session, no cookie, no bearer token), everything else by an
+		// ordinary operator session with the org owner role.
+		//
+		// Both /ops routes share the sync limiter. /scan/sync taught this
+		// codebase that an authenticated write reachable from the public internet
+		// still needs a bound; a cloud node's /ops is the same shape of thing,
+		// and it is bounded from its first commit rather than after the fact —
+		// size-capped body, count-capped page, page-capped round.
+		//
+		// Nothing here runs on a node with no peers. There is no poller: a round
+		// happens when POST /api/sync/peers/{id}/sync is called.
+		syncLimiter := newIPLimiter(rate.Limit(5), 20) // 5/sec sustained, burst 20
+		r.Route("/sync", func(r chi.Router) {
+			r.With(rateLimit(syncLimiter)).Get("/ops", s.handleSyncPull)
+			r.With(rateLimit(syncLimiter)).Post("/ops", s.handleSyncPush)
+
+			// Rate-limited despite being owner-only: it reads the engine's own
+			// version, which instantiates the WebAssembly module, so it is the
+			// one operator GET here with a real per-call cost.
+			r.With(rateLimit(syncLimiter)).Get("/status", s.requireUser(s.handleSyncStatus))
+			r.Post("/peers", s.requireUser(s.handleEnrolSyncPeer))
+			r.Delete("/peers/{id}", s.requireUser(s.handleDeleteSyncPeer))
+			r.With(rateLimit(syncLimiter)).Post("/peers/{id}/sync", s.requireUser(s.handleSyncPeerRound))
+		})
 	})
 
 	// GET /media/{id} is public (uploaded event images are not secrets) and
@@ -204,6 +248,15 @@ func New(deps Deps) http.Handler {
 	// the root router, so chi's longest-static-prefix-first resolution
 	// means it can never be shadowed by the SPA catch-all below.
 	r.Get("/media/{id}", s.handleServeMedia)
+
+	// GET /h/{slugOrID} is the public, server-rendered host page — HTML, not
+	// API, so it lives beside /media rather than under /api. It is
+	// unauthenticated and published-only, serves no script, and answers with
+	// its own far stricter Content-Security-Policy than the app-wide one (see
+	// page_handlers.go). Registered on the root router for the same reason
+	// /media is: chi resolves the longest static prefix first, so the SPA
+	// catch-all below can never shadow it.
+	r.Get("/h/{ref}", s.handleHostPage)
 
 	// Everything else falls through to the embedded SPA (or a "not built"
 	// notice), never shadowing /api/* — chi resolves the longest matching

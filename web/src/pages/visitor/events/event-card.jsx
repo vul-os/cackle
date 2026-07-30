@@ -5,7 +5,7 @@ import { Calendar, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { getCoverImageUrl } from './media';
-import { formatMoney } from './ticket-utils';
+import { Money } from '@/components/ui/money';
 
 function formatDate(iso) {
     if (!iso) return 'Date TBA';
@@ -46,7 +46,7 @@ const EventCard = ({ event, pricing, index = 0, featured = false }) => {
                             />
                         ) : (
                             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-                                <Calendar className="h-10 w-10 text-primary/50" aria-hidden="true" />
+                                <Calendar className="h-10 w-10 text-primary-emphasis/50" aria-hidden="true" />
                             </div>
                         )}
                         {event.category && (
@@ -61,12 +61,18 @@ const EventCard = ({ event, pricing, index = 0, featured = false }) => {
                         )}
                         {!pricing?.soldOut && price !== undefined && price !== null && (
                             <div className="absolute right-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">
-                                {price === 0 ? 'Free' : `From ${formatMoney(price, event.currency)}`}
+                                {price === 0 ? (
+                                    'Free'
+                                ) : (
+                                    <>
+                                        From <Money minor={price} currency={event.currency} />
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
                     <CardContent className={`space-y-2 ${featured ? 'p-6' : 'p-5'}`}>
-                        <h3 className={`font-display font-bold leading-snug tracking-tight group-hover:text-primary ${featured ? 'text-xl' : 'text-lg'}`}>
+                        <h3 className={`font-display font-bold leading-snug tracking-tight group-hover:text-primary-emphasis ${featured ? 'text-xl' : 'text-lg'}`}>
                             {event.title}
                         </h3>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -172,7 +172,7 @@ const EventPage = () => {
                     title="Event not found"
                     description="It may have been deleted, or the link is wrong."
                     action={
-                        <button type="button" className="text-sm font-medium text-primary underline-offset-4 hover:underline" onClick={() => navigate('/admin/events')}>
+                        <button type="button" className="text-sm font-medium text-primary-emphasis underline-offset-4 hover:underline" onClick={() => navigate('/admin/events')}>
                             Back to events
                         </button>
                     }

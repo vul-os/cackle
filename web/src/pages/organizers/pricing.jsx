@@ -32,7 +32,7 @@ const PricingPage = () => {
 
                 <div className="mx-auto max-w-5xl px-4 py-16">
                     <div className="mb-16 text-center">
-                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary">Payment Solutions</span>
+                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">Payment Solutions</span>
                         <h1 className="mb-6 font-display text-4xl font-bold tracking-tight sm:text-5xl">Transparent Pricing</h1>
                         <p className="mx-auto max-w-2xl text-lg text-muted-foreground">No surprises. See exactly what you pay per transaction.</p>
                     </div>
@@ -41,7 +41,7 @@ const PricingPage = () => {
                         <CardContent className="p-8">
                             <div className="mb-8 flex items-center gap-4">
                                 <div className="rounded-2xl bg-primary/10 p-4">
-                                    <CreditCard className="h-10 w-10 text-primary" />
+                                    <CreditCard className="h-10 w-10 text-primary-emphasis" />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-bold">Card Payments</h3>
@@ -57,7 +57,7 @@ const PricingPage = () => {
                                                 <h4 className="mb-1 font-semibold">{rate.name}</h4>
                                                 <p className="text-sm text-muted-foreground">{rate.description}</p>
                                             </div>
-                                            <span className="text-lg font-bold text-primary">{rate.fee}</span>
+                                            <span className="text-lg font-bold text-primary-emphasis">{rate.fee}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -70,7 +70,7 @@ const PricingPage = () => {
                     <Card>
                         <CardContent className="grid gap-8 p-8 md:grid-cols-2 md:gap-12">
                             <div>
-                                <div className="mb-3 flex items-center gap-2 text-primary">
+                                <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
                                     <ShieldCheck className="h-5 w-5" />
                                     <h3 className="text-xl font-bold text-foreground">Secure Payments</h3>
                                 </div>
@@ -79,7 +79,7 @@ const PricingPage = () => {
                                 </p>
                             </div>
                             <div className="md:border-l md:border-border md:pl-12">
-                                <div className="mb-3 flex items-center gap-2 text-primary">
+                                <div className="mb-3 flex items-center gap-2 text-primary-emphasis">
                                     <Clock3 className="h-5 w-5" />
                                     <h3 className="text-xl font-bold text-foreground">Cackle never holds your funds</h3>
                                 </div>

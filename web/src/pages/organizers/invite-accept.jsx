@@ -50,7 +50,7 @@ const AcceptInvitePage = () => {
         <div className="mx-auto max-w-md py-16">
             <Card>
                 <CardHeader className="text-center">
-                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary-emphasis">
                         <MailCheck className="h-6 w-6" />
                     </div>
                     <CardTitle>Join the team</CardTitle>

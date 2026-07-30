@@ -45,7 +45,7 @@ export default function TicketLayout({ ticket, event, type }) {
                 <div className="flex flex-col gap-6 bg-card px-6 py-6 sm:flex-row sm:items-center">
                     <div className="flex-[3] space-y-4">
                         <div className="flex items-start gap-3">
-                            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-primary-emphasis" aria-hidden="true" />
                             <div>
                                 <div className="text-sm font-semibold text-foreground">{event.venue_name || 'Venue TBA'}</div>
                                 {event.address && <div className="text-sm text-muted-foreground">{event.address}</div>}
@@ -53,13 +53,13 @@ export default function TicketLayout({ ticket, event, type }) {
                         </div>
                         {ticket.holder_name && (
                             <div className="flex items-center gap-3">
-                                <User className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                                <User className="h-5 w-5 shrink-0 text-primary-emphasis" aria-hidden="true" />
                                 <div className="text-sm font-semibold text-foreground">{ticket.holder_name}</div>
                             </div>
                         )}
                         {ticket.seat && (
                             <div className="flex items-center gap-3">
-                                <Armchair className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                                <Armchair className="h-5 w-5 shrink-0 text-primary-emphasis" aria-hidden="true" />
                                 <div className="text-sm font-semibold text-foreground">Seat {ticket.seat}</div>
                             </div>
                         )}

@@ -7,7 +7,7 @@ import Header from '@/pages/visitor/header';
 const THEMES = {
     processing: {
         icon: Loader2,
-        iconClass: 'text-primary animate-spin',
+        iconClass: 'text-primary-emphasis animate-spin',
         title: 'Verifying Payment',
         description: 'Please wait while we confirm your payment...',
         buttonText: 'Please wait...',
@@ -31,7 +31,7 @@ const THEMES = {
     },
     redirecting: {
         icon: Loader2,
-        iconClass: 'text-primary animate-spin',
+        iconClass: 'text-primary-emphasis animate-spin',
         title: 'Redirecting to Payment Gateway',
         description: 'Please wait while we redirect you to our secure payment page...',
         buttonText: 'Redirecting...',

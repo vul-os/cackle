@@ -1,0 +1,637 @@
+{
+  "$comment": [
+    "Conformance vectors for the Cackle host page document format.",
+    "Companion to docs/HOST-PAGES.md, which specifies the format these pin down.",
+    "FROZEN: these documents are the contract. A change here is a format change and",
+    "must be accompanied by a `version` bump and a note in CHANGELOG.md.",
+    "Verified by internal/pages/conformance_test.go.",
+    "Every `reject` vector names the reason class it exercises; the runner asserts",
+    "that every class in `reason_classes` is exercised by at least one vector, so a",
+    "validation rule cannot be deleted while the corpus still 'passes'.",
+    "",
+    "EXPANSION. Two rules, applied to every vector before it is used, so that",
+    "length-limit cases do not need thousands of literal characters here:",
+    "  1. A string exactly equal to \"@rep:<unit>:<count>\" becomes <unit> repeated",
+    "     <count> times. Example: \"@rep:x:201\" is 201 letter x.",
+    "  2. An array whose only element is {\"@rep\": <count>, \"value\": <v>} becomes",
+    "     <count> copies of <v>.",
+    "Nothing else is expanded. A vector with no @rep in it is used verbatim."
+  ],
+  "format": "cackle-host-page-document",
+  "version": 1,
+  "limits": {
+    "max_document_bytes": 65536,
+    "max_blocks": 64,
+    "max_heading_runes": 200,
+    "max_paragraphs": 24,
+    "max_paragraph_runes": 2000,
+    "max_links": 24,
+    "max_label_runes": 120,
+    "max_href_bytes": 2048,
+    "max_faq_items": 32,
+    "max_question_runes": 300,
+    "max_answer_runes": 2000,
+    "max_alt_runes": 300,
+    "max_lang_bytes": 35
+  },
+  "block_types": [
+    "heading",
+    "text",
+    "image",
+    "links",
+    "faq",
+    "tickets",
+    "details",
+    "divider"
+  ],
+  "reason_classes": [
+    "version",
+    "lang",
+    "theme_colour",
+    "theme_enum",
+    "label",
+    "block_type",
+    "block_count",
+    "stowaway_field",
+    "required_text",
+    "text_length",
+    "control_character",
+    "bidi_control",
+    "replacement_character",
+    "heading_level",
+    "paragraph_count",
+    "link_count",
+    "faq_count",
+    "href_scheme",
+    "href_relative",
+    "href_credentials",
+    "href_hostless",
+    "unknown_field",
+    "trailing_content",
+    "document_size"
+  ],
+  "accept": [
+    {
+      "name": "minimal — a version and nothing else",
+      "note": "An empty page is legal. The renderer still emits the event title and, if the event is cancelled, the cancellation notice.",
+      "document": { "version": 1, "theme": {}, "labels": {}, "blocks": [] }
+    },
+    {
+      "name": "every block type once",
+      "document": {
+        "version": 1,
+        "theme": {},
+        "labels": {},
+        "blocks": [
+          { "type": "heading", "text": "About", "level": 2 },
+          { "type": "text", "paragraphs": ["A line about the night.", "And another."] },
+          { "type": "image", "image_id": "01J8ZK8T0M8N0P0Q0R0S0T0U0I", "alt": "The room, lit blue" },
+          { "type": "links", "links": [{ "label": "Venue", "href": "https://example.org/venue" }] },
+          { "type": "faq", "items": [{ "question": "Is there parking?", "answer": "Street parking only." }] },
+          { "type": "tickets" },
+          { "type": "details" },
+          { "type": "divider" }
+        ]
+      }
+    },
+    {
+      "name": "full theme",
+      "document": {
+        "version": 1,
+        "theme": {
+          "background": "#101014",
+          "surface": "#17171d",
+          "text": "#f4f4f7",
+          "muted": "#a0a0b0",
+          "accent": "#f2c14e",
+          "accent_text": "#101014",
+          "font": "serif",
+          "direction": "rtl",
+          "corners": "round"
+        },
+        "labels": {},
+        "blocks": []
+      }
+    },
+    {
+      "name": "uppercase hex is accepted",
+      "document": { "version": 1, "theme": { "accent": "#F2C14E" }, "labels": {}, "blocks": [] }
+    },
+    {
+      "name": "right-to-left text with a declared direction",
+      "note": "Direction is DECLARED. The same reordering attempted with U+202E is rejected — see the bidi_control vectors.",
+      "document": {
+        "version": 1,
+        "lang": "ar",
+        "theme": { "direction": "rtl" },
+        "labels": { "tickets": "التذاكر", "free": "مجاني", "when": "متى", "where": "أين" },
+        "blocks": [{ "type": "heading", "text": "عن الحفلة", "level": 2 }]
+      }
+    },
+    {
+      "name": "angle brackets and quotes are ordinary text",
+      "note": "This document is VALID. Nothing in it is markup; the renderer escapes it. Rejecting it would punish a host whose event is called <Reset>.",
+      "document": {
+        "version": 1,
+        "theme": {},
+        "labels": {},
+        "blocks": [
+          { "type": "heading", "text": "<script>alert(1)</script>", "level": 2 },
+          { "type": "text", "paragraphs": ["\"><img src=x onerror=alert(1)>"] }
+        ]
+      }
+    },
+    {
+      "name": "mailto link",
+      "document": {
+        "version": 1,
+        "theme": {},
+        "labels": {},
+        "blocks": [{ "type": "links", "links": [{ "label": "Email us", "href": "mailto:box@example.org" }] }]
+      }
+    },
+    {
+      "name": "tickets block with its own call to action",
+      "note": "A host selling through their own checkout points the CTA at it.",
+      "document": {
+        "version": 1,
+        "theme": {},
+        "labels": {},
+        "blocks": [{ "type": "tickets", "cta_href": "https://tickets.example.org/midnight" }]
+      }
+    },
+    {
+      "name": "heading level omitted defaults to 2",
+      "document": { "version": 1, "theme": {}, "labels": {}, "blocks": [{ "type": "heading", "text": "Line-up" }] }
+    },
+    {
+      "name": "lang with a region subtag",
+      "document": { "version": 1, "lang": "pt-BR", "theme": {}, "labels": {}, "blocks": [] }
+    }
+  ],
+  "reject": [
+    {
+      "name": "version 0",
+      "reason": "version",
+      "message_contains": "version must be 1",
+      "document": { "version": 0, "blocks": [] }
+    },
+    {
+      "name": "version 2 is not read as version 1",
+      "reason": "version",
+      "message_contains": "version must be 1",
+      "document": { "version": 2, "blocks": [] }
+    },
+    {
+      "name": "lang is not a language tag",
+      "reason": "lang",
+      "message_contains": "lang must be a BCP-47 tag",
+      "document": { "version": 1, "lang": "english please", "blocks": [] }
+    },
+    {
+      "name": "lang carrying a quote",
+      "reason": "lang",
+      "message_contains": "lang must be a BCP-47 tag",
+      "document": { "version": 1, "lang": "en\" onload=\"alert(1)", "blocks": [] }
+    },
+    {
+      "name": "named colour",
+      "reason": "theme_colour",
+      "path": "theme.background",
+      "message_contains": "six-digit hex colour",
+      "document": { "version": 1, "theme": { "background": "red" }, "blocks": [] }
+    },
+    {
+      "name": "three-digit hex shorthand",
+      "reason": "theme_colour",
+      "path": "theme.accent",
+      "message_contains": "six-digit hex colour",
+      "document": { "version": 1, "theme": { "accent": "#f00" }, "blocks": [] }
+    },
+    {
+      "name": "colour with an eight-digit alpha",
+      "reason": "theme_colour",
+      "path": "theme.text",
+      "message_contains": "six-digit hex colour",
+      "document": { "version": 1, "theme": { "text": "#11223344" }, "blocks": [] }
+    },
+    {
+      "name": "CSS declaration smuggled through a colour",
+      "reason": "theme_colour",
+      "path": "theme.background",
+      "message_contains": "six-digit hex colour",
+      "document": { "version": 1, "theme": { "background": "#fff; } body { display: none } .x{" }, "blocks": [] }
+    },
+    {
+      "name": "url() smuggled through a colour",
+      "reason": "theme_colour",
+      "path": "theme.surface",
+      "message_contains": "six-digit hex colour",
+      "document": { "version": 1, "theme": { "surface": "url(https://evil.example/beacon)" }, "blocks": [] }
+    },
+    {
+      "name": "font outside the closed set",
+      "reason": "theme_enum",
+      "path": "theme.font",
+      "message_contains": "theme.font must be one of",
+      "document": { "version": 1, "theme": { "font": "Comic Sans" }, "blocks": [] }
+    },
+    {
+      "name": "direction outside the closed set",
+      "reason": "theme_enum",
+      "path": "theme.direction",
+      "message_contains": "theme.direction must be one of",
+      "document": { "version": 1, "theme": { "direction": "sideways" }, "blocks": [] }
+    },
+    {
+      "name": "corners outside the closed set",
+      "reason": "theme_enum",
+      "path": "theme.corners",
+      "message_contains": "theme.corners must be one of",
+      "document": { "version": 1, "theme": { "corners": "9999px" }, "blocks": [] }
+    },
+    {
+      "name": "enum match is case-sensitive",
+      "reason": "theme_enum",
+      "path": "theme.font",
+      "message_contains": "theme.font must be one of",
+      "document": { "version": 1, "theme": { "font": "SERIF" }, "blocks": [] }
+    },
+    {
+      "name": "label carrying a line break",
+      "reason": "label",
+      "path": "labels.tickets",
+      "message_contains": "tabs or line breaks",
+      "document": { "version": 1, "labels": { "tickets": "Tickets\nand more" }, "blocks": [] }
+    },
+    {
+      "name": "unknown block type",
+      "reason": "block_type",
+      "path": "blocks[0]",
+      "message_contains": "is not a block type",
+      "document": { "version": 1, "blocks": [{ "type": "html" }] }
+    },
+    {
+      "name": "block type missing",
+      "reason": "block_type",
+      "path": "blocks[0]",
+      "message_contains": "blocks[0].type is required",
+      "document": { "version": 1, "blocks": [{ "text": "orphan" }] }
+    },
+    {
+      "name": "an embed block does not exist",
+      "reason": "block_type",
+      "path": "blocks[1]",
+      "message_contains": "is not a block type",
+      "document": { "version": 1, "blocks": [{ "type": "divider" }, { "type": "embed" }] }
+    },
+    {
+      "name": "stowaway paragraphs on a divider",
+      "reason": "stowaway_field",
+      "path": "blocks[0]",
+      "message_contains": "does not take \"paragraphs\"",
+      "document": { "version": 1, "blocks": [{ "type": "divider", "paragraphs": ["hidden"] }] }
+    },
+    {
+      "name": "stowaway links on a heading",
+      "reason": "stowaway_field",
+      "path": "blocks[0]",
+      "message_contains": "does not take \"links\"",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "heading", "text": "Hi", "links": [{ "label": "x", "href": "https://example.org" }] }]
+      }
+    },
+    {
+      "name": "stowaway cta_href on a details block",
+      "reason": "stowaway_field",
+      "path": "blocks[0]",
+      "message_contains": "does not take \"cta_href\"",
+      "document": { "version": 1, "blocks": [{ "type": "details", "cta_href": "https://example.org" }] }
+    },
+    {
+      "name": "heading with empty text",
+      "reason": "required_text",
+      "path": "blocks[0].text",
+      "message_contains": "blocks[0].text is required",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "   " }] }
+    },
+    {
+      "name": "image without alt text",
+      "reason": "required_text",
+      "path": "blocks[0].alt",
+      "message_contains": "blocks[0].alt is required",
+      "document": { "version": 1, "blocks": [{ "type": "image", "image_id": "01J8ZK8T0M8N0P0Q0R0S0T0U0I" }] }
+    },
+    {
+      "name": "link with an empty label",
+      "reason": "required_text",
+      "path": "blocks[0].links[0].label",
+      "message_contains": "blocks[0].links[0].label is required",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "label": "", "href": "https://example.org" }] }] }
+    },
+    {
+      "name": "text block with no paragraphs",
+      "reason": "required_text",
+      "path": "blocks[0].paragraphs",
+      "message_contains": "at least one paragraph",
+      "document": { "version": 1, "blocks": [{ "type": "text", "paragraphs": [] }] }
+    },
+    {
+      "name": "heading longer than the cap",
+      "reason": "text_length",
+      "path": "blocks[0].text",
+      "message_contains": "the maximum is 200",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "@rep:x:201" }] }
+    },
+    {
+      "name": "paragraph longer than the cap",
+      "reason": "text_length",
+      "path": "blocks[0].paragraphs[0]",
+      "message_contains": "the maximum is 2000",
+      "document": { "version": 1, "blocks": [{ "type": "text", "paragraphs": ["@rep:x:2001"] }] }
+    },
+    {
+      "name": "caps count characters, not bytes",
+      "note": "201 Japanese characters is 603 bytes and must fail on the same count a 201-character Latin heading fails on — a byte cap would silently give Latin-script hosts three times the room.",
+      "reason": "text_length",
+      "path": "blocks[0].text",
+      "message_contains": "is 201 characters",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "@rep:\u3042:201" }] }
+    },
+    {
+      "name": "NUL in text",
+      "reason": "control_character",
+      "path": "blocks[0].text",
+      "message_contains": "control characters",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "a\u0000b" }] }
+    },
+    {
+      "name": "newline inside a paragraph",
+      "reason": "control_character",
+      "path": "blocks[0].paragraphs[0]",
+      "message_contains": "tabs or line breaks",
+      "document": { "version": 1, "blocks": [{ "type": "text", "paragraphs": ["one\ntwo"] }] }
+    },
+    {
+      "name": "tab inside a paragraph",
+      "reason": "control_character",
+      "path": "blocks[0].paragraphs[0]",
+      "message_contains": "tabs or line breaks",
+      "document": { "version": 1, "blocks": [{ "type": "text", "paragraphs": ["one\ttwo"] }] }
+    },
+    {
+      "name": "right-to-left override in a link label",
+      "note": "Trojan Source. A label reading as one URL while pointing at another is a spoofing primitive on a page other people's buyers trust.",
+      "reason": "bidi_control",
+      "path": "blocks[0].links[0].label",
+      "message_contains": "bidirectional override characters",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "links", "links": [{ "label": "gro.elpmaxe\u202e", "href": "https://example.org" }] }]
+      }
+    },
+    {
+      "name": "bidi isolate in a heading",
+      "reason": "bidi_control",
+      "path": "blocks[0].text",
+      "message_contains": "bidirectional override characters",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "a\u2066b\u2069c" }] }
+    },
+    {
+      "name": "replacement character in text",
+      "note": "U+FFFD means something was already lost in transit; storing it would freeze a mojibake page.",
+      "reason": "replacement_character",
+      "path": "blocks[0].text",
+      "message_contains": "replacement character",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "caf\ufffd" }] }
+    },
+    {
+      "name": "heading level 1",
+      "note": "Level 1 is the event title, which the renderer owns.",
+      "reason": "heading_level",
+      "path": "blocks[0]",
+      "message_contains": "level must be 2 or 3",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "Mine now", "level": 1 }] }
+    },
+    {
+      "name": "heading level 7",
+      "reason": "heading_level",
+      "path": "blocks[0]",
+      "message_contains": "level must be 2 or 3",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "Deep", "level": 7 }] }
+    },
+    {
+      "name": "too many paragraphs",
+      "reason": "paragraph_count",
+      "path": "blocks[0].paragraphs",
+      "message_contains": "at most 24 paragraphs",
+      "document": { "version": 1, "blocks": [{ "type": "text", "paragraphs": [{ "@rep": 25, "value": "a paragraph" }] }] }
+    },
+    {
+      "name": "too many links",
+      "reason": "link_count",
+      "path": "blocks[0].links",
+      "message_contains": "at most 24 links",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "@rep": 25, "value": { "label": "Link", "href": "https://example.org/" } }] }] }
+    },
+    {
+      "name": "too many FAQ items",
+      "reason": "faq_count",
+      "path": "blocks[0].items",
+      "message_contains": "at most 32 items",
+      "document": { "version": 1, "blocks": [{ "type": "faq", "items": [{ "@rep": 33, "value": { "question": "Q?", "answer": "A." } }] }] }
+    },
+    {
+      "name": "too many blocks",
+      "reason": "block_count",
+      "path": "blocks",
+      "message_contains": "at most 64 blocks",
+      "document": { "version": 1, "blocks": [{ "@rep": 65, "value": { "type": "divider" } }] }
+    },
+    {
+      "name": "javascript: href",
+      "reason": "href_scheme",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "is not allowed",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "links", "links": [{ "label": "Click", "href": "javascript:alert(1)" }] }]
+      }
+    },
+    {
+      "name": "data: href",
+      "reason": "href_scheme",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "is not allowed",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "links", "links": [{ "label": "Doc", "href": "data:text/html,<script>alert(1)</script>" }] }]
+      }
+    },
+    {
+      "name": "file: href",
+      "reason": "href_scheme",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "is not allowed",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "label": "Local", "href": "file:///etc/passwd" }] }] }
+    },
+    {
+      "name": "javascript: on a tickets call to action",
+      "reason": "href_scheme",
+      "path": "blocks[0].cta_href",
+      "message_contains": "is not allowed",
+      "document": { "version": 1, "blocks": [{ "type": "tickets", "cta_href": "javascript:alert(1)" }] }
+    },
+    {
+      "name": "relative href",
+      "reason": "href_relative",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "must be an absolute URL",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "label": "Admin", "href": "/admin/orgs" }] }] }
+    },
+    {
+      "name": "protocol-relative href",
+      "note": "//evil.example has no scheme and would inherit the page's own — an absolute link to somewhere else, wearing a relative link's clothes.",
+      "reason": "href_relative",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "must be an absolute URL",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "label": "Mirror", "href": "//evil.example/x" }] }] }
+    },
+    {
+      "name": "href with embedded credentials",
+      "note": "https://cackle.example.org@evil.example reads as a Cackle URL and resolves to evil.example.",
+      "reason": "href_credentials",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "must not embed credentials",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "links", "links": [{ "label": "Official", "href": "https://cackle.example.org@evil.example/" }] }]
+      }
+    },
+    {
+      "name": "http href with no host",
+      "reason": "href_hostless",
+      "path": "blocks[0].links[0].href",
+      "message_contains": "must include a host",
+      "document": { "version": 1, "blocks": [{ "type": "links", "links": [{ "label": "Broken", "href": "https:///path" }] }] }
+    },
+    {
+      "name": "unknown top-level field",
+      "reason": "unknown_field",
+      "message_contains": "unknown field",
+      "document": { "version": 1, "blocks": [], "custom_css": "body{display:none}" }
+    },
+    {
+      "name": "unknown block field",
+      "reason": "unknown_field",
+      "message_contains": "unknown field",
+      "document": { "version": 1, "blocks": [{ "type": "divider", "html": "<script>alert(1)</script>" }] }
+    },
+    {
+      "name": "unknown theme field",
+      "reason": "unknown_field",
+      "message_contains": "unknown field",
+      "document": { "version": 1, "theme": { "css": "body{}" }, "blocks": [] }
+    },
+    {
+      "name": "trailing content after the document",
+      "reason": "trailing_content",
+      "message_contains": "trailing content",
+      "raw": "{\"version\":1,\"blocks\":[]}{\"version\":1,\"blocks\":[]}"
+    },
+    {
+      "name": "document larger than the byte cap",
+      "reason": "document_size",
+      "message_contains": "exceeds 65536 bytes",
+      "document": { "version": 1, "blocks": [{ "type": "heading", "text": "@rep:x:70000" }] }
+    }
+  ],
+  "render": [
+    {
+      "name": "host text is escaped, never markup",
+      "document": {
+        "version": 1,
+        "blocks": [
+          { "type": "heading", "text": "<script>alert(1)</script>", "level": 2 },
+          { "type": "text", "paragraphs": ["\"><img src=x onerror=alert(1)>"] }
+        ]
+      },
+      "must_contain": ["&lt;script&gt;alert(1)&lt;/script&gt;"],
+      "must_not_contain": ["<script>alert(1)</script>", "<img src=x", "javascript:"]
+    },
+    {
+      "name": "the page has no script and no third-party reference",
+      "document": { "version": 1, "blocks": [{ "type": "details" }, { "type": "tickets" }] },
+      "must_not_contain": ["<script", "<iframe", "<object", "<embed", "<form", "@import", "https://", "http://"]
+    },
+    {
+      "name": "a valid theme colour survives the CSS escaper intact",
+      "document": { "version": 1, "theme": { "background": "#101014", "accent": "#F2C14E" }, "blocks": [] },
+      "must_contain": ["--hp-bg: #101014;", "--hp-accent: #F2C14E;"],
+      "must_not_contain": ["ZgotmplZ"]
+    },
+    {
+      "name": "an image outside the event's own gallery is dropped",
+      "document": {
+        "version": 1,
+        "blocks": [
+          { "type": "image", "image_id": "01OTHERORGSIMAGEID0000000", "alt": "theirs" },
+          { "type": "image", "image_id": "01OURSOWNIMAGEID000000000", "alt": "ours" }
+        ]
+      },
+      "allowed_images": [{ "id": "01OURSOWNIMAGEID000000000", "width": 800, "height": 600 }],
+      "must_contain": ["/media/01OURSOWNIMAGEID000000000"],
+      "must_not_contain": ["01OTHERORGSIMAGEID0000000"]
+    },
+    {
+      "name": "zero-exponent currency renders no decimal point",
+      "event": { "currency": "JPY" },
+      "tickets": [{ "name": "General", "price_minor": 25000 }],
+      "document": { "version": 1, "blocks": [{ "type": "tickets" }] },
+      "must_contain": ["25000", "JPY"],
+      "must_not_contain": ["250.00", "$"]
+    },
+    {
+      "name": "three-exponent currency renders three decimals",
+      "event": { "currency": "KWD" },
+      "tickets": [{ "name": "General", "price_minor": 25000 }],
+      "document": { "version": 1, "blocks": [{ "type": "tickets" }] },
+      "must_contain": ["25.000", "KWD"]
+    },
+    {
+      "name": "a free RSVP is not an amount",
+      "tickets": [{ "name": "RSVP", "price_minor": 0 }],
+      "document": { "version": 1, "blocks": [{ "type": "tickets" }] },
+      "must_contain": ["Free"],
+      "must_not_contain": ["0.00"]
+    },
+    {
+      "name": "labels and direction are the host's",
+      "document": {
+        "version": 1,
+        "lang": "ar",
+        "theme": { "direction": "rtl" },
+        "labels": { "tickets": "التذاكر", "free": "مجاني" },
+        "blocks": [{ "type": "tickets" }]
+      },
+      "tickets": [{ "name": "دخول عام", "price_minor": 0 }],
+      "must_contain": ["lang=\"ar\"", "dir=\"rtl\"", "التذاكر", "مجاني"],
+      "must_not_contain": [">Tickets<"]
+    },
+    {
+      "name": "a cancelled event says so regardless of the document",
+      "event": { "status": "cancelled" },
+      "document": { "version": 1, "blocks": [] },
+      "must_contain": ["cancelled"]
+    },
+    {
+      "name": "an outbound link carries rel=nofollow noopener noreferrer ugc",
+      "document": {
+        "version": 1,
+        "blocks": [{ "type": "links", "links": [{ "label": "Venue", "href": "https://example.org/venue" }] }]
+      },
+      "must_contain": ["rel=\"nofollow noopener noreferrer ugc\"", "href=\"https://example.org/venue\""]
+    }
+  ]
+}

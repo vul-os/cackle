@@ -126,7 +126,7 @@ const TeamPage = () => {
     return (
         <div className="mx-auto max-w-4xl space-y-6">
             <div className="flex items-center gap-3">
-                <Users className="h-8 w-8 text-primary" />
+                <Users className="h-8 w-8 text-primary-emphasis" />
                 <div>
                     <h1 className="font-display text-3xl font-bold">Team</h1>
                     {activeOrg && <p className="text-sm text-muted-foreground">{activeOrg.name}</p>}

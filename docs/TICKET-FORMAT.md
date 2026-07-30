@@ -127,17 +127,61 @@ the vectors byte for byte.
 ### Signing
 
 Every event has its own Ed25519 keypair, stored in `event_keys` (public key,
-private key, `created_at`, `revoked_at`). **There is no global signing key,
-and there never will be** — see the frozen invariant in
+**encrypted** private key, `created_at`, `revoked_at`). **There is no global
+signing key, and there never will be** — see the frozen invariant in
 [CONTRIBUTING.md](../CONTRIBUTING.md). Per-event authority is the whole
-design: a compromised or leaked key compromises exactly one event, and
-rotating it (issue a new `event_keys` row, keep the old one valid via `kid`
-until its tickets expire, then `revoked_at` it) doesn't touch any other
-event on the platform.
+design: a compromised or leaked key compromises exactly one event, and rotating
+it doesn't touch any other event on the platform.
+
+The private half is encrypted at rest under key material the operator supplies
+at startup, so an issuing server that has not been given that material cannot
+sign anything. This changes nothing for a gate: a gate holds **public keys
+only**, and verification is unaffected — see
+[SELF-HOSTING.md](SELF-HOSTING.md#the-ticket-keys-are-the-crown-jewels-and-here-is-exactly-how-they-sit).
 
 Signatures are plain Ed25519 (RFC 8032, PureEdDSA over Curve25519) — no
 pre-hash, no context string, no domain separator. The message is the payload
 bytes and nothing else.
+
+### Key rotation, and what it costs
+
+Multiple valid keys per event are supported, and this is not a plan — it is what
+the code does today:
+
+- `event_keys` holds **many rows per event**. Nothing in the schema or the
+  queries assumes one.
+- A key ring is built from **every non-revoked key** for the event, not just the
+  newest one, so a ring routinely carries several public keys.
+- Every token names the key that signed it in its `kid`, and ring dispatch looks
+  that `kid` up. A ticket does not care which key is "current".
+- New tickets are signed with the **newest non-revoked** key.
+
+So rotation splits into two operations with very different consequences, and
+conflating them is how a rotation story quietly voids sold tickets:
+
+| Operation | Effect on tickets already in attendees' inboxes |
+| --- | --- |
+| **Add a key** (new `event_keys` row) | **None.** The old key stays in the ring, old tickets keep verifying, new tickets get the new key. This is the safe half, and it is the whole of an ordinary rotation. |
+| **Revoke a key** (`revoked_at`) | **Every ticket signed with that key stops working at the door**, as soon as each gate re-pulls its bundle. The gate answers `ErrUnknownKID`: it no longer holds the key, so it cannot check the signature. |
+
+Revocation is a *ring policy*, not a cryptographic event — the signature on
+those tickets remains mathematically valid forever, and a gate that has **not**
+re-pulled its bundle still admits them. That is why a revocation is only fully
+in effect once every gate has refreshed, and why a gate that stays offline
+through the event keeps honouring a key you revoked mid-show.
+
+Practical consequence: rotate by **adding**, and only revoke the old key when
+either its tickets are out of circulation, or you have decided that stopping a
+forger is worth turning away legitimate holders. Cackle has no re-issue pass
+that would re-sign outstanding tickets under a new key, so there is no way to
+revoke a key *and* keep its tickets working.
+
+Neither operation is exposed over the HTTP API or a CLI flag today: they are
+store-level operations (`CreateEventKey`, `RevokeEventKey`), so rotating means
+running code against the database, not clicking something. Rotating the
+operator's *passphrase* is separate and much cheaper — it re-wraps one row and
+cannot affect a ticket at all (see
+[SELF-HOSTING.md](SELF-HOSTING.md#how-it-is-protected)).
 
 ### Key IDs and the key ring
 

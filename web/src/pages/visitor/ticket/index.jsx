@@ -180,7 +180,7 @@ function TicketCard({ ticket }) {
                 <div className="flex flex-col-reverse bg-card px-6 py-8 sm:flex-row sm:items-center sm:gap-10 sm:px-10">
                     <div className="mt-8 flex-[3] space-y-5 sm:mt-0">
                         <div className="flex items-start gap-3">
-                            <User className="mt-0.5 h-6 w-6 shrink-0 text-primary" aria-hidden="true" />
+                            <User className="mt-0.5 h-6 w-6 shrink-0 text-primary-emphasis" aria-hidden="true" />
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ticket holder</p>
                                 <p className="text-xl font-bold text-foreground sm:text-2xl">{ticket.holder_name || 'Ticket holder'}</p>
@@ -189,7 +189,7 @@ function TicketCard({ ticket }) {
 
                         {ticket.seat && (
                             <div className="flex items-center gap-3">
-                                <Armchair className="h-6 w-6 shrink-0 text-primary" aria-hidden="true" />
+                                <Armchair className="h-6 w-6 shrink-0 text-primary-emphasis" aria-hidden="true" />
                                 <div>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seat</p>
                                     <p className="text-lg font-bold text-foreground">{ticket.seat}</p>

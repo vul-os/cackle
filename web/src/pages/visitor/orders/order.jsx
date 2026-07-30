@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Check, ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, Clock, XCircle, RotateCcw, Hash } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import { orders as ordersApi, events as eventsApi, tickets as ticketsApi } from '@/lib/api';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 function formatWhen(iso) {
     if (!iso) return null;
@@ -271,11 +271,11 @@ export default function OrderPage() {
                                                 <div className="min-w-0 space-y-1">
                                                     <p className="truncate font-medium">{ticketTypeName(item.ticket_type_id)}</p>
                                                     <p className="text-sm text-muted-foreground">
-                                                        {item.quantity} × {formatMoney(item.unit_price_minor, order.currency)}
+                                                        {item.quantity} × <Money minor={item.unit_price_minor} currency={order.currency} />
                                                     </p>
                                                 </div>
                                                 <p className="shrink-0 font-medium">
-                                                    {formatMoney((item.unit_price_minor ?? 0) * item.quantity, order.currency)}
+                                                    <Money minor={(item.unit_price_minor ?? 0) * item.quantity} currency={order.currency} />
                                                 </p>
                                             </div>
                                         ))}
@@ -284,17 +284,17 @@ export default function OrderPage() {
                                     <div className="space-y-2 border-t border-border pt-4">
                                         <div className="flex items-center justify-between text-sm">
                                             <span className="text-muted-foreground">Subtotal</span>
-                                            <span>{formatMoney(order.subtotal_minor, order.currency)}</span>
+                                            <span><Money minor={order.subtotal_minor} currency={order.currency} /></span>
                                         </div>
                                         {order.fee_minor > 0 && (
                                             <div className="flex items-center justify-between text-sm">
                                                 <span className="text-muted-foreground">Fees</span>
-                                                <span>{formatMoney(order.fee_minor, order.currency)}</span>
+                                                <span><Money minor={order.fee_minor} currency={order.currency} /></span>
                                             </div>
                                         )}
                                         <div className="flex items-center justify-between border-t border-border pt-2">
                                             <span className="font-semibold">Total</span>
-                                            <span className="text-lg font-semibold">{formatMoney(order.total_minor, order.currency)}</span>
+                                            <span className="text-lg font-semibold"><Money minor={order.total_minor} currency={order.currency} /></span>
                                         </div>
                                     </div>
                                 </div>
@@ -358,10 +358,10 @@ export default function OrderPage() {
                                                 <li key={t.id}>
                                                     <Link
                                                         to={`/ticket/${t.id}`}
-                                                        className="flex items-center justify-between gap-4 py-3 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                                        className="flex items-center justify-between gap-4 py-3 transition-colors hover:text-primary-emphasis focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                                     >
                                                         <span className="flex min-w-0 items-center gap-3">
-                                                            <Ticket className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                                                            <Ticket className="h-4 w-4 shrink-0 text-primary-emphasis" aria-hidden="true" />
                                                             <span className="min-w-0">
                                                                 <span className="block truncate text-sm font-medium">
                                                                     {t.ticket_type_name || ticketTypeName(t.ticket_type_id)} — {t.holder_name}

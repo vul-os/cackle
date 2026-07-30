@@ -35,7 +35,7 @@ const TopBar = ({ onMenuClick }) => {
                     <img src={Logo} alt="" className="h-8 w-8" />
                     <span className="font-display text-2xl font-black tracking-tight text-sidebar-foreground">
                         <span className="sr-only sm:not-sr-only">cackle</span>
-                        <span className="text-primary">.</span>
+                        <span className="text-primary-emphasis">.</span>
                     </span>
                 </Link>
             </div>

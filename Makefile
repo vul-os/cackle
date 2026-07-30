@@ -1,5 +1,5 @@
 .PHONY: build build-frontend build-backend dev run test lint check screenshots notices clean \
-	release-guards patala-generate build-patala test-patala run-patala
+	release-guards site-guards patala-generate build-patala test-patala run-patala
 
 BIN := cackle
 
@@ -85,8 +85,17 @@ lint:
 release-guards:
 	bash scripts/verify.sh --selftest
 
+# site/ is the only thing here a customer reads before they read anything else,
+# and it is the only thing no gate covered. This one loads both pages in a real
+# browser at both path shapes, proves they fetch nothing off-origin and never
+# scroll sideways — and refuses a page that claims cross-gate double-scan is
+# PREVENTED, because it is only ever detected. Needs playwright (npm ci at the
+# repo root), so it is its own target rather than part of `lint`.
+site-guards:
+	node scripts/check-site.mjs
+
 # Single gate to run at the end of every change — mirrors CI.
-check: lint test release-guards build
+check: lint test release-guards site-guards build
 
 # ── Docs / release housekeeping ─────────────────────────────────────────────
 screenshots:

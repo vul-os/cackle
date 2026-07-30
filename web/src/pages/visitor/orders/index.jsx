@@ -8,7 +8,7 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout } from 'lucide-react';
 import { orders as ordersApi, events as eventsApi } from '@/lib/api';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 const STATUS_STYLE = {
     pending: { className: 'bg-warning/15 text-warning-foreground', icon: Clock },
@@ -139,7 +139,7 @@ export default function OrdersPage() {
                                                 <StatusIcon className="h-3 w-3" aria-hidden="true" />
                                                 {order.status}
                                             </span>
-                                            <span className="font-medium">{formatMoney(order.total_minor, order.currency)}</span>
+                                            <span className="font-medium"><Money minor={order.total_minor} currency={order.currency} /></span>
                                             <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                                         </div>
                                     </CardContent>

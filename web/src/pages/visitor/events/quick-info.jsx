@@ -1,6 +1,7 @@
 import React from 'react';
 import { Calendar, Clock, MapPin, Tag, Ticket } from 'lucide-react';
-import { availabilitySummary, priceFromMinor, formatMoney } from './ticket-utils';
+import { availabilitySummary, priceFromMinor } from './ticket-utils';
+import { Money } from '@/components/ui/money';
 
 const QuickFact = ({ icon: Icon, label, value, tone, first }) => (
     <div
@@ -26,7 +27,7 @@ const QuickFact = ({ icon: Icon, label, value, tone, first }) => (
                     ? 'bg-warning/15 text-warning'
                     : tone === 'destructive'
                       ? 'bg-destructive/10 text-destructive'
-                      : 'bg-primary/10 text-primary')
+                      : 'bg-primary/10 text-primary-emphasis')
             }
         >
             <Icon className="h-5 w-5" aria-hidden="true" />
@@ -82,7 +83,7 @@ const EventQuickInfo = ({ event, ticketTypes = [] }) => {
             <QuickFact
                 icon={Tag}
                 label="Price from"
-                value={price === null ? 'TBA' : price === 0 ? 'Free' : formatMoney(price, event.currency)}
+                value={price === null ? 'TBA' : price === 0 ? 'Free' : <Money minor={price} currency={event.currency} />}
             />
             <QuickFact icon={Ticket} label="Availability" value={availability.value} tone={availability.tone} />
         </div>

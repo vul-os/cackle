@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { Clock, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
     return (
@@ -33,7 +33,7 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
                             <span>
                                 {item.quantity}x {item.ticket_type.name}
                             </span>
-                            <span>{formatMoney(item.quantity * item.ticket_type.price_minor, event.currency)}</span>
+                            <span><Money minor={item.quantity * item.ticket_type.price_minor} currency={event.currency} /></span>
                         </div>
                     ))}
                 </div>
@@ -41,7 +41,7 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
             <CardFooter className="flex-col space-y-4">
                 <div className="flex w-full items-center justify-between text-lg font-medium">
                     <span>Total</span>
-                    <span>{formatMoney(total, event.currency)}</span>
+                    <span><Money minor={total} currency={event.currency} /></span>
                 </div>
                 <Button className="w-full" onClick={onCheckout} disabled={isProcessing}>
                     {isProcessing ? (
@@ -50,7 +50,9 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
                             Processing...
                         </div>
                     ) : (
-                        `Pay ${formatMoney(total, event.currency)}`
+                        <span className="flex items-center gap-1.5">
+                            Pay <Money minor={total} currency={event.currency} />
+                        </span>
                     )}
                 </Button>
             </CardFooter>
