@@ -59,10 +59,50 @@ nothing to enumerate and needs to be told they mistyped. Add `-db` /
 `-base-url` (or `CACKLE_DB` / `CACKLE_BASE_URL`) when the defaults are
 wrong; the link must use an address the recipient can actually reach.
 
+### Google sign-in — off unless an operator turns it on
+
+```
+GET    /api/auth/providers                  public → {providers:[{id,label,start_path}]}
+GET    /api/auth/oauth/{provider}/start     redirects to the provider              only mounted if configured
+GET    /api/auth/oauth/{provider}/callback  redirects to /login?sso=<reason>       only mounted if configured
+```
+
+`GET /api/auth/providers` always exists and is always public — the
+frontend has to be able to ask "what sign-in methods work here" whether or
+not anything is configured. On a stock box it answers `{"providers":[]}`,
+which is what stops a sign-in button rendering that could never work.
+
+The `/oauth/{provider}/*` routes exist **only on a box whose operator set
+both `CACKLE_GOOGLE_CLIENT_ID` and `CACKLE_GOOGLE_CLIENT_SECRET`**
+(`google` is the only provider today). Not mounted-and-refusing — not
+mounted at all: an unconfigured box 404s `/api/auth/oauth/google/start`
+exactly like any other route that doesn't exist. See
+[SELF-HOSTING.md](SELF-HOSTING.md#signing-in-with-google-optional-and-off-unless-you-turn-it-on)
+for what to paste into the Google Cloud Console and the two environment
+variables.
+
+This is organiser sign-in only — nothing on the admission/scanning path
+can reach it, and password sign-in keeps working exactly as before whether
+or not a provider is configured. `GET .../start` mints a state value and a
+nonce and redirects to the provider; `GET .../callback` exchanges the
+code, requires the provider to report the email address verified, and
+either signs the caller into a matching existing account or creates one —
+ending at `/login?sso=ok`, or `denied`/`state`/`unverified`/`failed` on the
+paths that don't complete. There is never a token in that URL: the
+callback issues the same server-side session, httpOnly cookie, that
+password login does.
+
+**Unit-tested, not sandbox-verified.** This code has never been run
+against a real Google Cloud OAuth application — see
+[SELF-HOSTING.md](SELF-HOSTING.md#what-is-and-is-not-verified) for exactly
+what the test suite does and does not prove before you point it at a real
+Google project.
+
 ## Events
 
 ```
-GET    /api/events                 ?q=&category=&from=&to=&limit=   public, published only
+GET    /api/events                 ?q=&category=&from=&to=&limit=&host=   public, published only
+                                   → {events:[...], host:{scope,name,organisations[],multi_org,peers_included,org?}}
 GET    /api/events/{slug}          public → event + ticket_types + issuer pubkey + gallery
 POST   /api/events                 org auth
 PATCH  /api/events/{id}
@@ -73,6 +113,46 @@ GET    /api/events/{id}/attendees  ?q=&status=&limit=&offset=   scanner+ auth
                                    → {attendees:[...], total, limit, offset}
 GET    /api/orgs/{id}/events       scanner+ auth → {events:[...]}  every event, ANY status
 ```
+
+### Whose events these are — host scoping
+
+Cackle is self-hosted by one organiser, not a marketplace, so `GET
+/api/events` always answers with a `host` envelope alongside `events`,
+saying whose box this is:
+
+```json
+{ "events": [...], "host": {
+    "scope": "own", "name": "", "organisations": [{"id":"…","name":"…","slug":"…"}],
+    "multi_org": false, "peers_included": false, "org": null } }
+```
+
+`scope`/`name`/`organisations`/`multi_org` mirror `CACKLE_HOST_SCOPE` /
+`CACKLE_HOST_ORG` / `CACKLE_HOST_NAME` — see
+[CONFIGURATION.md](CONFIGURATION.md#what-your-front-page-shows) for what
+each value means to an operator setting them. `?host=<org-slug-or-id>`
+narrows the listing to one organisation already named in `organisations`
+and echoes it back as `org`.
+
+**An out-of-scope or nonexistent `host` value answers `404` identically —
+on purpose, not a bug.** Resolving `?host=` against every organisation on
+the box, rather than only the ones already in scope, would turn a display
+filter into a way to probe which organisations exist on somebody's server;
+read it that way rather than as an oversight. Pinned by
+`TestHostScope_HostParamNarrowsToOneOrganisation` and
+`TestHostScope_HostParamOutOfScopeIs404` in `internal/httpapi`.
+
+**`peers_included` is `false` in every scope today, `peers` included, and
+stays that way until a peer event source exists.** `CACKLE_HOST_SCOPE=peers`
+is an accepted value that behaves **exactly like `own`** —
+`config.HostScope.IncludesPeerEvents()` returns `false` unconditionally, so
+setting it does not add any other box's events to this listing today. It
+exists as the name an operator can set early and the one predicate a real
+peer-listing feature would have to flip, not as a working feature yet.
+Pinned by `TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo`. See
+[Peer feeds](#peer-feeds) below for the federation feature that *does*
+exist, and
+[FEDERATION.md](FEDERATION.md#3-host-display-scoping--built--and-peer-event-feeds--check-before-you-cite)
+for the fuller design this scope is a placeholder inside.
 
 ### Money
 
@@ -401,6 +481,9 @@ POST   /api/orders                 {event_id, items:[{ticket_type_id,quantity}],
                                    → {order, payment:{provider,redirect_url,reference}}
 GET    /api/orders                 mine
 GET    /api/orders/{id}
+GET    /api/events/{id}/orders     admin+ auth → {orders:[{...order, marked_by?, marked_at?}]}
+POST   /api/orders/{id}/mark-paid    admin+ auth → {order, tickets[]}
+POST   /api/orders/{id}/mark-failed  admin+ auth → {order}
 POST   /api/payments/verify        {reference} → {order, tickets[]}
 POST   /api/payments/webhook/{provider}   HMAC-verified, fail-closed
 ```
@@ -414,6 +497,28 @@ provider's own webhook hitting `/api/payments/webhook/{provider}` — Cackle
 marks the order paid and issues tickets. See [PAYMENTS.md](PAYMENTS.md) for
 the full flow and why the webhook route fails closed rather than open on any
 verification error.
+
+### The organiser side of `manual` — listing and marking orders
+
+`GET /api/events/{id}/orders` is the data source behind the organiser's
+Orders screen: every order ever placed against the event, most recent
+first. Admin+ on the event's org — one bar higher than the scanner-readable
+attendee roster, because this list carries the buyer's email and the
+amounts paid, the same bar as event payouts and the org bank account.
+Orders settled through the `manual` provider additionally carry
+`marked_by`/`marked_at`, read from `manual`'s own audit trail.
+
+`POST /api/orders/{id}/mark-paid` and `POST /api/orders/{id}/mark-failed`
+are what make `manual` — Cackle's zero-config, no-API-key, no-network-call
+default provider (see [PAYMENTS.md](PAYMENTS.md)) — actually usable end to
+end: an organiser who received a bank transfer, cash at the door, or a paid
+invoice records that here. Marking paid runs the exact same
+settle-and-issue-tickets path a real provider's webhook or verify poll
+would, and is idempotent — calling it twice returns the tickets already
+issued rather than issuing a second set. Marking failed releases the
+order's reserved inventory back to sale. Both are refused on any order that
+was not created with `manual`; every other provider settles exclusively
+through its own `verify`/`webhook` above.
 
 ## Tickets
 
@@ -500,6 +605,101 @@ among the claims that reached this server", never "no double admissions
 happened". The merge runs on the shared DMTAP Sync algebra
 (`internal/scan/substrate`), and the response names the `algebra` and `engine`
 it merged under. See [OFFLINE-GATES.md](OFFLINE-GATES.md).
+
+## Peer feeds
+
+> **In plain English:** two organisers who already know each other and both
+> run Cackle can let each other's box show their published events — a venue
+> showing a promoter's upcoming gigs, a promoter showing a venue's. Each
+> direction is its own yes/no switch, **off by default**, and either side
+> can turn theirs off again at any time. Cackle never goes looking for a
+> box on its own: you get the other one's address from the person who runs
+> it, the way you'd get a phone number, and enrol it by hand — see
+> [CLUSTERING.md](CLUSTERING.md). A borrowed listing is a signpost, never a
+> ticket: buying always still happens on the publisher's own box.
+
+```
+GET    /api/sync/feed                 peer-authenticated (signed envelope, same
+                                      credential every /api/sync route uses)
+                                      → {node, events:[...], complete, caveat}
+PUT    /api/sync/peers/{id}/feed      owner auth  {publish,subscribe} → sync peer view
+POST   /api/sync/peers/{id}/feed      owner auth → {peer_id,peer,fetched,stored,
+                                      refused[],complete,error,caveat}
+GET    /api/sync/peers/{id}/feed      owner auth → {events:[...], caveat}
+GET    /api/peer-events?org=<org_id>  public → {events:[...], caveat}
+```
+
+This rides the peer channel [CLUSTERING.md](CLUSTERING.md) documents in
+full — enrolment (`POST /api/sync/peers`), the pinned node key, the signed
+envelope — and adds nothing to that trust model. `/api/sync/ops`,
+`/api/sync/status`, `/api/sync/peers` and `/api/sync/peers/{id}/sync`
+(enrolling a peer and running an admission-replication round) are
+documented [there](CLUSTERING.md#setting-it-up) rather than repeated here.
+
+**Off by default, and that matters on an upgrade.** Enrolling a peer to
+reconcile door scans grants neither feed direction: a `sync_peer` row
+carries two **separate** switches, `feed_publish` and `feed_subscribe`
+(`internal/store/migrations/0007_peer_event_feeds.sql`), and **both
+default to `0`.** An operator who upgrades an already-clustered deployment
+publishes nothing and is shown nothing from any peer until they turn a
+switch on for each one, on purpose.
+
+`GET /api/sync/feed` is the publish side, and it is a **peer route, not an
+operator route**: the caller authenticates with the same signed envelope
+every other `/api/sync` route uses, and is additionally refused
+(`forbidden`) unless at least one of its enrolments has `feed_publish` set
+— enrolment alone is not consent to be listed elsewhere. It answers this
+node's own **published** events, **capped at 200 with no pagination**: a
+publisher with more than 200 published events serves the soonest 200 and
+reports `"complete": false` — there is no further page to ask for, ever,
+on this route. Each event carries `event_id`, `slug`, `publisher` (this
+node's org name, untrusted display text), `title`, `summary`, `venue_name`,
+`address`, `starts_at`, `ends_at`, `timezone`, `category` — deliberately no
+price, no ticket type, no capacity, so this route cannot become a
+cross-node checkout even by accident.
+
+The other three routes are ordinary owner-session routes, one per enrolled
+peer:
+
+- `PUT /api/sync/peers/{id}/feed` sets both switches in one call — the
+  body must state both (`{"publish":true,"subscribe":false}`); a request
+  that omits either is refused rather than treated as "leave it alone", so
+  a stale form can never hold a switch open by silence. Turning
+  `subscribe` off **deletes that peer's cached listings in the same
+  call** — withdrawing consent removes what was already shown, not just
+  future refreshes.
+- `POST /api/sync/peers/{id}/feed` triggers one fetch of that peer's feed
+  right now and replaces the cache wholesale. **Nothing polls** — the same
+  discipline [CLUSTERING.md](CLUSTERING.md) holds replication to: a
+  deployment that never calls this never opens a socket for a feed. Every
+  refusal (no address, the peer disabled, `feed_subscribe` off) happens
+  *before* any network call, so a peer nobody consented to is never
+  contacted even once.
+- `GET /api/sync/peers/{id}/feed` reads back what the last pull actually
+  cached, for the operator screen that shows it.
+
+`GET /api/peer-events?org=<org_id>` is the public read: every listing
+currently borrowed into that organisation, from every peer it subscribes
+to. Public, and it makes no network call of its own — it only reads this
+node's cache, which is filled solely by an operator-triggered pull —
+because every row in it is an event its own publisher already made public
+on their own site; hiding a copy of already-public data behind auth would
+not make it any less public. Each row carries `external: true`,
+`publisher`/`publisher_key` (the pinned key it came from — the actual
+identity; `publisher` itself is untrusted display text), `url` (composed
+**on this node** from the peer's enrolled origin plus a validated slug,
+never taken verbatim from the peer's own answer), and a `notice` string
+every renderer must show beside the listing: *"Hosted by another
+organiser. Tickets are sold on their own site, not here."* There is no
+price and no ticket type anywhere in this shape — see
+[FEDERATION.md](FEDERATION.md#1-what-federation-means-here) rule 3.
+
+Every answer on this surface — publish, pull, and the read-back — carries
+a `caveat` string repeating that these are somebody else's events, hosted
+on their own box, and that Cackle finds no peers on its own. It is not
+boilerplate: it is the sentence this feature depends on a renderer never
+dropping, so treat it as load-bearing text if you're building a client
+against this.
 
 ## Error codes
 
