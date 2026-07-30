@@ -38,6 +38,10 @@
  *  7. The "there is no billing system in this software" claim is re-verified
  *     against the Go source every run, so if billing ever lands the copy is
  *     forced to change with it.
+ *  8. No claim that Cackle discovers organisers, events or peers on its own —
+ *     no directory, no proximity search, no global or central feed. There is
+ *     no discovery mechanism anywhere in the stack; every peer an operator
+ *     sees was enrolled by key, out of band.
  *
  * # Fail-closed
  *
@@ -113,7 +117,12 @@ const FORBIDDEN_CLAIMS = [
  */
 const NEGATOR = /\b(?:not|never|cannot|can't|no|nobody|neither|nor|without|refus\w*|doesn't|won't|isn't|instead of|rather than)\b/i;
 
-function unnegatedClaims(text) {
+// `patterns` defaults to FORBIDDEN_CLAIMS so every existing call site keeps
+// working unchanged; DISCOVERY_CLAIMS below reuses the same sentence-scoped
+// negation logic instead of duplicating it, because the reasoning — a bare
+// regex hit is not evidence of a false claim, a NEGATOR in the same sentence
+// is what tells an honest mention from a promise apart — applies to both.
+function unnegatedClaims(text, patterns = FORBIDDEN_CLAIMS) {
   const hits = [];
   // Whitespace is collapsed BEFORE splitting, and the reason is specific:
   // check-site.mjs reads rendered innerText, where a sentence is one line;
@@ -125,13 +134,44 @@ function unnegatedClaims(text) {
   const flat = text.replace(/\s+/g, ' ');
   for (const sentence of flat.split(/(?<=[.!?])\s+/)) {
     if (NEGATOR.test(sentence)) continue;
-    for (const re of FORBIDDEN_CLAIMS) {
+    for (const re of patterns) {
       const m = sentence.match(re);
       if (m) hits.push(`${m[0]}`);
     }
   }
   return hits;
 }
+
+// ── the discovery matchers ──────────────────────────────────────────────────
+//
+// There is no discovery mechanism anywhere in the stack — no directory, no
+// DHT, no rendezvous, no geo index, no search — and none is planned. Peer
+// event feeds only show organisers a box operator explicitly enrolled by key,
+// out of band. `web/src/pages/visitor/events/peer-scope.test.js` already
+// holds this line for `peer-events.jsx`, the one component that renders
+// borrowed listings, but nothing held it repo-wide, so a discovery claim
+// anywhere else — a marketing blurb on an unrelated settings page, an empty
+// state that got creative — would ship unnoticed.
+//
+// Scoped narrowly on purpose. "near you", "search" and "directory" are all
+// ordinary words with innocent uses this app actually has — "events near the
+// top of the page", "search these events" (the local search box on a single
+// organiser's own listing), a venue's own address field. Each pattern below
+// requires the SPECIFIC combination that only means proximity-based or
+// central-index discovery, never a bare word alone.
+const DISCOVERY_CLAIMS = [
+  /\bdiscover(?:s|ing|y)?\s+(?:organisers?|organizers?|events?|peers?)\b/i,
+  /\b(?:organisers?|organizers?|events?)\s+(?:near|nearby)\s+you\b/i,
+  /\bevents?\s+nearby\b/i,
+  /\bnear\s+you\b/i,
+  /\bin\s+your\s+area\b/i,
+  /\bbrowse\s+(?:organisers?|organizers?|(?:the\s+)?directory)\b/i,
+  /\bfind\s+(?:more\s+)?organisers?\b/i,
+  /\b(?:global|central|public)\s+(?:feed|directory|index)\b/i,
+  /\b(?:organiser|organizer)\s+directory\b/i,
+  /\bdirectory\s+of\s+organisers?\b/i,
+  /\bsearch\s+(?:for\s+)?(?:organisers?|organizers?|peers?|the\s+directory)\b/i,
+];
 
 // ── the money matchers ──────────────────────────────────────────────────────
 //
@@ -152,6 +192,52 @@ const FABRICATED_MONEY = [
   { re: /\bin the (?:market|industry)\b/i, why: 'unsubstantiated competitive positioning' },
   { re: /\b(?:industry[- ]leading|world[- ]class|unbeatable|second to none|the (?:only|number one) (?:ticketing|platform))\b/i, why: 'unsubstantiated superlative' },
 ];
+
+// ── billing-identifier matcher ──────────────────────────────────────────────
+//
+// Check 7 (the "backing" section below) re-reads the Go source every run and
+// fails if it finds a fee-collection identifier, because Cackle has no
+// billing code and the app tells organisers so in writing. The regex this
+// replaced was `/\b(?:platform_?[Ff]ee|service_?[Ff]ee|application_?[Ff]ee|
+// our_?[Ff]ee|[Cc]ommission[Rr]ate)\b/` with no `i` flag: every alternative
+// but the commission one is anchored to a lowercase first letter, so it
+// missed the exact form EXPORTED Go identifiers take — `PlatformFee`,
+// `ApplicationFeeAmount`, `PLATFORM_FEE` — which is precisely the realistic
+// case, because a field or constant meant to be read from another package
+// has to be exported, and exported means capitalised.
+//
+// Go identifiers take four shapes: snake_case, SCREAMING_SNAKE, PascalCase
+// (exported) and camelCase (unexported). One alternative is built per shape
+// per prefix below, and each is anchored so "Fee"/"FEE"/"fee" starts its own
+// identifier segment and does not continue into more lowercase letters. That
+// second anchor is doing the real work: it is what separates
+// `PlatformFeeBps` (segment ends at "Fee", "B" opens a new one — a catch)
+// from `PlatformFeedback` ("d" continues the same run — not a fee) and from
+// `coffee`/`feed`/`feeds` (no qualifying prefix, and "fee" is mid-word, not
+// a segment, in every one of them). The old trailing `\b` could not draw
+// that distinction: `\b` fires on any word/non-word transition, not on a
+// naming-convention segment start, so it passed straight through the
+// difference between "FeeBps" and "Feedback".
+const FEE_PREFIXES = ['platform', 'service', 'application', 'our'];
+const feeIdentifierAlternatives = FEE_PREFIXES.flatMap((w) => {
+  const Cap = w[0].toUpperCase() + w.slice(1);
+  const UPPER = w.toUpperCase();
+  return [
+    `${w}_fee(?:_\\w+)?`,       // platform_fee, platform_fee_bps
+    `${UPPER}_FEE(?:_\\w+)?`,   // PLATFORM_FEE, PLATFORM_FEE_BPS
+    `${Cap}Fee(?:[A-Z]\\w*)?`,  // PlatformFee, PlatformFeeBps (exported)
+    `${w}Fee(?:[A-Z]\\w*)?`,    // applicationFee, applicationFeeAmount (unexported)
+  ];
+});
+// Commission is spelled with "...Rate", not "...Fee", but takes the same
+// four shapes.
+feeIdentifierAlternatives.push(
+  'commission_rate(?:_\\w+)?',
+  'COMMISSION_RATE(?:_\\w+)?',
+  'CommissionRate(?:[A-Z]\\w*)?',
+  'commissionRate(?:[A-Z]\\w*)?',
+);
+const FEE_IDENTIFIER = new RegExp(`\\b(?:${feeIdentifierAlternatives.join('|')})\\b`);
 
 // ── privileged-default matchers ─────────────────────────────────────────────
 //
@@ -297,6 +383,30 @@ function claimMatcherSelfTest() {
   return bad;
 }
 
+function discoveryMatcherSelfTest() {
+  const bad = [];
+  const mustCatch = [
+    'Discover organisers near you.',
+    'Browse the organiser directory to find your next event.',
+    'Find more organisers in your area.',
+    'Search for organisers near you.',
+    'A global feed of every event on the network.',
+  ];
+  for (const s of mustCatch) if (unnegatedClaims(s, DISCOVERY_CLAIMS).length === 0) bad.push(`discovery gate did NOT catch: "${s}"`);
+  // Every one of these uses a word the matcher keys on — "organiser",
+  // "near", "search", "directory" — in a sense that is not discovery.
+  const mustPass = [
+    'Paste the address and key an organiser gives you.',
+    'Events near the top of the page are starting soonest.',
+    'Search these events by name or date.',
+    'Venue: 45 Bree Street, Cape Town.',
+    'Cackle does not discover organisers on its own; you paste in a key someone gives you out of band.',
+    'There is no directory, no DHT, no rendezvous, no geo index and no search.',
+  ];
+  for (const s of mustPass) if (unnegatedClaims(s, DISCOVERY_CLAIMS).length > 0) bad.push(`discovery gate wrongly flagged: "${s}"`);
+  return bad;
+}
+
 function moneyMatcherSelfTest() {
   const bad = [];
   const mustCatch = [
@@ -319,6 +429,32 @@ function moneyMatcherSelfTest() {
     const hit = FABRICATED_MONEY.find(({ re }) => re.test(s));
     if (hit) bad.push(`money gate wrongly flagged: "${s}" (${hit.re})`);
   }
+  return bad;
+}
+
+function feeIdentifierMatcherSelfTest() {
+  const bad = [];
+  // Real shapes an exported or unexported Go identifier actually takes —
+  // the exact forms the unanchored, non-`i` predecessor could not catch.
+  const mustCatch = [
+    'PlatformFee', 'ServiceFee', 'ApplicationFee', 'PlatformFeeBps',
+    'applicationFeeAmount', 'PLATFORM_FEE', 'platform_fee', 'OUR_FEE',
+    'our_fee', 'CommissionRate', 'commissionRate', 'COMMISSION_RATE',
+    'PLATFORM_FEE_BPS', 'ApplicationFeeAmount',
+  ];
+  for (const s of mustCatch) if (!FEE_IDENTIFIER.test(s)) bad.push(`fee-identifier gate did NOT catch: "${s}"`);
+  // "fee" is a substring of every one of these, and none of them is a fee.
+  // Each either lacks a qualifying prefix or is the SAME lowercase run
+  // continuing past where a real "Fee" segment would end — the distinction
+  // a blanket case-insensitive `\bfee\b` cannot draw.
+  const mustPass = [
+    'feed', 'feeds', 'feedback', 'coffee', 'Feedback',
+    'PlatformFeedback', 'applicationFeedback', 'ApplicationFeeder',
+    'FeeCollector', // a real word, but not one of the four gated prefixes
+    'Cackle charges you nothing. There is no billing system in this software.',
+    'no fee is charged here',
+  ];
+  for (const s of mustPass) if (FEE_IDENTIFIER.test(s)) bad.push(`fee-identifier gate wrongly flagged: "${s}"`);
   return bad;
 }
 
@@ -357,6 +493,9 @@ function urlMatcherSelfTest() {
     "attribution='&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>'",
     '// this block used to fetch https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png on every render',
     'const directionsHref = hasCoords ? `https://www.openstreetmap.org/?mlat=${lat}` : null;\n<a href={directionsHref}>Open in maps</a>',
+    // A real comment can still name two schemed URLs — the FIRST url's own
+    // "//" must not be what makes this a comment; the leading "// " is.
+    '// migrated from https://old.example.com/a to https://old.example.com/b, both gone now',
   ];
   for (const s of nav) if (externalFetches(s).length) bad.push(`url gate wrongly flagged navigation: "${s}"`);
   const fetches = [
@@ -368,9 +507,31 @@ function urlMatcherSelfTest() {
     // bound and never hrefed, so the variable is no hiding place.
     'const tileHref = "https://tile.example.com/{z}/{x}/{y}.png";\n<TileLayer url={tileHref} />',
     "fetch('https://api.example.com/v1/track') // harmless, honest",
+    // The defect this guards: a prior URL's own "https://" scheme on the
+    // same line used to be mistaken for a "//" comment marker, so the
+    // SECOND url on a line — the one actually reaching `fetch` — escaped
+    // entirely. Realistic JSX shape: a legitimate <a href> followed by a
+    // real fetch call on the same line.
+    'const ok = "https://a.example.com"; fetch("https://evil.example.com/track");',
+    '<a href="https://vulos.org">Home</a> && fetch("https://evil.example.com/track")',
   ];
   for (const s of fetches) if (!externalFetches(s).length) bad.push(`url gate did NOT catch a fetch: "${s}"`);
   return bad;
+}
+
+/**
+ * True if `linePrefix` contains a real `//` line-comment marker — one that is
+ * NOT the two slashes of a URL scheme (`http://`, `https://`). A scheme's
+ * `//` is always immediately preceded by the scheme's own `:`; a comment
+ * marker never is, so that single character of lookbehind is enough to tell
+ * them apart without a real tokenizer.
+ */
+function hasLineComment(linePrefix) {
+  let idx = -1;
+  while ((idx = linePrefix.indexOf('//', idx + 1)) !== -1) {
+    if (linePrefix[idx - 1] !== ':') return true;
+  }
+  return false;
 }
 
 /** Every absolute URL in `src` that is not plainly navigation or an identifier. */
@@ -383,11 +544,21 @@ function externalFetches(src) {
     // A URL written into a comment is documentation, not a request — and the
     // comments that matter most here are the ones explaining why a fetch was
     // REMOVED, which would otherwise be punished for naming what they killed.
-    // Deliberately one-directional: the `//` has to come BEFORE the URL on
-    // its own line, so `fetch('https://x') // fine` is still caught.
+    // Deliberately one-directional: the comment marker has to come BEFORE the
+    // URL on its own line, so `fetch('https://x') // fine` is still caught.
+    //
+    // `linePrefix.includes('//')` used to be the whole check, and it was
+    // hollow: a URL's OWN scheme contains "//", so the first URL on a line
+    // poisons every match after it. `const ok = "https://a"; fetch("https:
+    // //evil")` had its `fetch` call walk straight through the exemption,
+    // because by the time the second URL was reached, `linePrefix` already
+    // contained the first URL's "https://". hasLineComment() below looks for
+    // a `//` that is NOT the two slashes of a scheme instead: a scheme's `//`
+    // is always immediately preceded by the `:` of `http:`/`https:`, and a
+    // real `//` comment marker never is.
     const lineStart = src.lastIndexOf('\n', m.index) + 1;
     const linePrefix = src.slice(lineStart, m.index);
-    if (linePrefix.includes('//') || /^\s*[*]/.test(linePrefix)) continue;
+    if (hasLineComment(linePrefix) || /^\s*[*]/.test(linePrefix)) continue;
 
     // A URL bound to a name that the same file then hands to an `href={}` is
     // navigation that happens to travel through a variable — the shape
@@ -422,7 +593,9 @@ function main() {
   log('matcher self-tests');
   for (const [label, run] of [
     ['claim', claimMatcherSelfTest],
+    ['discovery', discoveryMatcherSelfTest],
     ['fabricated-money', moneyMatcherSelfTest],
+    ['fee-identifier', feeIdentifierMatcherSelfTest],
     ['privileged-processor', processorMatcherSelfTest],
     ['external-url', urlMatcherSelfTest],
   ]) {
@@ -478,12 +651,19 @@ function main() {
   note(files.length >= MIN_FILES_SCANNED,
     `${files.length} source files found under web/src (floor ${MIN_FILES_SCANNED}) — an emptied glob cannot pass by scanning nothing`);
 
-  const upgraded = [], money = [], privileged = [], remote = [];
+  const upgraded = [], discovered = [], money = [], privileged = [], remote = [];
   const shipped = [], testFiles = [];
   let urlsClassified = 0;
   for (const file of files) {
     const src = readFileSync(file, 'utf8');
     for (const hit of unnegatedClaims(src)) upgraded.push(`${rel(file)}: "${hit}"`);
+    // Test files are exempt from THIS matcher only (the other three run over
+    // every file unchanged). `peer-scope.test.js` plants the literal phrase
+    // "Discover organisers near you" — both as regex source and as a
+    // planted-defect fixture — to prove its OWN local guard over
+    // peer-events.jsx fires; that string never ships (vite does not bundle
+    // `*.test.js`) and is proof the guard works, not evidence of a claim.
+    if (!isTest(file)) for (const hit of unnegatedClaims(src, DISCOVERY_CLAIMS)) discovered.push(`${rel(file)}: "${hit}"`);
     for (const { re, why } of FABRICATED_MONEY) {
       const m = src.match(re);
       if (m) money.push(`${rel(file)}: "${m[0]}" — ${why}`);
@@ -505,6 +685,8 @@ function main() {
 
   note(upgraded.length === 0,
     `${files.length} files: nothing upgrades "detected" into "prevented"${fail('claims', upgraded)}`);
+  note(discovered.length === 0,
+    `${files.length} files: no discovery, directory or proximity claim — Cackle finds no peers on its own${fail('found', discovered)}`);
   note(money.length === 0,
     `${files.length} files: no fabricated fee, price or superlative${fail('found', money)}`);
   note(privileged.length === 0,
@@ -525,15 +707,14 @@ function main() {
     .flatMap((d) => walkGo(d));
   const billing = [];
   for (const f of goFiles) {
-    const m = readFileSync(f, 'utf8')
-      .match(/\b(?:platform_?[Ff]ee|service_?[Ff]ee|application_?[Ff]ee|our_?[Ff]ee|[Cc]ommission[Rr]ate)\b/);
+    const m = readFileSync(f, 'utf8').match(FEE_IDENTIFIER);
     if (m) billing.push(`${rel(f)}: ${m[0]}`);
   }
   note(goFiles.length >= 50, `${goFiles.length} Go files examined for fee-collection code (floor 50)`);
   note(billing.length === 0,
     `no fee-collection identifier in the Go source — "no billing system" is still true${fail('found', billing)}`);
 
-  const EXPECTED_CHECKS = 22;
+  const EXPECTED_CHECKS = 25;
   if (ran !== EXPECTED_CHECKS) {
     problems.push(`only ${ran} of ${EXPECTED_CHECKS} checks ran — the run did not complete`);
     console.log(`  FAIL  only ${ran} of ${EXPECTED_CHECKS} checks ran`);
