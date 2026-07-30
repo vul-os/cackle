@@ -37,9 +37,21 @@ type orgView struct {
 // from org_members for the org NAMED IN THAT REQUEST, so a user with a
 // hundred of their own orgs is still a non-member, and still a 403,
 // everywhere else. TestCreateOrg_OwnerOfNewOrgIsStillNonMemberElsewhere
-// in org_handlers_test.go is the regression test for precisely that.
+// in org_create_test.go is the regression test for precisely that.
 func (s *server) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
-	user, _ := userFromContext(r.Context())
+	// Defence in depth, and the one handler in this package that earns it.
+	// Every other org/event handler takes the user with `user, _ :=` and
+	// leans on a CanManageOrg/CanManageEvent call immediately below to
+	// refuse an anonymous caller anyway. This handler has no such call —
+	// requireUser on the route is the ENTIRE gate — so an anonymous
+	// request reaching here would dereference a nil user and 500 rather
+	// than fail closed. Check explicitly instead: if the route's
+	// requireUser is ever dropped or reordered, the answer is still 401.
+	user, ok := userFromContext(r.Context())
+	if !ok || user == nil {
+		unauthorized(w, "authentication required")
+		return
+	}
 
 	var in orgs.CreateInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
