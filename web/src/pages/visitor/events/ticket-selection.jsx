@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import { visibleTicketTypes, remainingFor, priceFromMinor } from './ticket-utils';
 import { Money } from '@/components/ui/money';
+import { TAP_ICON } from '@/pages/visitor/ui-scale';
 
 /**
  * The event page's primary conversion surface: an inline (not modal) ticket
@@ -94,21 +95,21 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
                                                     type="button"
                                                     size="icon"
                                                     variant="outline"
-                                                    className="h-9 w-9"
+                                                    className={TAP_ICON}
                                                     onClick={() => updateQuantity(t.id, -1, left)}
                                                     disabled={qty === 0}
                                                     aria-label={`Fewer ${t.name} tickets`}
                                                 >
                                                     <Minus className="h-4 w-4" />
                                                 </Button>
-                                                <span className="w-6 text-center tabular-nums" aria-live="polite" aria-atomic="true">
+                                                <span className="w-8 text-center text-base font-semibold tabular-nums" aria-live="polite" aria-atomic="true">
                                                     {qty}
                                                 </span>
                                                 <Button
                                                     type="button"
                                                     size="icon"
                                                     variant="outline"
-                                                    className="h-9 w-9"
+                                                    className={TAP_ICON}
                                                     onClick={() => updateQuantity(t.id, 1, left)}
                                                     disabled={soldOut || qty >= Math.min(left, 10)}
                                                     aria-label={`More ${t.name} tickets`}

@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const chipClasses = (active) =>
     cn(
-        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-0',
         active
             ? 'border-transparent bg-primary text-primary-foreground shadow'
             : 'border-border bg-card text-foreground/80 hover:bg-muted',

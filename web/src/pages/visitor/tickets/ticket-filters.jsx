@@ -2,6 +2,7 @@ import React from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TAP_FIELD } from '@/pages/visitor/ui-scale';
 
 export default function TicketFilters({
     search,
@@ -25,13 +26,13 @@ export default function TicketFilters({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by event or venue"
-                    className="pl-9"
+                    className={`pl-9 ${TAP_FIELD}`}
                     aria-label="Search your tickets"
                 />
             </div>
 
             <Select value={selectedEvent} onValueChange={setSelectedEvent}>
-                <SelectTrigger className="sm:w-48" aria-label="Filter by event">
+                <SelectTrigger className={`sm:w-48 ${TAP_FIELD}`} aria-label="Filter by event">
                     <SelectValue placeholder="All events" />
                 </SelectTrigger>
                 <SelectContent>
@@ -45,7 +46,7 @@ export default function TicketFilters({
             </Select>
 
             <Select value={selectedTicketType} onValueChange={setSelectedTicketType}>
-                <SelectTrigger className="sm:w-44" aria-label="Filter by ticket type">
+                <SelectTrigger className={`sm:w-44 ${TAP_FIELD}`} aria-label="Filter by ticket type">
                     <SelectValue placeholder="All ticket types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -59,7 +60,7 @@ export default function TicketFilters({
             </Select>
 
             <Select value={selectedTime} onValueChange={setSelectedTime}>
-                <SelectTrigger className="sm:w-36" aria-label="Filter by date">
+                <SelectTrigger className={`sm:w-36 ${TAP_FIELD}`} aria-label="Filter by date">
                     <SelectValue placeholder="Any time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -70,7 +71,7 @@ export default function TicketFilters({
             </Select>
 
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="sm:w-36" aria-label="Filter by status">
+                <SelectTrigger className={`sm:w-36 ${TAP_FIELD}`} aria-label="Filter by status">
                     <SelectValue placeholder="Any status" />
                 </SelectTrigger>
                 <SelectContent>

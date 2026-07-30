@@ -2,6 +2,7 @@ import React from 'react';
 import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 const EventHeader = ({ title, venueName, category }) => {
     const handleShare = async () => {
@@ -33,7 +34,7 @@ const EventHeader = ({ title, venueName, category }) => {
                     <div className="ml-auto">
                         <Button
                             variant="outline"
-                            className="border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white"
+                            className={`border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white ${TAP_BUTTON}`}
                             onClick={handleShare}
                         >
                             <Share2 className="mr-2 h-4 w-4" />

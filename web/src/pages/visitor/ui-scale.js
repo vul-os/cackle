@@ -29,4 +29,4 @@ export const TAP_ICON = 'h-11 w-11 sm:h-9 sm:w-9';
 export const TAP_FIELD = 'h-11 sm:h-10';
 
 /** A standalone navigation link in a list — not prose. */
-export const TAP_LINK = 'inline-flex min-h-[44px] items-center sm:min-h-0';
+export const TAP_LINK = 'inline-flex min-h-[44px] min-w-[44px] items-center sm:min-h-0 sm:min-w-0';

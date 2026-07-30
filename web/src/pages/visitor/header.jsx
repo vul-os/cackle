@@ -93,7 +93,7 @@ const Header = ({ className = '' }) => {
                         wordmark, from the shared component. Three files used
                         to each hand-roll this, which is exactly how the mark
                         drifted to a lowercase all-red word with no dot. */}
-                    <Link to="/" className="flex shrink-0 items-center rounded-md" aria-label="Cackle — home">
+                    <Link to="/" className="flex h-11 shrink-0 items-center rounded-md" aria-label="Cackle — home">
                         <BrandLockup size="md" />
                     </Link>
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { BrandLockup } from '@/components/brand/wordmark';
 import { Separator } from '@/components/ui/separator';
+import { TAP_LINK } from '@/pages/visitor/ui-scale';
 
 const PLATFORM = [
     { to: '/events', label: 'Browse events' },
@@ -19,10 +20,13 @@ const ACCOUNT = [
 const FooterColumn = ({ title, links }) => (
     <div>
         <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{title}</h2>
-        <ul className="mt-4 space-y-3 text-sm">
+        {/* Each entry is a standalone navigation target on a phone, not a
+            link inside a sentence, so it gets a real 44px hit area rather
+            than the 17px line box the type alone would give it. */}
+        <ul className="mt-2 text-sm sm:mt-4 sm:space-y-3">
             {links.map(({ to, label }) => (
                 <li key={to}>
-                    <Link to={to} className="text-foreground/80 transition-colors hover:text-primary-emphasis">
+                    <Link to={to} className={`${TAP_LINK} text-foreground/80 transition-colors hover:text-primary-emphasis`}>
                         {label}
                     </Link>
                 </li>
@@ -42,7 +46,7 @@ const Footer = () => (
         <div className="container mx-auto px-4 py-12 sm:py-14">
             <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4">
                 <div className="col-span-2">
-                    <Link to="/" className="inline-flex rounded-md" aria-label="Cackle — home">
+                    <Link to="/" className="inline-flex h-11 items-center rounded-md" aria-label="Cackle — home">
                         <BrandLockup size="md" />
                     </Link>
                     <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">

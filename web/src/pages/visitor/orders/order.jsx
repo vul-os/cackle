@@ -9,6 +9,8 @@ import { Check, ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, Clock, XCir
 import Header from '@/pages/visitor/header';
 import { orders as ordersApi, events as eventsApi, tickets as ticketsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
+import Footer from '@/pages/visitor/landing/footer';
+import { TAP_BUTTON, TAP_BUTTON_SM } from '@/pages/visitor/ui-scale';
 
 function formatWhen(iso) {
     if (!iso) return null;
@@ -197,11 +199,11 @@ export default function OrderPage() {
     const ticketTypeName = (ticketTypeId) => event?.ticket_types?.find((t) => t.id === ticketTypeId)?.name ?? 'Ticket';
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen flex-col bg-background">
             <Header />
-            <main className="pt-24">
+            <main id="main" className="flex-1 pt-24">
                 <div className="mx-auto max-w-4xl px-4 py-4">
-                    <Button variant="ghost" onClick={() => navigate('/orders')} className="flex items-center gap-2">
+                    <Button variant="ghost" onClick={() => navigate('/orders')} className={`-ml-2 flex items-center gap-2 ${TAP_BUTTON}`}>
                         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                         Back to orders
                     </Button>
@@ -335,7 +337,7 @@ export default function OrderPage() {
                                 <CardHeader className="flex flex-row items-center justify-between">
                                     <CardTitle className="text-lg">Your tickets</CardTitle>
                                     {Array.isArray(myTickets) && myTickets.length > 0 && (
-                                        <Button variant="outline" size="sm" onClick={() => navigate('/tickets')}>
+                                        <Button variant="outline" size="sm" className={TAP_BUTTON_SM} onClick={() => navigate('/tickets')}>
                                             View all tickets
                                         </Button>
                                     )}
@@ -388,6 +390,7 @@ export default function OrderPage() {
                     </div>
                 )}
             </main>
+            <Footer />
         </div>
     );
 }

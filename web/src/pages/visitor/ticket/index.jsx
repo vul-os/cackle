@@ -2,13 +2,32 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import Header from '@/pages/visitor/header';
+import Footer from '@/pages/visitor/landing/footer';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, MapPin, User, Armchair, Printer, Download, Ban, ChevronLeft } from 'lucide-react';
+import { Calendar, MapPin, User, Armchair, Printer, Download, Ban, ChevronLeft, Sun, WifiOff } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { tickets as ticketsApi } from '@/lib/api';
 import PrintStyles from '@/pages/visitor/tickets/printing/print-styles';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+
+// ── This page is read at a door ───────────────────────────────────────────
+//
+// Not at a desk. Someone is holding a phone up one-handed, in a queue, in
+// bad light, possibly with no signal, while a steward two feet away needs
+// to read the ticket type off it. Everything here is arranged for that:
+//
+//   - The QR comes FIRST on a phone. It is the thing being held up, so it
+//     must not be below the fold, and it scales with the viewport instead
+//     of sitting at a fixed 220px on every screen.
+//   - The QR plate is white with black modules in BOTH themes. A scanner
+//     reads reflectance, not brand; inverting it in dark mode would be a
+//     tasteful way to stop the ticket working.
+//   - Error correction stays at level H, which is what survives a
+//     fingerprint, a cracked screen and a glare band across the code.
+//   - The details a steward calls out — type, name, seat, serial — are set
+//     large enough to read at arm's length rather than as form captions.
 
 const STATUS_LABEL = {
     void: 'This ticket has been voided and cannot be used for entry.',
@@ -33,20 +52,31 @@ function formatTime(dateString) {
     }
 }
 
+const Shell = ({ children }) => (
+    <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <PrintStyles />
+        <main id="main" className="flex-1 px-4 pb-16 pt-24">
+            <div className="mx-auto max-w-3xl">{children}</div>
+        </main>
+        <div className="print:hidden">
+            <Footer />
+        </div>
+    </div>
+);
+
 function TicketSkeleton() {
     return (
         <div className="space-y-6" role="status" aria-label="Loading ticket">
             <Skeleton className="h-10 w-40" />
             <div className="overflow-hidden rounded-3xl border border-border">
-                <Skeleton className="h-28 w-full rounded-none" />
-                <div className="flex flex-col gap-8 bg-card p-8 sm:flex-row">
-                    <div className="flex-[3] space-y-4">
-                        <Skeleton className="h-5 w-2/3" />
-                        <Skeleton className="h-5 w-1/2" />
-                        <Skeleton className="h-5 w-1/3" />
-                    </div>
-                    <div className="flex flex-1 items-center justify-center">
-                        <Skeleton className="h-[220px] w-[220px] rounded-2xl" />
+                <Skeleton className="h-32 w-full rounded-none" />
+                <div className="flex flex-col items-center gap-8 bg-card p-6 sm:flex-row sm:p-8">
+                    <Skeleton className="h-[280px] w-[280px] max-w-full rounded-2xl" />
+                    <div className="w-full flex-1 space-y-4">
+                        <Skeleton className="h-6 w-2/3" />
+                        <Skeleton className="h-6 w-1/2" />
+                        <Skeleton className="h-6 w-1/3" />
                     </div>
                 </div>
             </div>
@@ -80,25 +110,32 @@ export default function TicketPage() {
     const { ticket, loading, error } = state;
 
     return (
-        <>
-            <Header />
-            <PrintStyles />
-            <main className="mx-auto max-w-3xl p-4 pb-24 pt-24">
-                {loading && <TicketSkeleton />}
+        <Shell>
+            {loading && <TicketSkeleton />}
 
-                {!loading && (error || !ticket) && (
-                    <ErrorState
-                        title="Couldn't load this ticket"
-                        description={error || 'This ticket does not exist, or is not yours.'}
-                        onRetry={() => setReloadToken((n) => n + 1)}
-                    />
-                )}
+            {!loading && (error || !ticket) && (
+                <ErrorState
+                    title="Couldn't load this ticket"
+                    description={error || 'This ticket does not exist, or is not yours.'}
+                    onRetry={() => setReloadToken((n) => n + 1)}
+                />
+            )}
 
-                {!loading && !error && ticket && <TicketCard ticket={ticket} />}
-            </main>
-        </>
+            {!loading && !error && ticket && <TicketCard ticket={ticket} />}
+        </Shell>
     );
 }
+
+/** A label/value pair sized to be read from a couple of feet away. */
+const GateFact = ({ icon: Icon, label, value }) => (
+    <div className="flex items-start gap-3">
+        <Icon className="mt-1 h-5 w-5 shrink-0 text-primary-emphasis" aria-hidden="true" />
+        <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="text-lg font-bold leading-snug text-foreground sm:text-xl">{value}</p>
+        </div>
+    </div>
+);
 
 function TicketCard({ ticket }) {
     // GET /api/tickets/{id} returns a flat, decorated ticket — event_title /
@@ -113,18 +150,18 @@ function TicketCard({ ticket }) {
     return (
         <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
-                <Button variant="ghost" asChild>
+                <Button variant="ghost" className={`-ml-2 ${TAP_BUTTON}`} asChild>
                     <Link to="/tickets">
                         <ChevronLeft className="mr-2 h-4 w-4" aria-hidden="true" />
                         Back to tickets
                     </Link>
                 </Button>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => window.print()}>
+                    <Button variant="outline" className={TAP_BUTTON} onClick={() => window.print()}>
                         <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
                         Print
                     </Button>
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" className={TAP_BUTTON} asChild>
                         <a href={ticketsApi.pdfUrl(ticket.id)} target="_blank" rel="noopener noreferrer">
                             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                             PDF
@@ -152,74 +189,84 @@ function TicketCard({ ticket }) {
                 {isVoid && (
                     <div
                         role="alert"
-                        className="print-keep-color flex items-center justify-center gap-2 bg-destructive px-6 py-3 text-center text-sm font-extrabold uppercase tracking-wide text-destructive-foreground sm:text-base"
+                        className="print-keep-color relative z-20 flex items-center justify-center gap-2 bg-destructive px-6 py-3 text-center text-sm font-extrabold uppercase tracking-wide text-destructive-foreground sm:text-base"
                     >
                         <Ban className="h-5 w-5 shrink-0" aria-hidden="true" />
                         {STATUS_LABEL[status] ?? `This ticket is ${status} and cannot be used for entry.`}
                     </div>
                 )}
 
+                {/* The header band is INK with the page ground reversed out of
+                    it in both themes: it must read the same at noon and at
+                    dusk, exactly like the gate screen it will be held up to. */}
                 <div className="print-keep-color bg-foreground px-6 py-7 text-background sm:px-10 sm:py-9">
-                    <p className="text-xs font-bold uppercase tracking-widest text-background/70">{ticketTypeName}</p>
-                    <h1 className="mt-1 font-display text-3xl font-extrabold leading-tight tracking-tight text-background sm:text-4xl">
+                    <p className="text-sm font-black uppercase tracking-widest text-background/70">{ticketTypeName}</p>
+                    <h1 className="mt-1.5 font-display text-display-sm font-extrabold leading-tight tracking-tight text-background sm:text-display-md">
                         {eventTitle}
                     </h1>
-                    <div className="mt-5 flex flex-col gap-2 text-sm font-semibold text-background/90 sm:flex-row sm:flex-wrap sm:gap-x-8">
+                    <div className="mt-5 flex flex-col gap-2 text-base font-semibold text-background/90 sm:flex-row sm:flex-wrap sm:gap-x-8">
                         <span className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <Calendar className="h-5 w-5 shrink-0" aria-hidden="true" />
                             {formatDate(ticket.event_starts_at)}
                             {ticket.event_starts_at && ` · ${formatTime(ticket.event_starts_at)}`}
                         </span>
                         <span className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            <MapPin className="h-5 w-5 shrink-0" aria-hidden="true" />
                             {venue}
                         </span>
                     </div>
                 </div>
 
-                <div className="flex flex-col-reverse bg-card px-6 py-8 sm:flex-row sm:items-center sm:gap-10 sm:px-10">
-                    <div className="mt-8 flex-[3] space-y-5 sm:mt-0">
-                        <div className="flex items-start gap-3">
-                            <User className="mt-0.5 h-6 w-6 shrink-0 text-primary-emphasis" aria-hidden="true" />
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ticket holder</p>
-                                <p className="text-xl font-bold text-foreground sm:text-2xl">{ticket.holder_name || 'Ticket holder'}</p>
-                            </div>
-                        </div>
-
-                        {ticket.seat && (
-                            <div className="flex items-center gap-3">
-                                <Armchair className="h-6 w-6 shrink-0 text-primary-emphasis" aria-hidden="true" />
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seat</p>
-                                    <p className="text-lg font-bold text-foreground">{ticket.seat}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="border-t border-dashed border-border pt-4">
-                            <p className="font-mono text-sm font-medium text-foreground">#{ticket.serial}</p>
-                            {!isVoid && (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Present this QR code at the gate. It verifies offline — no signal required.
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-1 flex-col items-center justify-center gap-3 border-b border-dashed border-border pb-8 sm:border-b-0 sm:border-l sm:pb-0 sm:pl-10">
+                {/* QR first in the DOM, so it is first on a phone and second
+                    on a wide screen (sm:order-2) — the thing you hold up is
+                    never below the fold. */}
+                <div className="flex flex-col gap-8 bg-card px-6 py-8 sm:flex-row sm:items-center sm:gap-10 sm:px-10">
+                    <div className="flex flex-col items-center gap-4 sm:order-2 sm:flex-1">
                         <div
-                            className={`print-keep-color print-qr rounded-2xl bg-white p-5 shadow-soft ring-1 ring-black/5 ${
+                            className={`print-keep-color print-qr w-[min(100%,20rem)] rounded-2xl bg-white p-4 shadow-soft ring-1 ring-black/10 sm:p-5 ${
                                 isVoid ? 'opacity-60 grayscale' : ''
                             }`}
-                            aria-label={isVoid ? `Ticket QR code, ${status}, not valid for entry` : 'Ticket QR code — present this at the gate'}
+                            aria-label={
+                                isVoid
+                                    ? `Ticket QR code, ${status}, not valid for entry`
+                                    : 'Ticket QR code — hold this up at the door'
+                            }
                         >
                             {ticket.capability ? (
-                                <QRCodeSVG value={ticket.capability} size={220} level="H" />
+                                // Rendered at 320 and then sized by CSS, so it
+                                // is as large as the screen allows instead of
+                                // a fixed 220px box on a 1440px monitor and a
+                                // 390px phone alike.
+                                <QRCodeSVG value={ticket.capability} size={320} level="H" className="h-auto w-full" />
                             ) : (
-                                <div className="flex h-[220px] w-[220px] items-center justify-center text-center text-sm text-gray-500">
+                                <div className="flex aspect-square w-full items-center justify-center text-center text-sm font-medium text-gray-600">
                                     No capability issued for this ticket.
                                 </div>
+                            )}
+                        </div>
+                        {!isVoid && (
+                            <p className="flex items-center gap-2 text-center text-xs font-medium text-muted-foreground print:hidden">
+                                <Sun className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                Turn your screen brightness up before you reach the door.
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="space-y-5 sm:order-1 sm:flex-1">
+                        <GateFact icon={User} label="Ticket holder" value={ticket.holder_name || 'Ticket holder'} />
+                        {ticket.seat && <GateFact icon={Armchair} label="Seat" value={ticket.seat} />}
+
+                        <div className="border-t border-dashed border-border pt-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Ticket number</p>
+                            <p className="mt-0.5 select-all font-mono text-base font-semibold text-foreground">#{ticket.serial}</p>
+                            {!isVoid && (
+                                <p className="mt-3 flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
+                                    <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span>
+                                        Hold this up at the door. It is checked on the spot — neither you nor the venue needs
+                                        a signal for it to work.
+                                    </span>
+                                </p>
                             )}
                         </div>
                     </div>

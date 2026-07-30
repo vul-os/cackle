@@ -9,6 +9,8 @@ import { SkeletonList } from '@/components/ui/skeleton';
 import { ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout } from 'lucide-react';
 import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
+import Footer from '@/pages/visitor/landing/footer';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 const STATUS_STYLE = {
     pending: { className: 'bg-warning/15 text-warning-foreground', icon: Clock },
@@ -77,15 +79,15 @@ export default function OrdersPage() {
     }, [state.orders]);
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen flex-col bg-background">
             <Header />
-            <main className="container mx-auto max-w-5xl px-4 pb-16 pt-24">
-                <div className="mb-8 flex items-center justify-between">
+            <main id="main" className="container mx-auto max-w-5xl flex-1 px-4 pb-16 pt-24">
+                <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
                     <div>
-                        <h1 className="font-display text-3xl font-bold">Your orders</h1>
-                        <p className="mt-1 text-muted-foreground">Every order you&apos;ve placed on Cackle.</p>
+                        <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-md">Your orders</h1>
+                        <p className="mt-1.5 text-sm text-muted-foreground">Every order you&apos;ve placed, newest first.</p>
                     </div>
-                    <Button variant="outline" onClick={() => navigate('/tickets')}>
+                    <Button variant="outline" className={TAP_BUTTON} onClick={() => navigate('/tickets')}>
                         <Layout className="mr-2 h-4 w-4" aria-hidden="true" />
                         My tickets
                     </Button>
@@ -101,8 +103,12 @@ export default function OrdersPage() {
                     <EmptyState
                         icon={Ticket}
                         title="No orders yet"
-                        description="Once you buy tickets, they'll show up here."
-                        action={<Button onClick={() => navigate('/')}>Browse events</Button>}
+                        description="Once you buy tickets, the order and its tickets show up here."
+                        action={
+                            <Button className={TAP_BUTTON} onClick={() => navigate('/events')}>
+                                Browse events
+                            </Button>
+                        }
                     />
                 )}
 
@@ -149,6 +155,7 @@ export default function OrdersPage() {
                     </div>
                 )}
             </main>
+            <Footer />
         </div>
     );
 }

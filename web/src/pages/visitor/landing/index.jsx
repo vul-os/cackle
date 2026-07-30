@@ -14,6 +14,7 @@ import EventCard from '@/pages/visitor/events/event-card';
 import CategoryTabs from '@/pages/visitor/events/category-tabs';
 import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 const FEATURED_COUNT = 3;
 // The homepage is a preview, but the preview has to actually be wide enough
@@ -80,9 +81,9 @@ const LandingPage = () => {
     const upcoming = state.events.slice(FEATURED_COUNT);
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen flex-col bg-background">
             <Header />
-            <main>
+            <main id="main" className="flex-1">
                 <Hero query="" onSearch={handleSearch} />
 
                 <div className="border-b border-border bg-background/60 py-5">
@@ -140,7 +141,7 @@ const LandingPage = () => {
                                     <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Upcoming events</h2>
                                     <p className="mt-1 text-muted-foreground">Find something happening near you.</p>
                                 </div>
-                                <Button variant="outline" asChild>
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
                                     <Link to="/events">
                                         Browse all events
                                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -157,7 +158,7 @@ const LandingPage = () => {
 
                     {!state.error && !state.loading && state.events.length > 0 && upcoming.length === 0 && (
                         <div className="mt-4 flex justify-center">
-                            <Button variant="outline" asChild>
+                            <Button variant="outline" className={TAP_BUTTON} asChild>
                                 <Link to="/events">
                                     Browse all events
                                     <ArrowRight className="ml-2 h-4 w-4" />

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Header from '@/pages/visitor/header';
+import Footer from '@/pages/visitor/landing/footer';
 import { Ticket } from 'lucide-react';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -111,16 +114,26 @@ export default function TicketsListPage() {
         [filteredTickets],
     );
 
+    const totalShown = filteredTickets.length;
+
     return (
-        <>
+        <div className="flex min-h-screen flex-col bg-background">
             <Header />
             <PrintStyles />
-            <main className="mx-auto max-w-6xl p-4 pb-24 pt-24">
+            <main id="main" className="mx-auto w-full max-w-6xl flex-1 p-4 pb-16 pt-24">
                 <div className="mb-6 print:hidden">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
                         <div>
-                            <h1 className="font-display text-3xl font-bold">My tickets</h1>
-                            <p className="mt-1 text-sm text-muted-foreground">Every ticket issued to your paid orders.</p>
+                            <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-md">
+                                My tickets
+                            </h1>
+                            <p className="mt-1.5 text-sm text-muted-foreground">
+                                {loading
+                                    ? 'Loading your tickets…'
+                                    : tickets.length === 0
+                                      ? 'Every ticket from a paid order shows up here.'
+                                      : `${totalShown} of ${tickets.length} ticket${tickets.length === 1 ? '' : 's'}. Each one works at the door with no signal.`}
+                            </p>
                         </div>
                         {!loading && !error && tickets.length > 0 && (
                             <PrintAllButton onPrintAll={printAllTickets} isPrinting={isPrinting} ticketsCount={filteredTickets.length} />
@@ -153,10 +166,10 @@ export default function TicketsListPage() {
                     <EmptyState
                         icon={Ticket}
                         title="No tickets yet"
-                        description="Tickets from paid orders will show up here."
+                        description="Once an order is paid, its tickets appear here — one QR code each, ready for the door."
                         action={
-                            <Button asChild>
-                                <a href="/events">Browse events</a>
+                            <Button className={TAP_BUTTON} asChild>
+                                <Link to="/events">Browse events</Link>
                             </Button>
                         }
                     />
@@ -168,7 +181,7 @@ export default function TicketsListPage() {
                         title="No tickets match your filters"
                         description="Try clearing a filter or your search."
                         action={
-                            <Button variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                            <Button variant="outline" className={TAP_BUTTON} onClick={() => setFilters(DEFAULT_FILTERS)}>
                                 Clear filters
                             </Button>
                         }
@@ -178,13 +191,21 @@ export default function TicketsListPage() {
                 {!loading &&
                     !error &&
                     Object.values(groupedTickets).map(({ event, ticketTypes: byType }) => (
-                        <div key={event.id} className="mb-8">
-                            <h2 className="mb-4 text-2xl font-semibold">{event.title}</h2>
+                        <section key={event.id} className="mb-12" aria-labelledby={`tickets-event-${event.id}`}>
+                            <h2
+                                id={`tickets-event-${event.id}`}
+                                className="mb-5 font-display text-2xl font-bold tracking-tight sm:text-3xl"
+                            >
+                                {event.title}
+                            </h2>
 
                             {Object.values(byType).map(({ type, tickets: typeTickets }) => (
-                                <div key={type.id} className="mb-6">
-                                    <h3 className="mb-3 border-l-4 border-primary pl-4 text-xl font-medium">
-                                        {type.name} ({typeTickets.length})
+                                <div key={type.id} className="mb-8">
+                                    <h3 className="mb-4 flex items-baseline gap-2 border-l-4 border-primary pl-4 text-lg font-bold tracking-tight">
+                                        {type.name}
+                                        <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                                            × {typeTickets.length}
+                                        </span>
                                     </h3>
                                     <div className="grid grid-cols-1 gap-6">
                                         {typeTickets.map((ticket) => {
@@ -206,9 +227,12 @@ export default function TicketsListPage() {
                             ))}
 
                             <EventInformation event={event} />
-                        </div>
+                        </section>
                     ))}
             </main>
-        </>
+            <div className="print:hidden">
+                <Footer />
+            </div>
+        </div>
     );
 }

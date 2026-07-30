@@ -20,6 +20,7 @@ import CategoryTabs from '@/pages/visitor/events/category-tabs';
 import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
+import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
 
 const PAGE_SIZE = 24;
 
@@ -152,13 +153,13 @@ export default function BrowsePage() {
     const activeCategoryLabel = category ? categories.find((c) => c.slug === category)?.label || category : '';
 
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex min-h-screen flex-col bg-background">
             <Header />
-            <main className="pt-16">
+            <main id="main" className="flex-1 pt-16">
                 <div className="border-b border-border bg-muted/30">
                     <div className="container mx-auto px-4 py-10">
-                        <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Browse events</h1>
-                        <p className="mt-2 text-muted-foreground">Search live events and grab your tickets.</p>
+                        <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-lg">Browse events</h1>
+                        <p className="mt-2 text-muted-foreground">Everything on sale right now. Pick one and grab your tickets.</p>
 
                         <form onSubmit={handleSearchSubmit} className="mt-6 flex flex-col gap-3 sm:flex-row" role="search">
                             <div className="relative flex-1">
@@ -171,7 +172,7 @@ export default function BrowsePage() {
                                     value={searchValue}
                                     onChange={(e) => setSearchValue(e.target.value)}
                                     placeholder="Search events, venues, or organisers"
-                                    className="pl-10"
+                                    className={`pl-10 ${TAP_FIELD}`}
                                 />
                             </div>
 
@@ -183,7 +184,7 @@ export default function BrowsePage() {
                                         setLimit(PAGE_SIZE);
                                     }}
                                 >
-                                    <SelectTrigger className="w-[150px]" aria-label="Filter by date">
+                                    <SelectTrigger className={`w-[150px] ${TAP_FIELD}`} aria-label="Filter by date">
                                         <SelectValue placeholder="Any time" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -196,7 +197,7 @@ export default function BrowsePage() {
                                 </Select>
 
                                 <Select value={priceFilter} onValueChange={setPriceFilter}>
-                                    <SelectTrigger className="w-[150px]" aria-label="Filter by price">
+                                    <SelectTrigger className={`w-[150px] ${TAP_FIELD}`} aria-label="Filter by price">
                                         <SelectValue placeholder="Any price" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -208,7 +209,7 @@ export default function BrowsePage() {
                                     </SelectContent>
                                 </Select>
 
-                                <Button type="submit">Search</Button>
+                                <Button type="submit" className={TAP_BUTTON}>Search</Button>
                             </div>
                         </form>
 
@@ -225,7 +226,7 @@ export default function BrowsePage() {
                             <button
                                 type="button"
                                 onClick={clearFilters}
-                                className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                                className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
                             >
                                 <X className="h-3.5 w-3.5" />
                                 Clear filters
@@ -252,7 +253,7 @@ export default function BrowsePage() {
                             }
                             action={
                                 hasActiveFilters ? (
-                                    <Button variant="outline" onClick={clearFilters}>
+                                    <Button variant="outline" className={TAP_BUTTON} onClick={clearFilters}>
                                         Clear filters
                                     </Button>
                                 ) : undefined
@@ -267,7 +268,7 @@ export default function BrowsePage() {
                             title="No events match that price range"
                             description="Try a wider price filter."
                             action={
-                                <Button variant="outline" onClick={() => setPriceFilter('any')}>
+                                <Button variant="outline" className={TAP_BUTTON} onClick={() => setPriceFilter('any')}>
                                     Reset price filter
                                 </Button>
                             }
@@ -289,7 +290,7 @@ export default function BrowsePage() {
 
                             {state.events.length >= limit && (
                                 <div className="mt-10 flex justify-center">
-                                    <Button variant="outline" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
+                                    <Button variant="outline" className={TAP_BUTTON} onClick={() => setLimit((l) => l + PAGE_SIZE)}>
                                         Load more events
                                     </Button>
                                 </div>
