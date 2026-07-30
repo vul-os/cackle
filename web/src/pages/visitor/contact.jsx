@@ -1,86 +1,141 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { BookOpen, Phone, Mail } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { BookOpen, Github, Ticket, Building2, ArrowRight, ExternalLink } from 'lucide-react';
 import Footer from '@/pages/visitor/landing/footer.jsx';
 import Header from '@/pages/visitor/header.jsx';
-import { toast } from '@/components/ui/use-toast';
+import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
-const ContactIconBlock = ({ icon: Icon, title, description, link, linkText }) => (
-    <div className="flex gap-x-6 py-6">
-        <Icon className="mt-1 h-6 w-6 flex-shrink-0 text-primary-emphasis" />
-        <div className="grow">
-            <h3 className="font-bold">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            {link && (
-                <a className="mt-2 inline-flex items-center gap-x-2 text-sm font-medium text-primary-emphasis hover:underline" href={link}>
-                    {linkText}
-                </a>
-            )}
+// ── Why there is no contact form on this page ─────────────────────────────
+//
+// There used to be one. Filling it in and pressing Send fired ZERO network
+// requests and then told you "We've received your message and will reply
+// within 1-2 business days." Nobody received anything: there is no contact
+// endpoint in the API and no inbox behind it. The page also printed a phone
+// number and an email address that do not exist.
+//
+// A form that swallows a refund request and answers "we'll get back to you"
+// is worse than no form, because it stops the person asking somebody who
+// can actually help. So the page now answers the real question — WHO do I
+// ask — and every route on it goes somewhere that exists.
+//
+// The honest answer is also the useful one: Cackle is software an organiser
+// runs themselves. This deployment cannot know its operator's support
+// address, and it must not invent one.
+
+const REPO_ISSUES = 'https://github.com/vul-os/cackle/issues';
+
+const Route = ({ icon: Icon, title, children, action }) => (
+    <div className="flex gap-4 py-6">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 grow">
+            <h3 className="text-base font-bold tracking-tight text-foreground">{title}</h3>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{children}</p>
+            {action && <div className="mt-3">{action}</div>}
         </div>
     </div>
 );
 
-const ContactPage = () => {
-    const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', phone: '', details: '' });
+const ContactPage = () => (
+    <div className="flex min-h-screen flex-col bg-background">
+        <Header />
+        <main id="main" className="flex-1 pt-16">
+            <section className="mx-auto max-w-3xl px-4 py-12 sm:py-16">
+                <div className="max-w-2xl">
+                    <span className="text-xs font-bold uppercase tracking-[0.16em] text-primary-emphasis">Get help</span>
+                    <h1 className="mt-3 font-display text-display-md font-extrabold tracking-tight sm:text-display-lg">
+                        Who to ask
+                    </h1>
+                    <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+                        Cackle is software that whoever put this event on runs themselves. So the right person to ask
+                        depends on what you need — here is the whole list, shortest route first.
+                    </p>
+                </div>
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-    };
+                <Separator variant="perforated" className="my-10" />
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        toast({ title: 'Thanks!', description: "We've received your message and will reply within 1-2 business days." });
-        setFormData({ firstName: '', lastName: '', email: '', phone: '', details: '' });
-    };
+                <Card>
+                    <CardContent className="divide-y divide-border p-5 sm:p-6">
+                        <Route
+                            icon={Ticket}
+                            title="A ticket you bought, a refund, or getting in on the night"
+                            action={
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                    <Link to="/orders">
+                                        Find my order
+                                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                                    </Link>
+                                </Button>
+                            }
+                        >
+                            Ask the organiser who sold it to you — they hold the money, the guest list and the door. Their
+                            details are on the event page and on your order. Cackle never holds funds, so nobody here can
+                            issue you a refund.
+                        </Route>
 
-    return (
-        <>
-            <Header />
-            <main className="min-h-screen bg-background pt-16">
-                <section className="mx-auto max-w-5xl px-4 py-12">
-                    <div className="mb-12 text-center">
-                        <span className="mb-4 block text-sm font-semibold uppercase tracking-wider text-primary-emphasis">Get in Touch</span>
-                        <h1 className="mb-4 font-display text-4xl font-bold">Contact Us</h1>
-                        <p className="mx-auto max-w-2xl text-muted-foreground">Questions about an event, a refund, or selling tickets? We're here.</p>
-                    </div>
+                        <Route
+                            icon={Building2}
+                            title="You want to sell tickets with Cackle"
+                            action={
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                    <Link to="/pricing">
+                                        See what it costs
+                                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                                    </Link>
+                                </Button>
+                            }
+                        >
+                            You run it yourself: one file, your own machine, your own payment account. Start with the
+                            pricing page, then the docs. Cackle is experimental — try it on a small night first.
+                        </Route>
 
-                    <div className="grid items-start gap-6 lg:grid-cols-2 lg:gap-16">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Send us a message</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleSubmit} className="grid gap-4">
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                        <Input name="firstName" value={formData.firstName} onChange={handleChange} placeholder="First Name" />
-                                        <Input name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Last Name" />
-                                    </div>
-                                    <Input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" required />
-                                    <Input type="tel" name="phone" value={formData.phone} onChange={handleChange} placeholder="Phone Number" />
-                                    <Textarea name="details" value={formData.details} onChange={handleChange} rows={4} placeholder="Details" required />
-                                    <Button type="submit" className="w-full">
-                                        Send Message
-                                    </Button>
-                                    <p className="text-center text-sm text-muted-foreground">We&apos;ll get back to you in 1-2 business days.</p>
-                                </form>
-                            </CardContent>
-                        </Card>
+                        <Route
+                            icon={BookOpen}
+                            title="How something works, or what it cannot do"
+                            action={
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                    <Link to="/docs">
+                                        Read the docs
+                                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                                    </Link>
+                                </Button>
+                            }
+                        >
+                            The docs say plainly what is built, what is not, and the one thing that can never work. Start
+                            there before anything else.
+                        </Route>
 
-                        <div className="divide-y divide-border">
-                            <ContactIconBlock icon={BookOpen} title="Docs" description="Read the documentation." link="/docs" linkText="Browse docs" />
-                            <ContactIconBlock icon={Phone} title="Call us" description="Have an urgent question?" link="tel:0674358901" linkText="067 435 8901" />
-                            <ContactIconBlock icon={Mail} title="Email us" description="Prefer writing?" link="mailto:hello@cackle.app" linkText="hello@cackle.app" />
-                        </div>
-                    </div>
-                </section>
-            </main>
-            <Footer />
-        </>
-    );
-};
+                        <Route
+                            icon={Github}
+                            title="A bug, or a question about the software itself"
+                            action={
+                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                    <a href={REPO_ISSUES} target="_blank" rel="noopener noreferrer">
+                                        Open an issue
+                                        <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+                                    </a>
+                                </Button>
+                            }
+                        >
+                            Cackle is open source, MIT licensed. Issues are public and are read by the people who build it.
+                            This is the only channel the project itself has.
+                        </Route>
+                    </CardContent>
+                </Card>
+
+                <p className="mt-8 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+                    <span className="font-semibold text-foreground">There is no contact form on this page on purpose.</span>{' '}
+                    This copy of Cackle has no inbox to send one to, and a form that quietly discards a refund request while
+                    saying &ldquo;we&apos;ll get back to you&rdquo; would be worse than no form at all.
+                </p>
+            </section>
+        </main>
+        <Footer />
+    </div>
+);
 
 export default ContactPage;
