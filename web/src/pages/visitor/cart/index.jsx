@@ -69,7 +69,7 @@ const CartPage = () => {
                         action={
                             <Button className={TAP_BUTTON} asChild>
                                 <Link to="/events">
-                                    Browse events
+                                    What&apos;s on
                                     <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                                 </Link>
                             </Button>

@@ -16,13 +16,14 @@ import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
+import { EMPTY_HEADING, emptyDescription, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
 
 const FEATURED_COUNT = 3;
 // The homepage is a preview, but the preview has to actually be wide enough
 // to show what's on — a handful of events isn't a preview, it's the whole
 // catalogue looking sparse. 12 comfortably covers a new/small deployment
-// (--demo seeds 10) while still being a real cap for a large one; "Browse
-// all events" below always covers the rest either way.
+// (--demo seeds 10) while still being a real cap for a large one; "See what
+// else is on" below always covers the rest either way.
 const HOMEPAGE_EVENT_LIMIT = 12;
 
 // Plain language, because the person deciding whether to use this runs a
@@ -49,7 +50,7 @@ const HOW_IT_WORKS = [
 
 const LandingPage = () => {
     const navigate = useNavigate();
-    const [state, setState] = useState({ events: [], loading: true, error: null });
+    const [state, setState] = useState({ events: [], host: null, loading: true, error: null });
     const [reloadToken, setReloadToken] = useState(0);
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
@@ -60,11 +61,19 @@ const LandingPage = () => {
             .list({ limit: HOMEPAGE_EVENT_LIMIT })
             .then((data) => {
                 if (cancelled) return;
-                setState({ events: Array.isArray(data) ? data : (data?.events ?? []), loading: false, error: null });
+                // `host` says WHOSE events these are. A missing envelope stays
+                // null and every @/lib/host helper degrades to the name-free
+                // single-tenant page rather than inventing a name.
+                setState({
+                    events: Array.isArray(data) ? data : (data?.events ?? []),
+                    host: Array.isArray(data) ? null : (data?.host ?? null),
+                    loading: false,
+                    error: null,
+                });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ events: [], loading: false, error: err.message || 'Could not load events.' });
+                setState({ events: [], host: null, loading: false, error: err.message || 'Could not load events.' });
             });
         return () => {
             cancelled = true;
@@ -122,8 +131,8 @@ const LandingPage = () => {
                     {!state.error && !state.loading && state.events.length === 0 && (
                         <EmptyState
                             icon={CalendarX2}
-                            title="No events yet"
-                            description="Check back soon — new events are added all the time."
+                            title={EMPTY_HEADING}
+                            description={emptyDescription(state.host)}
                             className="py-20"
                         />
                     )}
@@ -132,13 +141,26 @@ const LandingPage = () => {
                         <div className="mb-16">
                             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                                 <div>
-                                    <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Featured</h2>
-                                    <p className="mt-1 text-muted-foreground">Hand-picked events happening soon.</p>
+                                    {/* Neither "Featured" nor "hand-picked" —
+                                        both claim an editorial process. This
+                                        section is `state.events.slice(0, 3)`,
+                                        the first three by start date. Nobody
+                                        picked them, so the heading says what
+                                        the slice actually is. */}
+                                    <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Next up</h2>
+                                    <p className="mt-1 text-muted-foreground">Happening soon.</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                                 {featured.map((event, i) => (
-                                    <EventCard key={event.id} event={event} pricing={pricing[event.slug || event.id]} index={i} featured />
+                                    <EventCard
+                                        key={event.id}
+                                        event={event}
+                                        org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
+                                        pricing={pricing[event.slug || event.id]}
+                                        index={i}
+                                        featured
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -149,18 +171,29 @@ const LandingPage = () => {
                             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                                 <div>
                                     <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Upcoming events</h2>
-                                    <p className="mt-1 text-muted-foreground">Find something happening near you.</p>
+                                    {/* Not "happening near you" — there is no
+                                        geolocation and no discovery anywhere in
+                                        this product. The honest line is who is
+                                        selling, which is what hostSubheading
+                                        answers. */}
+                                    <p className="mt-1 text-muted-foreground">{hostSubheading(state.host)}</p>
                                 </div>
                                 <Button variant="outline" className={TAP_BUTTON} asChild>
                                     <Link to="/events">
-                                        Browse all events
-                                        <ArrowRight className="ml-2 h-4 w-4" />
+                                        See what else is on
+                                        <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                                     </Link>
                                 </Button>
                             </div>
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                                 {upcoming.map((event, i) => (
-                                    <EventCard key={event.id} event={event} pricing={pricing[event.slug || event.id]} index={i} />
+                                    <EventCard
+                                        key={event.id}
+                                        event={event}
+                                        org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
+                                        pricing={pricing[event.slug || event.id]}
+                                        index={i}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -170,8 +203,8 @@ const LandingPage = () => {
                         <div className="mt-4 flex justify-center">
                             <Button variant="outline" className={TAP_BUTTON} asChild>
                                 <Link to="/events">
-                                    Browse all events
-                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                    See what else is on
+                                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                                 </Link>
                             </Button>
                         </div>

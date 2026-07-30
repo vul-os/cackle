@@ -1,10 +1,18 @@
-// Public event browse — the storefront's main listing surface. Search and
-// filter published events, anonymously, with real availability/price info
-// pulled in per-card from the public event-detail endpoint (the list
-// endpoint itself carries no pricing — see docs/API.md), plus a category
-// filter wired to ?category= and GET /api/categories.
+// This host's event listing. Search and filter the published events on THIS
+// box, anonymously, with real availability/price info pulled in per-card from
+// the public event-detail endpoint (the list endpoint itself carries no
+// pricing — see docs/API.md), plus a category filter wired to ?category= and
+// GET /api/categories.
+//
+// It is not a marketplace and the copy must not read like one. Cackle is
+// self-hosted: somebody installed it to sell tickets to their own events, so
+// this page is "what's on at their place", not "every event there is". Who
+// that somebody is comes from the `host` envelope on GET /api/events and is
+// turned into words in ONE place — @/lib/host — so no page can invent a name
+// or dress a single venue up as a directory. `?host=<org-slug>` narrows the
+// listing to one organisation on a box that hosts several.
 import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Search, CalendarX2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +30,7 @@ import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
 import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
+import { EMPTY_HEADING, emptyDescription, hostHeading, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
 
 const PAGE_SIZE = 24;
 
@@ -71,13 +80,18 @@ export default function BrowsePage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const category = searchParams.get('category') || '';
+    // ?host= narrows the listing to one organisation. It is a SCOPE, not a
+    // filter — "Clear filters" keeps it, because the visitor followed an
+    // organisation's own link to get here and clearing their search should
+    // not silently widen the page back out to everybody on the box.
+    const hostParam = searchParams.get('host') || '';
     const [searchValue, setSearchValue] = useState(query);
     const [dateFilter, setDateFilter] = useState('any');
     const [priceFilter, setPriceFilter] = useState('any');
     const [limit, setLimit] = useState(PAGE_SIZE);
     const [reloadToken, setReloadToken] = useState(0);
 
-    const [state, setState] = useState({ events: [], loading: true, error: null });
+    const [state, setState] = useState({ events: [], host: null, loading: true, error: null });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     // Keep the search box in sync if the query changes from outside this
@@ -94,22 +108,33 @@ export default function BrowsePage() {
             .list({
                 q: query || undefined,
                 category: category || undefined,
+                host: hostParam || undefined,
                 from: from ? from.toISOString() : undefined,
                 to: to ? to.toISOString() : undefined,
                 limit,
             })
             .then((data) => {
                 if (cancelled) return;
-                setState({ events: Array.isArray(data) ? data : (data?.events ?? []), loading: false, error: null });
+                // An older server, or a request that fell back to a bare
+                // array, leaves `host` null — every helper in @/lib/host
+                // degrades that to the name-free single-tenant page rather
+                // than guessing, so a missing envelope can never produce
+                // marketplace copy.
+                setState({
+                    events: Array.isArray(data) ? data : (data?.events ?? []),
+                    host: Array.isArray(data) ? null : (data?.host ?? null),
+                    loading: false,
+                    error: null,
+                });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ events: [], loading: false, error: err.message || 'Could not load events.' });
+                setState({ events: [], host: null, loading: false, error: err.message || 'Could not load events.' });
             });
         return () => {
             cancelled = true;
         };
-    }, [query, category, dateFilter, limit, reloadToken]);
+    }, [query, category, hostParam, dateFilter, limit, reloadToken]);
 
     const pricing = useEventPricing(state.events);
 
@@ -130,6 +155,7 @@ export default function BrowsePage() {
         const params = {};
         if (searchValue) params.q = searchValue;
         if (category) params.category = category;
+        if (hostParam) params.host = hostParam;
         setSearchParams(params);
         setLimit(PAGE_SIZE);
     };
@@ -138,6 +164,7 @@ export default function BrowsePage() {
         const params = {};
         if (query) params.q = query;
         if (slug) params.category = slug;
+        if (hostParam) params.host = hostParam;
         setSearchParams(params);
         setLimit(PAGE_SIZE);
     };
@@ -145,7 +172,7 @@ export default function BrowsePage() {
     const hasActiveFilters = Boolean(query) || Boolean(category) || dateFilter !== 'any' || priceFilter !== 'any';
     const clearFilters = () => {
         setSearchValue('');
-        setSearchParams({});
+        setSearchParams(hostParam ? { host: hostParam } : {});
         setDateFilter('any');
         setPriceFilter('any');
         setLimit(PAGE_SIZE);
@@ -159,20 +186,27 @@ export default function BrowsePage() {
             <main id="main" className="flex-1 pt-16">
                 <div className="border-b border-border bg-muted/30">
                     <div className="container mx-auto px-4 py-10">
-                        <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-lg">Browse events</h1>
-                        <p className="mt-2 text-muted-foreground">Everything on sale right now. Pick one and grab your tickets.</p>
+                        <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-lg">
+                            {hostHeading(state.host)}
+                        </h1>
+                        <p className="mt-2 text-muted-foreground">{hostSubheading(state.host)}</p>
 
                         <form onSubmit={handleSearchSubmit} className="mt-6 flex flex-col gap-3 sm:flex-row" role="search">
                             <div className="relative flex-1">
                                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                {/* "or organisers" promised a search across
+                                    organisers. The query only ever matches the
+                                    title, summary and venue of the events
+                                    already on this page (internal/store/events.go
+                                    ListPublished) — so say that. */}
                                 <label htmlFor="browse-search" className="sr-only">
-                                    Search events, venues, or organisers
+                                    Search these events
                                 </label>
                                 <Input
                                     id="browse-search"
                                     value={searchValue}
                                     onChange={(e) => setSearchValue(e.target.value)}
-                                    placeholder="Search events, venues, or organisers"
+                                    placeholder="Search these events"
                                     className={`pl-10 ${TAP_FIELD}`}
                                 />
                             </div>
@@ -223,16 +257,33 @@ export default function BrowsePage() {
                             className="mt-5"
                         />
 
-                        {hasActiveFilters && (
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                                Clear filters
-                            </button>
-                        )}
+                        <div className="flex flex-wrap items-center gap-x-5">
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
+                                >
+                                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Clear filters
+                                </button>
+                            )}
+
+                            {/* The way back out of a ?host= narrowing. Only on a
+                                box that actually hosts more than one
+                                organisation — on a single venue there is no
+                                "everything else" to return to, and offering the
+                                link would imply there is. */}
+                            {state.host?.org && showsOrgLabels(state.host) && (
+                                <Link
+                                    to="/events"
+                                    className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
+                                >
+                                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Show everything on this site
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -251,11 +302,13 @@ export default function BrowsePage() {
                     {!state.error && !state.loading && state.events.length === 0 && (
                         <EmptyState
                             icon={CalendarX2}
-                            title="No events found"
+                            title={hasActiveFilters ? 'No events found' : EMPTY_HEADING}
+                            // NOT "check back soon, new events are added all
+                            // the time". Nobody adds events to somebody else's
+                            // box, and on a venue between programmes that
+                            // sentence is simply untrue.
                             description={
-                                hasActiveFilters
-                                    ? 'Try a different search or loosen your filters.'
-                                    : 'Check back soon — new events are added all the time.'
+                                hasActiveFilters ? 'Try a different search or loosen your filters.' : emptyDescription(state.host)
                             }
                             action={
                                 hasActiveFilters ? (
@@ -290,7 +343,15 @@ export default function BrowsePage() {
                             </p>
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {filteredEvents.map((event, i) => (
-                                    <EventCard key={event.id} event={event} pricing={pricing[event.slug || event.id]} index={i} />
+                                    <EventCard
+                                        key={event.id}
+                                        event={event}
+                                        // null on a single-organisation box, so
+                                        // no organisation chrome appears at all.
+                                        org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
+                                        pricing={pricing[event.slug || event.id]}
+                                        index={i}
+                                    />
                                 ))}
                             </div>
 

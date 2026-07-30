@@ -176,7 +176,7 @@ export default function TicketsListPage() {
                         description="Once an order is paid, its tickets appear here — one QR code each, ready for the door."
                         action={
                             <Button className={TAP_BUTTON} asChild>
-                                <Link to="/events">Browse events</Link>
+                                <Link to="/events">What&apos;s on</Link>
                             </Button>
                         }
                     />

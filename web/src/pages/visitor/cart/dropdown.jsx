@@ -50,7 +50,7 @@ const CartDropdown = () => {
                         <ShoppingCart className="mx-auto h-8 w-8 text-muted-foreground/50" aria-hidden="true" />
                         <p className="mt-3 text-sm text-muted-foreground">Nothing in here yet.</p>
                         <Button variant="outline" size="sm" className="mt-4" asChild>
-                            <Link to="/events">Browse events</Link>
+                            <Link to="/events">What&apos;s on</Link>
                         </Button>
                     </div>
                 ) : (

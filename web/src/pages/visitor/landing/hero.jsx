@@ -92,14 +92,16 @@ function Hero({ query, onSearch }) {
                                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50"
                                 aria-hidden="true"
                             />
+                            {/* Scoped to this host's own events — the search
+                                reaches nothing else, so it must not offer to. */}
                             <label htmlFor="hero-search" className="sr-only">
-                                Search events, venues, or organisers
+                                Search these events
                             </label>
                             <Input
                                 id="hero-search"
                                 value={value}
                                 onChange={(e) => setValue(e.target.value)}
-                                placeholder="Search events or venues"
+                                placeholder="Search these events"
                                 className="h-11 border-0 bg-transparent pl-10 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/40"
                             />
                         </div>

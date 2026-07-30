@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { TAP_LINK } from '@/pages/visitor/ui-scale';
 
 const PLATFORM = [
-    { to: '/events', label: 'Browse events' },
+    { to: '/events', label: "What's on" },
     { to: '/pricing', label: 'Sell tickets' },
     { to: '/docs', label: 'How it works' },
     { to: '/contact', label: 'Contact' },

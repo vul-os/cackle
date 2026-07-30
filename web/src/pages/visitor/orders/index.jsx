@@ -111,7 +111,7 @@ export default function OrdersPage() {
                         description="Once you buy tickets, the order and its tickets show up here."
                         action={
                             <Button className={TAP_BUTTON} onClick={() => navigate('/events')}>
-                                Browse events
+                                What&apos;s on
                             </Button>
                         }
                     />

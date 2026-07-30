@@ -22,8 +22,20 @@ function formatDate(iso) {
  * events. `pricing` is optional best-effort per-card data ({ minPriceMinor,
  * soldOut }); omit it where the extra per-card lookup isn't worth it and the
  * card just won't show a price badge.
+ *
+ * `org` is optional and comes from `host.organisations` on GET /api/events,
+ * resolved by `orgForEvent()` in @/lib/host. Callers pass it ONLY on a box
+ * that hosts more than one organisation; on a single venue it is null and no
+ * organisation chrome renders, because a single venue must not be dressed up
+ * as a directory. The card never fetches it and never guesses it — a null org
+ * means "say nothing".
+ *
+ * The organisation is a NAME here, not a link: the whole card is already an
+ * <a> (the <Link> below), and nesting an anchor inside an anchor is invalid
+ * HTML. The link-through to an organisation's own listing lives beside the
+ * page heading instead.
  */
-const EventCard = ({ event, pricing, index = 0, featured = false }) => {
+const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
     const coverUrl = getCoverImageUrl(event);
     const price = pricing?.minPriceMinor;
 
@@ -75,6 +87,12 @@ const EventCard = ({ event, pricing, index = 0, featured = false }) => {
                         <h3 className={`font-display font-bold leading-snug tracking-tight group-hover:text-primary-emphasis ${featured ? 'text-xl' : 'text-lg'}`}>
                             {event.title}
                         </h3>
+                        {org && (
+                            <p className="text-sm text-muted-foreground">
+                                <span className="sr-only">Organised by </span>
+                                {org.name}
+                            </p>
+                        )}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="h-4 w-4 shrink-0" aria-hidden="true" />
                             <span>{formatDate(event.starts_at)}</span>

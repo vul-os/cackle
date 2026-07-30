@@ -138,7 +138,7 @@ const DocsPage = () => (
                                     </Link>
                                 </Button>
                                 <Button variant="outline" className={TAP_BUTTON} asChild>
-                                    <Link to="/events">Browse events</Link>
+                                    <Link to="/events">What&apos;s on</Link>
                                 </Button>
                             </div>
                         </Section>

@@ -101,7 +101,7 @@ const Header = ({ className = '' }) => {
                         <Button variant="ghost" asChild>
                             <Link to="/events">
                                 <Ticket className="mr-2 h-4 w-4" aria-hidden="true" />
-                                Browse events
+                                What&apos;s on
                             </Link>
                         </Button>
                         <CartDropdown />
@@ -138,7 +138,7 @@ const Header = ({ className = '' }) => {
                     <div className="container mx-auto flex flex-col gap-1 px-4 py-3">
                         <Button variant="ghost" className="w-full justify-start" onClick={() => handleNavigation('/events')}>
                             <Ticket className="mr-2 h-4 w-4" aria-hidden="true" />
-                            Browse events
+                            What&apos;s on
                         </Button>
                         {!loading && user && (
                             <Button variant="ghost" className="w-full justify-start" onClick={() => handleNavigation('/tickets')}>
