@@ -139,6 +139,15 @@ type PublicFilter struct {
 	From     time.Time `json:"from"`
 	To       time.Time `json:"to"`
 	Limit    int       `json:"limit"`
+	// OrgIDs restricts the listing to events owned by these organisations —
+	// the host display scope (internal/config.HostScope), resolved to org
+	// ids by the caller.
+	//
+	// nil means "no restriction". An EMPTY, NON-NIL slice means "restricted
+	// to no organisation" and returns nothing; the two are deliberately
+	// different, so a scope that resolves to nothing can never widen into
+	// "show the whole box". See store.ListPublishedEvents.
+	OrgIDs []string `json:"org_ids,omitempty"`
 }
 
 // TicketTypeStats is one ticket type's paid-sales figures within Stats.
@@ -435,7 +444,7 @@ func (s *Service) ListPublic(ctx context.Context, f PublicFilter) ([]Event, erro
 	if !f.To.IsZero() {
 		to = &f.To
 	}
-	rows, err := s.store.ListPublishedEvents(ctx, f.Query, normalizeCategory(f.Category), from, to, f.Limit)
+	rows, err := s.store.ListPublishedEvents(ctx, f.Query, normalizeCategory(f.Category), f.OrgIDs, from, to, f.Limit)
 	if err != nil {
 		return nil, err
 	}

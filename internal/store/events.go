@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -196,12 +197,25 @@ func (s *Store) scanEvent(row *sql.Row) (*Event, error) {
 
 // ListPublishedEvents returns published events, most recently created
 // first, optionally filtered by a case-insensitive substring match against
-// title/summary/venue_name, an exact category match, and/or a starts_at
-// range. limit <= 0 defaults to 50; it is always capped at 200. Only
-// status='published' rows are ever returned — this is enforced here, not
-// left to the caller, since this is the public listing route. category ==
-// "" means no category filter.
-func (s *Store) ListPublishedEvents(ctx context.Context, query, category string, from, to *time.Time, limit int) ([]Event, error) {
+// title/summary/venue_name, an exact category match, an owning-org
+// restriction, and/or a starts_at range. limit <= 0 defaults to 50; it is
+// always capped at 200. Only status='published' rows are ever returned —
+// this is enforced here, not left to the caller, since this is the public
+// listing route. category == "" means no category filter.
+//
+// orgIDs is the HOST DISPLAY SCOPE (internal/config.HostScope), and its two
+// empty cases mean opposite things, which is why it is a slice and not a
+// string:
+//
+//   - nil          no org restriction; every published event on this box.
+//   - empty slice  restrict to NO org, i.e. return nothing.
+//
+// An operator who has narrowed their box to one organisation that resolves
+// to nothing must get an empty listing, never the whole box. Collapsing
+// "restricted to nothing" into "unrestricted" is exactly the failure the
+// scope setting exists to prevent, so it is spelled out at the layer that
+// builds the SQL rather than trusted to every caller.
+func (s *Store) ListPublishedEvents(ctx context.Context, query, category string, orgIDs []string, from, to *time.Time, limit int) ([]Event, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -211,6 +225,28 @@ func (s *Store) ListPublishedEvents(ctx context.Context, query, category string,
 
 	q := eventSelectColumns + ` FROM events WHERE status = 'published'`
 	args := []any{}
+	if orgIDs != nil {
+		if len(orgIDs) == 0 {
+			// A restriction to the empty set. Expressed in SQL rather than by
+			// returning early so there is one code path and one result shape.
+			//
+			// Belt and braces, and knowingly so: SQLite accepts `x IN ()` and
+			// evaluates it to false, so the else branch below would also
+			// return nothing today. That means no test can kill this line —
+			// it is written out because the guarantee belongs to Cackle and
+			// not to a permissive quirk of one engine's grammar. The guard
+			// that IS observable, and is mutation-tested, is `orgIDs != nil`
+			// above: writing it as `len(orgIDs) > 0` turns "restricted to
+			// nothing" into "unrestricted" and reddens
+			// TestListPublishedEvents_OrgFilterNilVersusEmpty.
+			q += ` AND 0 = 1`
+		} else {
+			q += ` AND org_id IN (` + placeholders(len(orgIDs)) + `)`
+			for _, id := range orgIDs {
+				args = append(args, id)
+			}
+		}
+	}
 	if query != "" {
 		q += ` AND (title LIKE ? ESCAPE '\' OR summary LIKE ? ESCAPE '\' OR venue_name LIKE ? ESCAPE '\')`
 		like := "%" + likeEscape(query) + "%"
@@ -232,6 +268,48 @@ func (s *Store) ListPublishedEvents(ctx context.Context, query, category string,
 	args = append(args, limit)
 
 	return s.queryEvents(ctx, q, args...)
+}
+
+// placeholders returns "?, ?, ?" for n > 0. It exists so an IN clause is
+// built from a COUNT and never from caller-supplied text — the values
+// themselves always travel as bound arguments.
+func placeholders(n int) string {
+	return strings.TrimSuffix(strings.Repeat("?, ", n), ", ")
+}
+
+// ListPublicHostOrgs returns every organisation on this box that currently
+// has at least one PUBLISHED event, alphabetically by name.
+//
+// "Currently has a published event" is the visibility rule, not "exists":
+// an org with only drafts has published nothing, and listing it would
+// disclose that it exists (and what it is called) to anyone who loads the
+// root page. This is the set the public listing labels its events with, and
+// the set that decides whether a box is presenting one organisation or
+// several.
+func (s *Store) ListPublicHostOrgs(ctx context.Context) ([]Org, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT o.id, o.name, o.slug, o.default_currency, o.created_at
+		FROM orgs o
+		WHERE EXISTS (SELECT 1 FROM events e WHERE e.org_id = o.id AND e.status = 'published')
+		ORDER BY o.name COLLATE NOCASE ASC, o.id ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("store: list public host orgs: %w", err)
+	}
+	defer rows.Close()
+
+	var out []Org
+	for rows.Next() {
+		var o Org
+		var createdAt string
+		if err := rows.Scan(&o.ID, &o.Name, &o.Slug, &o.DefaultCurrency, &createdAt); err != nil {
+			return nil, fmt.Errorf("store: scan public host org: %w", err)
+		}
+		if o.CreatedAt, err = textToTime(createdAt); err != nil {
+			return nil, fmt.Errorf("store: parse org created_at: %w", err)
+		}
+		out = append(out, o)
+	}
+	return out, rows.Err()
 }
 
 // CategoryCount is one category's slug, display label, and the number of

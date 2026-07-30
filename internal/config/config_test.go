@@ -99,6 +99,7 @@ func isolateEnv(t *testing.T) {
 	t.Helper()
 	for _, k := range []string{
 		envAddr, envDB, envBaseURL, envSessionSecret, envMediaDir, envDemo, envPaystackKey,
+		envHostScope, envHostOrg, envHostName,
 	} {
 		t.Setenv(k, "")
 	}
@@ -405,6 +406,128 @@ func TestConfigNeverRendersKeyMaterial(t *testing.T) {
 	} {
 		if strings.Contains(rendered, secret) {
 			t.Fatalf("Config rendering leaks the passphrase: %s", rendered)
+		}
+	}
+}
+
+// --- host display scope ---------------------------------------------------
+
+// The default has to be the honest single-tenant one. A box that shows every
+// organisation's events by default, on a product that is self-hosted by one
+// organiser, is a marketplace page nobody asked for.
+func TestLoad_HostScopeDefaultsToOwn(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+
+	cfg, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HostScope != HostScopeOwn {
+		t.Errorf("HostScope = %q, want %q", cfg.HostScope, HostScopeOwn)
+	}
+	if cfg.HostOrg != "" || cfg.HostName != "" {
+		t.Errorf("HostOrg/HostName = %q/%q, want both empty", cfg.HostOrg, cfg.HostName)
+	}
+}
+
+func TestLoad_HostScopeSingle(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	t.Setenv(envHostScope, "  Single  ") // case and whitespace tolerated
+	t.Setenv(envHostOrg, " the-bijou ")
+	t.Setenv(envHostName, " The Bijou ")
+
+	cfg, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HostScope != HostScopeSingle {
+		t.Errorf("HostScope = %q, want %q", cfg.HostScope, HostScopeSingle)
+	}
+	if cfg.HostOrg != "the-bijou" {
+		t.Errorf("HostOrg = %q, want %q", cfg.HostOrg, "the-bijou")
+	}
+	if cfg.HostName != "The Bijou" {
+		t.Errorf("HostName = %q, want %q", cfg.HostName, "The Bijou")
+	}
+}
+
+// A typo in a tenancy setting must stop the process, not fall back to the
+// widest behaviour.
+func TestLoad_HostScopeUnknownIsRefused(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	t.Setenv(envHostScope, "singel")
+
+	_, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err == nil {
+		t.Fatal("Load accepted an unknown host scope; want an error")
+	}
+	if !strings.Contains(err.Error(), envHostScope) {
+		t.Errorf("error does not name %s: %v", envHostScope, err)
+	}
+}
+
+func TestLoad_HostScopeSingleNeedsAnOrg(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	t.Setenv(envHostScope, "single")
+
+	_, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err == nil {
+		t.Fatal("Load accepted single scope with no organisation named; want an error")
+	}
+	if !strings.Contains(err.Error(), envHostOrg) {
+		t.Errorf("error does not name %s: %v", envHostOrg, err)
+	}
+}
+
+// CACKLE_HOST_ORG next to a scope that ignores it is an operator who believes
+// their box presents as one organisation when it does not.
+func TestLoad_HostOrgWithoutSingleScopeIsRefused(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	for _, scope := range []string{"", "own", "peers"} {
+		t.Setenv(envHostScope, scope)
+		t.Setenv(envHostOrg, "the-bijou")
+		if _, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")}); err == nil {
+			t.Errorf("scope=%q with %s set was accepted; want an error", scope, envHostOrg)
+		}
+	}
+}
+
+// The peers scope is accepted as a NAME today and carries no peer data. If
+// this test ever has to change, peer events have become real and every claim
+// in docs/CONFIGURATION.md about them has to be re-read.
+func TestHostScopePeersCarriesNoPeerData(t *testing.T) {
+	isolateEnv(t)
+	clearKeyEnv(t)
+	t.Setenv(envHostScope, "peers")
+
+	cfg, err := Load(Flags{DB: filepath.Join(t.TempDir(), "cackle.db")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.HostScope != HostScopePeers {
+		t.Fatalf("HostScope = %q, want %q", cfg.HostScope, HostScopePeers)
+	}
+	for _, s := range []HostScope{HostScopeOwn, HostScopeSingle, HostScopePeers} {
+		if s.IncludesPeerEvents() {
+			t.Errorf("%q.IncludesPeerEvents() = true; no peer event source exists in this binary", s)
+		}
+	}
+}
+
+func TestHostScopeValid(t *testing.T) {
+	for _, s := range []HostScope{HostScopeOwn, HostScopeSingle, HostScopePeers} {
+		if !s.Valid() {
+			t.Errorf("%q.Valid() = false, want true", s)
+		}
+	}
+	for _, s := range []HostScope{"", "OWN", "peer", "all", "global"} {
+		if s.Valid() {
+			t.Errorf("%q.Valid() = true, want false", s)
 		}
 	}
 }

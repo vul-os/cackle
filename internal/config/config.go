@@ -62,7 +62,69 @@ type Config struct {
 	// boot log lines and error messages. Empty when none is configured. Safe
 	// to log — it is a variable name, never a value.
 	KeySourceOrigin string
+
+	// HostScope decides whose events the public listing at GET /api/events
+	// shows. See HostScope's own doc — this is a tenancy setting, not a
+	// display preference.
+	HostScope HostScope
+	// HostOrg names the one organisation this box presents as, when
+	// HostScope is HostScopeSingle. It is an org SLUG (preferred) or an org
+	// id, resolved at request time against the database — config cannot
+	// reach the database, and refusing to boot on a typo would also refuse
+	// to boot before the org has been created. Empty for every other scope.
+	HostOrg string
+	// HostName is the operator's own name for this box ("The Bijou",
+	// "Kloof Street Sessions"), shown as "Events at <HostName>". Empty means
+	// unset: the UI falls back to the organisation's own name (single scope)
+	// or to a name-free heading, and never invents one.
+	HostName string
 }
+
+// HostScope decides whose events the public listing shows. Cackle is
+// self-hosted by an organiser, so a root page that reads "browse all events"
+// implies a global marketplace that does not exist. This setting makes the
+// truth explicit and configurable.
+type HostScope string
+
+const (
+	// HostScopeOwn — the default — shows the published events of every
+	// organisation on THIS box, and nothing else. On a box that hosts one
+	// organisation this is that organisation's events; on a box that hosts
+	// several it is all of theirs, labelled per organisation.
+	HostScopeOwn HostScope = "own"
+	// HostScopeSingle presents the box as ONE organisation, named by
+	// HostOrg. Events belonging to any other organisation on the same box
+	// are not listed publicly. This is the common case for a single venue.
+	HostScopeSingle HostScope = "single"
+	// HostScopePeers is reserved for opt-in peer feeds — listing events from
+	// other Cackle boxes an operator has explicitly chosen to federate with.
+	//
+	// NO PEER DATA EXISTS TODAY. There is no peer event source in this
+	// binary, so this scope behaves EXACTLY as HostScopeOwn: it lists this
+	// box's own organisations' events and nothing else. It is accepted as a
+	// value so that the setting an operator writes now keeps its meaning
+	// when peer feeds land, and so the seam has one named place rather than
+	// being invented twice. The listing response reports
+	// "peers_included": false so a client can never assume otherwise.
+	HostScopePeers HostScope = "peers"
+)
+
+// Valid reports whether s is one of the three known scopes.
+func (s HostScope) Valid() bool {
+	switch s {
+	case HostScopeOwn, HostScopeSingle, HostScopePeers:
+		return true
+	}
+	return false
+}
+
+// IncludesPeerEvents reports whether the listing may contain events from
+// another box. It is FALSE for every scope, including HostScopePeers,
+// because no peer event source exists in this binary. It is a method rather
+// than a literal so that the day one does exist, there is exactly one place
+// that has to start saying true — and every caller (API response, docs
+// assertions, tests) follows.
+func (s HostScope) IncludesPeerEvents() bool { return false }
 
 // Key-material environment variables. Exactly one may be set; see
 // resolveKeySource.
@@ -181,6 +243,9 @@ const (
 	envPaystackKey   = "CACKLE_PAYSTACK_SECRET_KEY"
 	envDemo          = "CACKLE_DEMO"
 	envMediaDir      = "CACKLE_MEDIA_DIR"
+	envHostScope     = "CACKLE_HOST_SCOPE"
+	envHostOrg       = "CACKLE_HOST_ORG"
+	envHostName      = "CACKLE_HOST_NAME"
 
 	defaultAddr    = ":8080"
 	defaultDB      = "./cackle.db"
@@ -257,7 +322,56 @@ func Load(f Flags) (*Config, error) {
 	cfg.KeySource = keySrc
 	cfg.KeySourceOrigin = keyOrigin
 
+	scope, org, name, err := resolveHostScope()
+	if err != nil {
+		return nil, fmt.Errorf("config: %w", err)
+	}
+	cfg.HostScope = scope
+	cfg.HostOrg = org
+	cfg.HostName = name
+
 	return cfg, nil
+}
+
+// resolveHostScope reads the three CACKLE_HOST_* variables.
+//
+// Both failure modes here are refusals to start, because both are an
+// operator who believes their box is narrower than it is:
+//
+//   - An unrecognised scope. Falling back to the default would mean a
+//     typo ("singel") silently publishes every organisation's events on a
+//     box the operator meant to present as one venue.
+//   - CACKLE_HOST_ORG set alongside a scope that ignores it, or absent when
+//     the scope requires it. Same reasoning: the setting names a tenancy
+//     boundary, and a tenancy boundary that is quietly not applied is the
+//     failure this whole setting exists to prevent.
+//
+// CACKLE_HOST_ORG is NOT resolved against the database here — config has no
+// database, and the org may not have been created yet on first boot. The
+// listing route resolves it per request and fails closed (an error, never
+// "show everything") if it names no organisation.
+func resolveHostScope() (HostScope, string, string, error) {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(envHostScope)))
+	scope := HostScopeOwn
+	if raw != "" {
+		scope = HostScope(raw)
+		if !scope.Valid() {
+			return "", "", "", fmt.Errorf("%s=%q is not a known scope (want one of: %s, %s, %s)",
+				envHostScope, raw, HostScopeOwn, HostScopeSingle, HostScopePeers)
+		}
+	}
+
+	org := strings.TrimSpace(os.Getenv(envHostOrg))
+	switch {
+	case scope == HostScopeSingle && org == "":
+		return "", "", "", fmt.Errorf("%s=%s requires %s to name the one organisation this host presents as (its URL name, e.g. the-bijou)",
+			envHostScope, HostScopeSingle, envHostOrg)
+	case scope != HostScopeSingle && org != "":
+		return "", "", "", fmt.Errorf("%s is set but %s=%s ignores it; use %s=%s to present this host as one organisation, or unset %s",
+			envHostOrg, envHostScope, scope, envHostScope, HostScopeSingle, envHostOrg)
+	}
+
+	return scope, org, strings.TrimSpace(os.Getenv(envHostName)), nil
 }
 
 // firstNonEmpty returns the first non-empty string among candidates, in

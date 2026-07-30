@@ -31,11 +31,41 @@ func eventToMeta(ev *events.Event) scan.EventMeta {
 	}
 }
 
-// handleListPublicEvents serves GET /api/events?q=&from=&to=&limit= —
-// published events only, no auth required.
+// handleListPublicEvents serves GET /api/events?q=&category=&host=&from=&to=&limit=
+// — published events only, no auth required.
+//
+// This is THIS HOST'S listing, not a marketplace. Cackle is self-hosted by an
+// organiser, so the route answers with a "host" envelope naming whose events
+// these are (see host_scope.go) alongside the events themselves, and the set
+// it draws from is the configured host display scope rather than "every row in
+// the table". A client that renders only the array is still correct; a client
+// that wants to say "Events at The Bijou", or to label which organisation each
+// event belongs to on a box that hosts several, now has the facts to do it
+// without inventing any.
 func (s *server) handleListPublicEvents(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	filter := events.PublicFilter{Query: q.Get("q"), Category: q.Get("category")}
+
+	scope, orgs, orgIDs, err := s.hostScope(r.Context())
+	if err != nil {
+		// A scope that cannot be resolved fails CLOSED. The alternative —
+		// falling back to every organisation on the box — would publish
+		// events the operator narrowed the host away from, which is the exact
+		// failure this setting exists to prevent.
+		internalError(w, s.log(), "list public events: host scope", err)
+		return
+	}
+	view := hostView{
+		Scope:         string(scope),
+		Name:          hostDisplayName(s.deps.Config, scope, orgs),
+		Organisations: orgs,
+		MultiOrg:      len(orgs) > 1,
+		PeersIncluded: scope.IncludesPeerEvents(),
+	}
+	if !narrowToHostOrg(w, q.Get("host"), &view, &orgIDs) {
+		return
+	}
+	filter.OrgIDs = orgIDs
 
 	if from := q.Get("from"); from != "" {
 		t, err := time.Parse(time.RFC3339, from)
@@ -67,7 +97,7 @@ func (s *server) handleListPublicEvents(w http.ResponseWriter, r *http.Request) 
 		internalError(w, s.log(), "list public events", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"events": list})
+	writeJSON(w, http.StatusOK, map[string]any{"events": list, "host": view})
 }
 
 // handleGetPublicEvent serves GET /api/events/{slugOrID} — public, published
