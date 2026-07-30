@@ -16,6 +16,11 @@ type OAuthUserInfo struct {
 	Subject  string
 	Email    string
 	Name     string
+	// EmailVerified is the provider's own assertion that the person signing
+	// in controls Email. It is NOT a convenience flag: LoginWithOAuth
+	// refuses outright when it is false, because every account-linking
+	// decision downstream rests on it. See LoginWithOAuth.
+	EmailVerified bool
 }
 
 // OAuthProvider is the seam for third-party sign-in. Only a stub
@@ -65,9 +70,43 @@ func (p *StubOAuthProvider) Exchange(_ context.Context, _ string, _ string) (OAu
 //   - else creates a brand new account (with a random, unusable password —
 //     native login stays impossible until the user sets one via
 //     password-reset) and links the identity.
+//
+// # The account-linking decision, and why an unverified email is fatal
+//
+// Linking by email address is the whole reason this function is dangerous.
+// If a provider says "this is bob@venue.example" and Cackle attaches that to
+// the existing password account for bob@venue.example, then anybody who can
+// make the provider say that sentence owns Bob's organisation — his events,
+// his attendee roster, his payouts. With a provider that lets an account set
+// an arbitrary unverified address on itself, that is a self-service account
+// takeover, not an attack.
+//
+// So: EmailVerified is REQUIRED, and this is where the requirement is
+// enforced, before any lookup. Not "link only when verified, otherwise
+// create a fresh account" — refusing entirely is the only version with no
+// second path to reason about. A fresh account keyed on an unverified
+// address would still collide with the same address later, and the
+// placeholder-email branch below would leave an operator staring at an
+// account they cannot explain.
+//
+// What remains true after this rule, stated plainly rather than hidden: a
+// verified email from the provider IS accepted as proof of control of that
+// mailbox, and does link to an existing password account with the same
+// address. That is the standard trade — it is what "verified" means — and it
+// is the reason this is restricted to providers that make a verification
+// assertion at all. If a future provider cannot make one, it does not belong
+// here.
+//
+// GoogleProvider refuses an unverified address one layer earlier still, in
+// identityFromIDToken, so a bad token never reaches this function. This check
+// is the backstop, and the two are tested separately (see the mutation notes
+// in oauth_handlers_test.go) so neither can mask the other.
 func (s *Service) LoginWithOAuth(ctx context.Context, info OAuthUserInfo) (*store.User, error) {
 	if info.Provider == "" || info.Subject == "" {
 		return nil, errors.New("auth: oauth info missing provider/subject")
+	}
+	if !info.EmailVerified || info.Email == "" {
+		return nil, ErrOAuthEmailUnverified
 	}
 
 	ident, err := s.store.GetOAuthIdentity(ctx, info.Provider, info.Subject)
@@ -126,8 +165,12 @@ func (s *Service) findOrCreateOAuthUser(ctx context.Context, info OAuthUserInfo)
 		}
 	}
 	if email == "" {
-		// Provider gave no usable email: synthesize a unique placeholder
-		// so the NOT NULL UNIQUE constraint on users.email is satisfied.
+		// Reachable only when the provider asserted a VERIFIED address that
+		// normalizeEmail then rejected as not an address at all — verified
+		// garbage. LoginWithOAuth has already refused an empty one. Synthesize
+		// a unique placeholder so the NOT NULL UNIQUE constraint on
+		// users.email is satisfied, under a reserved TLD that can never
+		// collide with a real address and can never receive mail.
 		email = fmt.Sprintf("%s:%s@oauth.invalid", info.Provider, info.Subject)
 	}
 

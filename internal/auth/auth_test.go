@@ -367,9 +367,10 @@ func TestOAuthStubLoginCreatesAndLinksUser(t *testing.T) {
 	svc := NewService(st)
 
 	provider := NewStubOAuthProvider("google", OAuthUserInfo{
-		Subject: "google-subject-123",
-		Email:   "oauth@example.com",
-		Name:    "OAuth User",
+		Subject:       "google-subject-123",
+		Email:         "oauth@example.com",
+		Name:          "OAuth User",
+		EmailVerified: true,
 	})
 
 	info, err := provider.Exchange(ctx, "any-code", "https://cackle.example/callback")
@@ -401,7 +402,7 @@ func TestOAuthStubLoginCreatesAndLinksUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("signup native: %v", err)
 	}
-	linkedInfo := OAuthUserInfo{Provider: "github", Subject: "gh-456", Email: "linked@example.com", Name: "Linked"}
+	linkedInfo := OAuthUserInfo{Provider: "github", Subject: "gh-456", Email: "linked@example.com", Name: "Linked", EmailVerified: true}
 	linkedUser, err := svc.LoginWithOAuth(ctx, linkedInfo)
 	if err != nil {
 		t.Fatalf("LoginWithOAuth (link): %v", err)
@@ -412,7 +413,7 @@ func TestOAuthStubLoginCreatesAndLinksUser(t *testing.T) {
 }
 
 func TestAuthURLIsStubOnly(t *testing.T) {
-	provider := NewStubOAuthProvider("google", OAuthUserInfo{Subject: "s", Email: "e@example.com"})
+	provider := NewStubOAuthProvider("google", OAuthUserInfo{Subject: "s", Email: "e@example.com", EmailVerified: true})
 	url := provider.AuthURL("state123", "https://cackle.example/callback")
 	if url == "" {
 		t.Fatal("expected non-empty auth URL")
