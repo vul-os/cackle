@@ -435,6 +435,15 @@ type syncPeerView struct {
 	LastSyncAt *time.Time `json:"last_sync_at,omitempty"`
 	LastStatus string     `json:"last_status,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`
+
+	// The two event-feed switches (migration 0007, internal/httpapi/peer_feed.go).
+	// Separate from Ready/`enabled`: enrolling a peer to reconcile door scans is
+	// not consent to hand them your programme, nor to show theirs. Both are
+	// false on a peer that was just enrolled.
+	FeedPublish   bool       `json:"feed_publish"`
+	FeedSubscribe bool       `json:"feed_subscribe"`
+	FeedPulledAt  *time.Time `json:"feed_pulled_at,omitempty"`
+	FeedStatus    string     `json:"feed_status,omitempty"`
 }
 
 func syncPeerToView(p store.SyncPeer) syncPeerView {
@@ -442,6 +451,8 @@ func syncPeerToView(p store.SyncPeer) syncPeerView {
 		ID: p.ID, Name: p.Name, URL: p.URL, Key: p.PublicKey, Ready: p.Enabled,
 		Dialable: p.URL != "", PullCursor: p.PullCursor, PushCursor: p.PushCursor,
 		LastSyncAt: p.LastSyncAt, LastStatus: p.LastStatus, CreatedAt: p.CreatedAt,
+		FeedPublish: p.FeedPublish, FeedSubscribe: p.FeedSubscribe,
+		FeedPulledAt: p.FeedPulledAt, FeedStatus: p.FeedStatus,
 	}
 }
 

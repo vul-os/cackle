@@ -247,7 +247,28 @@ func New(deps Deps) http.Handler {
 			r.Post("/peers", s.requireUser(s.handleEnrolSyncPeer))
 			r.Delete("/peers/{id}", s.requireUser(s.handleDeleteSyncPeer))
 			r.With(rateLimit(syncLimiter)).Post("/peers/{id}/sync", s.requireUser(s.handleSyncPeerRound))
+
+			// The opt-in event feed (internal/httpapi/peer_feed.go). GET /feed is
+			// the PEER-AUTHENTICATED half and belongs with /ops: same signed
+			// envelope, same pinned key, same limiter — and it additionally
+			// refuses any key whose enrolment does not have publishing turned on.
+			//
+			// The three /peers/{id}/feed routes are ordinary owner-session routes:
+			// set the two switches, fetch now, read what the last fetch brought
+			// back. Nothing polls; a node whose operator never calls POST never
+			// opens a socket for a feed.
+			r.With(rateLimit(syncLimiter)).Get("/feed", s.handlePeerFeed)
+			r.Put("/peers/{id}/feed", s.requireUser(s.handleSetPeerFeed))
+			r.With(rateLimit(syncLimiter)).Post("/peers/{id}/feed", s.requireUser(s.handlePullPeerFeed))
+			r.Get("/peers/{id}/feed", s.requireUser(s.handleListPeerFeedCache))
 		})
+
+		// GET /api/peer-events?org=<id> reads THIS node's cache of what enrolled
+		// peers published. Public, because every row in it is an event its own
+		// publisher already made public on their own site, and it makes no
+		// network call of any kind — the cache is only ever filled by an operator
+		// triggering a pull against a peer they enrolled by hand.
+		r.Get("/peer-events", s.handleListPeerEventsForOrg)
 	})
 
 	// GET /media/{id} is public (uploaded event images are not secrets) and
