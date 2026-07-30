@@ -12,11 +12,9 @@ working even if the venue's network, or the server itself, goes down mid-event.
 
 <sub><img src="docs/assets/cackle-logo.svg" height="14" alt="VulOS"> Part of <strong><a href="https://vulos.org">VulOS</a></strong> — the open, self-hostable web OS &amp; app suite. Runs standalone, or as an app hosted by the Vulos OS.</sub>
 
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-F5A623.svg)](LICENSE-MIT)
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://golang.org)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
-[![Offline-verified](https://img.shields.io/badge/tickets-Ed25519%20offline--verified-FF4848)](docs/TICKET-FORMAT.md)
-[![Build](https://img.shields.io/github/actions/workflow/status/vul-os/cackle/ci.yml?branch=main&style=flat-square)](https://github.com/vul-os/cackle/actions)
+<!-- Plain-text badge on purpose: this page fetches nothing external, so it
+     doesn't ping a third party (shields.io) just to render a pill. -->
+<sub><a href="LICENSE-MIT">MIT</a> OR <a href="LICENSE-APACHE">Apache-2.0</a> · Go 1.25 · React 18 · <a href="docs/TICKET-FORMAT.md">Ed25519 offline-verified tickets</a></sub>
 
 [**Quick start**](#quick-start-standalone) · [**Docs**](docs/) · [**Ticket format**](docs/TICKET-FORMAT.md) · [**Offline gates**](docs/OFFLINE-GATES.md) · [**Roadmap**](ROADMAP.md)
 
