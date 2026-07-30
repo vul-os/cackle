@@ -584,15 +584,7 @@ pre .k{color:var(--red-ink)}
 .anat li span{display:block;color:var(--t2);font-size:14.2px;margin-top:4px}
 .anat li code{background:var(--sunken);border:1px solid var(--line);padding:1px 5px;border-radius:5px;font-size:.86em;color:var(--t1)}
 
-/* ── Vulos band + footer ─────────────────────────────────────────────────── */
-.band{
-  border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:30px;
-  display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;align-items:center;box-shadow:var(--shadow);
-}
-.band img{width:46px;height:46px;border-radius:12px}
-.band h3{font-size:19px;letter-spacing:-.025em;margin-bottom:9px}
-.band p{color:var(--t2);font-size:15px;max-width:76ch}
-.band .more{display:inline-flex;align-items:center;gap:7px;margin-top:14px;color:var(--red-ink);font-weight:750;font-size:14.5px}
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 .foot{border-top:1px solid var(--line);margin-top:20px}
 .foot-in{padding:34px 0 46px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between}
 .foot-l{display:flex;align-items:center;gap:11px;color:var(--t3);font-size:14px}
@@ -1402,24 +1394,6 @@ docker run -d -p 8080:8080 \
       <div class="lrow"><div class="nm">Signed releases, fail-closed verification <span class="chip chip-built">Built</span></div><div class="ds">A verify script with a test matrix covering the ways a tampered or truncated artefact must fail.</div></div>
       <div class="lrow"><div class="nm">Production-ready <span class="chip chip-planned">Planned</span></div><div class="ds">Cackle is experimental. The pieces above are built and tested, and it has not been run at scale by anybody. Treat a first event as a trial.</div></div>
       <div class="lrow"><div class="nm">Telemetry or a call home <span class="chip chip-never">Never</span></div><div class="ds">No analytics, no licence check, no default network call to any third party.</div></div>
-    </div>
-  </div>
-</section>
-
-<hr class="perf">
-
-<!-- ═══ VULOS ══════════════════════════════════════════════════════════════ -->
-<section>
-  <div class="wrap">
-    <div class="band rv">
-      <img src="./assets/vulos-logo.png" alt="Vulos">
-      <div>
-        <h3>Part of Vulos</h3>
-        <p>Vulos is an open, self-hostable web OS and the apps that come with it. Cackle runs perfectly well on its own — one file, no suite required — and also slots in as a first-class app in the Vulos shell alongside the rest.</p>
-        <a class="more" href="https://vulos.org" target="_blank" rel="noopener">Explore Vulos
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-        </a>
-      </div>
     </div>
   </div>
 </section>
