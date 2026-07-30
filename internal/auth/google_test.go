@@ -473,17 +473,55 @@ func TestFromEnvGoogle_OffUnlessBothVariablesAreSet(t *testing.T) {
 	// Half-configured is a refusal, never a silent fallback to "off": an
 	// operator who believes they enabled Google sign-in must be told, not
 	// left wondering where the button went.
-	for _, tc := range []struct{ id, secret string }{
-		{testClientID, ""},
-		{"", testClientSecret},
-		{testClientID, "   "},
-		{"  ", testClientSecret},
+	//
+	// SET-BUT-EMPTY and GENUINELY-UNSET are BOTH covered, and they are
+	// different code paths — os.LookupEnv can tell them apart, and the first
+	// version of this test only exercised the first kind. Running the
+	// mutation "if !idSet || !secretSet { return nil, nil }" is what found
+	// that: it stayed green, because every case here had both variables SET,
+	// one of them to "". The genuinely-unset cases below are the ones that
+	// mutation now fails.
+	for _, tc := range []struct {
+		name             string
+		id, secret       string
+		idSet, secretSet bool
+		wantNamedInError string
+	}{
+		{"client id set, secret entirely unset", testClientID, "", true, false, EnvGoogleClientSecret},
+		{"secret set, client id entirely unset", "", testClientSecret, false, true, EnvGoogleClientID},
+		{"client id set, secret set to empty", testClientID, "", true, true, EnvGoogleClientSecret},
+		{"secret set, client id set to empty", "", testClientSecret, true, true, EnvGoogleClientID},
+		{"client id set, secret is whitespace", testClientID, "   ", true, true, EnvGoogleClientSecret},
+		{"secret set, client id is whitespace", "  ", testClientSecret, true, true, EnvGoogleClientID},
 	} {
-		t.Run("half configured "+tc.id+"/"+tc.secret, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
+			// t.Setenv first in both cases so its cleanup restores whatever
+			// the environment held before, then unset for the "not set at
+			// all" half.
 			t.Setenv(EnvGoogleClientID, tc.id)
 			t.Setenv(EnvGoogleClientSecret, tc.secret)
-			if _, err := FromEnvGoogle(); !errors.Is(err, ErrOAuthMisconfigured) {
-				t.Fatalf("expected ErrOAuthMisconfigured, got %v", err)
+			if !tc.idSet {
+				os.Unsetenv(EnvGoogleClientID)
+			}
+			if !tc.secretSet {
+				os.Unsetenv(EnvGoogleClientSecret)
+			}
+
+			p, err := FromEnvGoogle()
+			if !errors.Is(err, ErrOAuthMisconfigured) {
+				t.Fatalf("expected ErrOAuthMisconfigured, got provider=%v err=%v", p != nil, err)
+			}
+			if p != nil {
+				t.Fatal("a provider was returned alongside the error")
+			}
+			// The message must name the MISSING variable, so the operator
+			// can fix it without reading the source.
+			if !strings.Contains(err.Error(), tc.wantNamedInError) {
+				t.Fatalf("the error does not name the missing variable %s: %v", tc.wantNamedInError, err)
+			}
+			// And must never echo the credential that WAS supplied.
+			if tc.secret != "" && strings.TrimSpace(tc.secret) != "" && strings.Contains(err.Error(), tc.secret) {
+				t.Fatalf("the error leaked the client secret: %v", err)
 			}
 		})
 	}

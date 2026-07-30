@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/vul-os/cackle/internal/auth"
 )
 
@@ -201,6 +203,77 @@ func TestOAuth_NotConfigured_NothingMountedNothingOffered(t *testing.T) {
 			t.Fatalf("%s on an unconfigured box: status %d, want 404 (body %s)", path, rec.Code, rec.Body.String())
 		}
 	}
+}
+
+// The test above asserts the OAuth paths 404 on an unconfigured box. That is
+// the behaviour a caller sees — but it is held up by TWO layers, and running
+// the mutation proved it: flipping deps.go's `if s.oauthProvider() != nil` to
+// `if true` left every assertion above GREEN, because handleOAuthStart's own
+// `p == nil` check still answers 404. A guard a neighbour can satisfy is not
+// a guard, and a mutation that changes nothing observable is a mutation that
+// proves nothing.
+//
+// So this test looks at the ROUTER instead of at a response: it enumerates
+// chi's registered patterns and requires the OAuth paths to be absent
+// entirely. Nothing downstream can satisfy it, because there is no handler
+// involved. It is also the honest version of the claim the docs make — "the
+// routes are not there", not "the routes are there and refuse".
+//
+// MUTATION: `if true` in deps.go's mount block, and this fails on its own.
+func TestOAuth_UnconfiguredBoxRegistersNoOAuthRouteAtAll(t *testing.T) {
+	routesOf := func(h http.Handler) []string {
+		t.Helper()
+		mux, ok := h.(chi.Routes)
+		if !ok {
+			t.Fatalf("the router is no longer a chi.Routes (%T) — this guard cannot see the route table", h)
+		}
+		var out []string
+		if err := chi.Walk(mux, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
+			out = append(out, method+" "+route)
+			return nil
+		}); err != nil {
+			t.Fatalf("walk routes: %v", err)
+		}
+		return out
+	}
+
+	bare := newTestHarness(t)
+	bareRoutes := routesOf(bare.handler)
+	// Fail-closed: a walk that found nothing must not pass by finding nothing.
+	if len(bareRoutes) < 30 {
+		t.Fatalf("only %d routes walked — the guard is looking at an empty router", len(bareRoutes))
+	}
+	for _, r := range bareRoutes {
+		if strings.Contains(r, "/oauth/") {
+			t.Fatalf("an unconfigured box REGISTERED an OAuth route: %q", r)
+		}
+	}
+	// The always-on providers endpoint must still be there, or the frontend
+	// cannot ask the question at all.
+	if !containsRoute(bareRoutes, "GET /api/auth/providers") {
+		t.Fatalf("GET /api/auth/providers is not registered:\n  %s", strings.Join(bareRoutes, "\n  "))
+	}
+
+	// Control: with a provider configured they ARE registered. Without this,
+	// a mount block deleted outright would pass everything above.
+	configured := routesOf(newTestHarness(t).withOAuth(verifiedFake()).handler)
+	for _, want := range []string{
+		"GET /api/auth/oauth/{provider}/start",
+		"GET /api/auth/oauth/{provider}/callback",
+	} {
+		if !containsRoute(configured, want) {
+			t.Fatalf("configured box did not register %q:\n  %s", want, strings.Join(configured, "\n  "))
+		}
+	}
+}
+
+func containsRoute(routes []string, want string) bool {
+	for _, r := range routes {
+		if r == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestOAuth_Configured_IsOfferedUnderARelativePath(t *testing.T) {
