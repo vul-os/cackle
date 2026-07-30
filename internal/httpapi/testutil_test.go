@@ -259,11 +259,14 @@ func (h *testHarness) signupUser(email, password, name string) (token, userID st
 	return resp.Token, resp.User.ID
 }
 
-// newOrgWithOwner creates an org directly against the store (there is no
-// HTTP route to create an org — see docs/API.md's "Org management", which
-// starts at managing an org's members: the org itself is assumed to already
-// exist, e.g. via --demo seed data or an out-of-band/admin path) and makes
-// userID its owner.
+// newOrgWithOwner creates an org directly against the store and makes
+// userID its owner. POST /api/orgs now exists (see handleCreateOrg), but
+// this fixture deliberately does NOT go through it: tests of other
+// subjects should not fail because org creation broke, and the org-
+// creation route needs at least one org in the world that it did not
+// itself create to prove its isolation against (see
+// TestCreateOrg_NonMemberOfAPreExistingOrgStaysOut). Tests OF the route
+// use h.createOrg in org_create_test.go.
 func (h *testHarness) newOrgWithOwner(name, slug, userID string) string {
 	h.t.Helper()
 	org := &store.Org{Name: name, Slug: slug}

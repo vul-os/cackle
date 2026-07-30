@@ -179,12 +179,17 @@ func TestRBAC_ScannerRoleSufficesButDoesNotElevate(t *testing.T) {
 	}
 }
 
-// TestRBAC_AuthOnlyRoutesRequireLogin covers the two wave-3 routes that
-// aren't org-scoped by URL at all — GET /api/banks (general reference
-// data) and POST /api/invites/accept (the token itself, not org
-// membership, carries the authority) — so they don't fit the
-// unauthenticated+non-member table above. Both must still reject an
-// anonymous caller outright.
+// TestRBAC_AuthOnlyRoutesRequireLogin covers the three routes that aren't
+// org-scoped by URL at all — GET /api/banks (general reference data),
+// POST /api/invites/accept (the token itself, not org membership, carries
+// the authority), and POST /api/orgs (there is no org yet to be a member
+// of) — so they don't fit the unauthenticated+non-member table above: a
+// non-member is a legitimate caller on all three. Every one must still
+// reject an anonymous caller outright.
+//
+// POST /api/orgs' non-member half is covered separately and deliberately,
+// by TestCreateOrg_OwnerOfNewOrgIsStillNonMemberElsewhere: creating an
+// org must grant no authority over any org that already exists.
 func TestRBAC_AuthOnlyRoutesRequireLogin(t *testing.T) {
 	h := newTestHarness(t)
 
@@ -197,6 +202,12 @@ func TestRBAC_AuthOnlyRoutesRequireLogin(t *testing.T) {
 	rec = h.do(http.MethodPost, "/api/invites/accept", "", map[string]any{"token": "bogus"})
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("POST /api/invites/accept unauthenticated: expected 401, got %d body %s", rec.Code, rec.Body.String())
+	}
+	assertErrorShape(t, rec)
+
+	rec = h.do(http.MethodPost, "/api/orgs", "", map[string]any{"name": "Anonymous Inc"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("POST /api/orgs unauthenticated: expected 401, got %d body %s", rec.Code, rec.Body.String())
 	}
 	assertErrorShape(t, rec)
 }
