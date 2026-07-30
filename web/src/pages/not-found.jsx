@@ -14,7 +14,15 @@ const NotFoundPage = () => {
             <p className="max-w-md text-muted-foreground">
                 The page you&apos;re looking for might have been removed, renamed, or never existed.
             </p>
-            <Button onClick={() => navigate('/')}>Go Home</Button>
+            {/* The one control on the page, and the only way out of it. The
+                button scale's `default` is 36px tall — a pointer size. This is
+                as likely to be hit by a thumb on a mistyped link as by a mouse,
+                so it gets a real 44x44 target (WCAG 2.5.5) and keeps it at
+                every width rather than relaxing above `sm`: there is nothing
+                crowding it that a tighter size would buy room for. */}
+            <Button className="h-11 min-w-[44px] px-6" onClick={() => navigate('/')}>
+                Go home
+            </Button>
         </div>
     );
 };
