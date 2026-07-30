@@ -72,6 +72,7 @@ const UpdatePassword = () => {
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 disabled={isLoading}
                                 required
+                                className="min-h-11"
                             />
                         </div>
                         <div className="space-y-2">
@@ -83,9 +84,10 @@ const UpdatePassword = () => {
                                 onChange={(e) => setConfirmNewPassword(e.target.value)}
                                 disabled={isLoading}
                                 required
+                                className="min-h-11"
                             />
                         </div>
-                        <Button type="submit" className="w-full" disabled={isLoading || !token}>
+                        <Button type="submit" size="lg" className="w-full" disabled={isLoading || !token}>
                             {isLoading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -97,7 +99,7 @@ const UpdatePassword = () => {
                         </Button>
                     </form>
                     <div className="mt-4">
-                        <Button variant="link" className="w-full" onClick={() => navigate('/login')} disabled={isLoading}>
+                        <Button variant="link" className="min-h-11 w-full" onClick={() => navigate('/login')} disabled={isLoading}>
                             Back to sign in
                         </Button>
                     </div>

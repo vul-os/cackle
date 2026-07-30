@@ -65,7 +65,14 @@ const SignUp = () => {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Name</Label>
-                                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={isLoading} required />
+                                <Input
+                                    id="name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    disabled={isLoading}
+                                    required
+                                    className="min-h-11"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
@@ -77,6 +84,7 @@ const SignUp = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={isLoading}
                                     required
+                                    className="min-h-11"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -88,6 +96,7 @@ const SignUp = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     disabled={isLoading}
                                     required
+                                    className="min-h-11"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -99,6 +108,7 @@ const SignUp = () => {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     disabled={isLoading}
                                     required
+                                    className="min-h-11"
                                 />
                             </div>
                             <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
@@ -121,7 +131,7 @@ const SignUp = () => {
                         <SsoButtons disabled={isLoading} />
                     </CardContent>
                     <CardFooter className="border-t border-border pt-6">
-                        <Button variant="link" className="w-full text-sm" onClick={() => navigate('/login')} disabled={isLoading}>
+                        <Button variant="link" className="min-h-11 w-full text-sm" onClick={() => navigate('/login')} disabled={isLoading}>
                             Already have an account? Sign in
                         </Button>
                     </CardFooter>

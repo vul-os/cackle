@@ -111,6 +111,7 @@ const SignIn = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                     disabled={isLoading}
                                     required
+                                    className="min-h-11"
                                 />
                             </div>
                             <div className="space-y-2">
@@ -123,6 +124,7 @@ const SignIn = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     disabled={isLoading}
                                     required
+                                    className="min-h-11"
                                 />
                             </div>
                             <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
@@ -144,10 +146,10 @@ const SignIn = () => {
                         <SsoButtons disabled={isLoading} />
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-2 border-t border-border pt-6">
-                        <Button variant="link" className="text-sm" onClick={() => navigate('/signup')} disabled={isLoading}>
+                        <Button variant="link" className="min-h-11 text-sm" onClick={() => navigate('/signup')} disabled={isLoading}>
                             Don&apos;t have an account? Sign up
                         </Button>
-                        <Button variant="link" className="text-sm text-muted-foreground" onClick={() => navigate('/password-reset')} disabled={isLoading}>
+                        <Button variant="link" className="min-h-11 text-sm text-muted-foreground" onClick={() => navigate('/password-reset')} disabled={isLoading}>
                             Forgot your password?
                         </Button>
                     </CardFooter>
