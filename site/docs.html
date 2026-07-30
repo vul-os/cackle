@@ -20,7 +20,7 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Cackle docs — Cackle documentation — the ticket format, running a gate with no network, clustering, payments, configuration and self-hosting.">
   <meta name="twitter:image" content="https://vulos.org/projects/cackle/assets/og-card.png">
-<meta name="theme-color" content="#0B0B0D">
+<meta name="theme-color" content="#14121A">
 <meta name="color-scheme" content="dark light">
 <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./assets/style.css">
@@ -57,7 +57,7 @@ document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(ma
       </button>
     </div>
   </div></header>
-<hr class="perf">
+<hr class="perf perf-red">
 <div class="wrap docs-shell">
   <aside class="docs-nav">
     <div class="label">Cackle docs</div>
@@ -184,7 +184,7 @@ document.getElementById('themeBtn').addEventListener('click', ()=>{
   root.setAttribute('data-theme', next);
   try { localStorage.setItem('cackle-site-theme', next); } catch(e){}
   const m = document.querySelector('meta[name=theme-color]');
-  if (m) m.setAttribute('content', next === 'light' ? '#FBFAF8' : '#0B0B0D');
+  if (m) m.setAttribute('content', next === 'light' ? '#FFFFFF' : '#14121A');
   initMermaid();
   load(current());
 });

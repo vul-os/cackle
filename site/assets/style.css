@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════════
    Cackle docs — the chrome for site/docs.html.
 
    This file used to dress BOTH pages. The landing is now self-contained (its
@@ -9,17 +9,21 @@
    markdown body.
 
    The tokens below are the LANDING's tokens, name for name and value for
-   value, including its light theme. That is the point of the rewrite: a
-   reader who sets the light theme on the landing and clicks "Docs" used to
-   land on a permanently-dark page in a different palette. Both pages now read
-   `cackle-site-theme` from localStorage before first paint and resolve to the
-   same surface.
+   value, including its light theme. That is the point: a reader who sets the
+   light theme on the landing and clicks "Docs" used to land on a permanently
+   dark page in a different palette. Both pages read `cackle-site-theme` from
+   localStorage before first paint and resolve to the same surface.
 
-   Measured, not guessed: #F5A623 on white is 1.99:1, so amber-coloured TEXT
-   (links, the active rail item) resolves to --amber-ink — a darkened amber in
-   light, a lifted one in dark — and the amber itself is only ever a fill or an
-   edge. See the note in site/index.html.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   COLOUR — three, per brand/logo.svg and the canonical spec: RED #FF4848,
+   WHITE #FFFFFF, INK #14121A, with BONE #F7F3EE as the light-theme sunken
+   surface so white cards lift off it.
+
+   MEASURED, not guessed: #FF4848 on white is 3.02:1 — a superb FILL and an
+   unusable INK for text on a light ground. So red-coloured TEXT (links, the
+   active rail item) resolves to --red-ink: #C42323 (5.9:1) in light, and
+   #FF4848 itself in dark, where it measures 5.5:1 against the ink ground. The
+   red is otherwise only ever a fill, an edge, or the wordmark's dot.
+   ════════════════════════════════════════════════════════════════════════════ */
 
 @font-face{
   font-family:'Figtree';
@@ -33,12 +37,13 @@
 *,*::before,*::after{box-sizing:border-box}
 
 :root{
-  --bg:#0B0B0D; --bg-2:#111114; --panel:#16161A; --panel-2:#1C1C21; --sunken:#141417;
-  --line:#26262B; --line-2:#35353D;
-  --t1:#F7F6F4; --t2:#A6A3AD; --t3:#7C7A85;
-  --amber:#F5A623; --amber-ink:#F8BC55; --amber-fg:#1A1105;
-  --amber-wash:rgba(245,166,35,.11); --amber-edge:rgba(245,166,35,.30);
-  --red:#FF4848;
+  /* Dark theme = INK ground. */
+  --bg:#14121A; --bg-2:#1A1722; --panel:#1D1A25; --panel-2:#252131; --sunken:#100E15;
+  --line:#2A2633; --line-2:#3A3547;
+  --t1:#FFFFFF; --t2:#A9A2B4; --t3:#8E87A0;
+  --red:#FF4848; --red-ink:#FF4848;
+  --red-wash:rgba(255,72,72,.13); --red-edge:rgba(255,72,72,.34);
+  --red-glow:rgba(255,72,72,.55);
   --err:#FF7B7B; --err-wash:rgba(255,72,72,.09); --err-edge:rgba(255,72,72,.28);
   --r:14px; --r-sm:9px; --max:1200px;
   --quick:130ms; --ease:cubic-bezier(.2,0,.2,1);
@@ -47,11 +52,13 @@
   color-scheme:dark;
 }
 :root[data-theme=light]{
-  --bg:#FBFAF8; --bg-2:#FFFFFF; --panel:#FFFFFF; --panel-2:#F6F4F1; --sunken:#F2F0EC;
-  --line:#E6E2DC; --line-2:#D6D1C9;
-  --t1:#17161A; --t2:#57545C; --t3:#6E6B74;
-  --amber-ink:hsl(30 92% 32%);
-  --amber-wash:rgba(245,166,35,.16); --amber-edge:rgba(180,110,10,.42);
+  /* Light theme = WHITE ground, BONE for anything sunken. */
+  --bg:#FFFFFF; --bg-2:#F7F3EE; --panel:#FFFFFF; --panel-2:#F7F3EE; --sunken:#F2ECE4;
+  --line:#E5DED5; --line-2:#D6CCC0;
+  --t1:#14121A; --t2:#57515E; --t3:#6B6470;
+  --red-ink:#C42323;              /* 5.9:1 on white — red as TEXT resolves here */
+  --red-wash:#FFF0F0; --red-edge:rgba(196,35,35,.30);
+  --red-glow:rgba(255,72,72,.42);
   --err:#C81E1E; --err-wash:rgba(200,30,30,.07); --err-edge:rgba(200,30,30,.28);
   color-scheme:light;
 }
@@ -64,7 +71,7 @@ body{
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-:where(a,button,summary,[tabindex]):focus-visible{outline:2px solid var(--amber-ink);outline-offset:2px;border-radius:7px}
+:where(a,button,summary,[tabindex]):focus-visible{outline:2px solid var(--red);outline-offset:2px;border-radius:7px}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}
@@ -75,16 +82,18 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 .skip{
   position:absolute;left:14px;top:-70px;z-index:200;padding:11px 18px;border-radius:10px;
-  background:var(--amber);color:var(--amber-fg);font-weight:750;font-size:14px;
+  background:var(--red);color:#fff;font-weight:750;font-size:14px;
   transition:top var(--quick) var(--ease);
 }
 .skip:focus{top:14px}
 
-/* The page's one structural motif, shared with the landing. */
+/* The page's one structural motif, shared with the landing: a ticket's tear
+   line. Restyled in the new palette, not replaced. */
 .perf{
   height:2px;width:100%;border:0;margin:0;
   background-image:repeating-linear-gradient(90deg,var(--line-2) 0 7px,transparent 7px 14px);
 }
+.perf-red{background-image:repeating-linear-gradient(90deg,var(--red-edge) 0 7px,transparent 7px 14px)}
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .site-header{
@@ -97,9 +106,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .brand{display:inline-flex;align-items:center;gap:11px;font-weight:800;letter-spacing:-.03em;font-size:19px;flex:none}
 .brand .tile{
   width:31px;height:31px;border-radius:9px;display:block;flex:none;
-  box-shadow:0 4px 14px -5px rgba(255,72,72,.7);
+  box-shadow:0 4px 14px -5px var(--red-glow);
 }
-.brand .dot{color:var(--amber)}
+/* Identity, not decoration: RED in BOTH themes, so it never follows the OS. */
+.brand .dot{color:var(--red)}
 .nav-links{display:flex;align-items:center;gap:3px;margin-left:auto}
 .nav-links a{
   padding:7px 11px;border-radius:8px;color:var(--t2);font-size:14px;font-weight:550;
@@ -138,15 +148,15 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 }
 @media(max-width:860px){.docs-nav{position:static}}
 .docs-nav .label{
-  font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--t3);
-  padding:6px 10px;font-weight:750;
+  font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--t3);
+  padding:6px 10px;font-weight:800;
 }
 .docs-nav a{
   display:block;padding:8px 11px;border-radius:8px;color:var(--t2);font-size:14.5px;font-weight:550;
   transition:color var(--quick) var(--ease),background var(--quick) var(--ease);
 }
 .docs-nav a:hover{background:var(--panel-2);color:var(--t1)}
-.docs-nav a.active{background:var(--amber-wash);color:var(--amber-ink)}
+.docs-nav a.active{background:var(--red-wash);color:var(--red-ink)}
 .docs-main{min-width:0}
 .docs-title{font-size:12.5px;color:var(--t3);margin-bottom:8px;font-weight:600;letter-spacing:.02em}
 .docs-error{
@@ -164,7 +174,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .markdown h4{font-size:16.2px;margin:1.3em 0 .4em}
 .markdown p,.markdown li{color:var(--t2)}
 .markdown strong,.markdown b{color:var(--t1);font-weight:700}
-.markdown a{color:var(--amber-ink);font-weight:550}
+.markdown a{color:var(--red-ink);font-weight:600}
 .markdown a:hover{text-decoration:underline}
 .markdown code{
   font-family:var(--mono);font-size:.87em;background:var(--sunken);
@@ -183,8 +193,8 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 }
 .markdown pre code{background:none;border:0;padding:0;font-size:13.4px;line-height:1.72;color:var(--t1);overflow-wrap:normal;word-break:normal}
 .markdown blockquote{
-  margin:1.2em 0;padding:.5em 1.1em;border-left:3px solid var(--amber);
-  background:var(--amber-wash);color:var(--t2);border-radius:0 var(--r-sm) var(--r-sm) 0;
+  margin:1.2em 0;padding:.5em 1.1em;border-left:3px solid var(--red);
+  background:var(--red-wash);color:var(--t2);border-radius:0 var(--r-sm) var(--r-sm) 0;
 }
 .markdown blockquote>*:first-child{margin-top:0}
 .markdown table{
@@ -194,7 +204,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .markdown th,.markdown td{border:1px solid var(--line);padding:9px 12px;text-align:left;color:var(--t2)}
 .markdown th{background:var(--panel-2);font-weight:700;color:var(--t1);white-space:nowrap}
 .markdown img{border-radius:10px;margin:1.2em 0;border:1px solid var(--line)}
-.markdown hr{border:none;border-top:1px dashed var(--line-2);margin:2.2em 0}
+.markdown hr{border:none;border-top:2px dashed var(--line-2);margin:2.2em 0}
 .markdown ul,.markdown ol{padding-left:1.35em}
 .markdown li+li{margin-top:.3em}
 .markdown .mermaid{
