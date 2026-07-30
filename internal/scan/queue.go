@@ -313,6 +313,31 @@ func (s *MemorySyncSink) All() []QueuedAdmission {
 // Attempts with a Status other than Admitted are returned unchanged —
 // reconciliation only ever resolves conflicts between attempts that each
 // independently believed they were the (sole) first admission.
+//
+// STATUS, stated so nobody mistakes this for the live path: nothing in
+// production calls ReconcileTicket. It is exercised only by this package's
+// tests. Two other things do the work it describes, and both are wired:
+//
+//   - the SERVER's reconciliation is `POST /api/scan/sync` plus the
+//     `admissions` table's partial unique index on
+//     `ticket_id WHERE result='admitted'`. Its winner rule is not this one —
+//     the first claim to REACH the server keeps the admitted row, rather than
+//     the earliest ScannedAt. That is deliberate: the row records who actually
+//     got through a door that has already opened, and reordering it after the
+//     fact by scan time would rewrite an operational record to match a tidier
+//     rule.
+//
+//   - the REPORT of what a partition let through is
+//     internal/scan/substrate, which expresses the same set of claims in the
+//     shared DMTAP Sync algebra and surfaces every surviving claim instead of
+//     naming a winner — because a §4.3 add-only set has no winner, and
+//     inventing one here that could disagree with the database above would be
+//     a second algebra.
+//
+// It is kept rather than deleted because the total order it defines
+// (ScannedAt, then DeviceID, then Note) is the order both of those paths
+// present claims in, and this is where that order is written down and tested.
+// Do not wire it in as a third authority.
 func ReconcileTicket(attempts []QueuedAdmission) []QueuedAdmission {
 	out := make([]QueuedAdmission, len(attempts))
 	copy(out, attempts)

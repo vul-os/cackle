@@ -391,3 +391,93 @@ func TestDecide_ConcurrentScans_ExactlyOneAdmitted(t *testing.T) {
 		})
 	}
 }
+
+// --- AdmittedIndex: the downstream convergence channel -------------------
+
+// TestDecideWithBundle_Duplicate_AdmittedAtAnotherGate is the property that
+// makes "sync opportunistically and the window shrinks" true rather than
+// hopeful. The local SeenSet has never seen this ticket — a fresh device, or
+// one that only just came back — and the ONLY evidence that somebody already
+// walked through with it is the bundle's admitted_index.
+func TestDecideWithBundle_Duplicate_AdmittedAtAnotherGate(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1", "ticket-2"})
+	b.AdmittedIndex = []string{"ticket-1"} // gate A admitted it; this is gate B
+	seen := NewMemorySeenSet()
+	now := time.Unix(1500, 0)
+
+	res := DecideWithBundle(context.Background(), token, b, seen, now)
+	if res.Status != Duplicate {
+		t.Fatalf("expected Duplicate for a ticket admitted at another gate, got %s (%s)", res.Status, res.Reason)
+	}
+	if res.Payload == nil || res.Payload.TID != "ticket-1" {
+		t.Fatalf("a duplicate must still identify the ticket, got %+v", res.Payload)
+	}
+	if res.Reason == "" {
+		t.Fatalf("expected a reason an operator can act on")
+	}
+
+	// The local set converged: this gate now refuses on its own evidence, so a
+	// later bundle that no longer lists the ticket cannot re-open the door.
+	if ok, err := seen.Seen(context.Background(), "ticket-1"); err != nil {
+		t.Fatalf("Seen: %v", err)
+	} else if !ok {
+		t.Fatal("the other gate's admission must be folded into the local dedupe log")
+	}
+	b.AdmittedIndex = nil
+	if res := DecideWithBundle(context.Background(), token, b, seen, now); res.Status != Duplicate {
+		t.Fatalf("after convergence the local log alone must refuse, got %s", res.Status)
+	}
+}
+
+// TestDecideWithBundle_AdmittedIndex_EmptyAndAbsentBehaveIdentically pins the
+// documented asymmetry with TicketIndex: an empty admitted index carries no
+// hidden "admit nothing" meaning, so it needs no present flag.
+func TestDecideWithBundle_AdmittedIndex_EmptyAndAbsentBehaveIdentically(t *testing.T) {
+	for name, idx := range map[string][]string{"absent": nil, "empty": {}} {
+		b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1"})
+		b.AdmittedIndex = idx
+		res := DecideWithBundle(context.Background(), token, b, NewMemorySeenSet(), time.Unix(1500, 0))
+		if res.Status != Admitted {
+			t.Fatalf("%s admitted_index must not block admission, got %s (%s)", name, res.Status, res.Reason)
+		}
+	}
+}
+
+// TestDecideWithBundle_AdmittedIndex_DoesNotShadowRevocation keeps the check
+// order honest: a revoked ticket that also happens to appear in the admitted
+// index must still be Invalid, not merely Duplicate. Reporting "already used"
+// for a ticket that was never legitimately usable would tell an operator the
+// wrong story.
+func TestDecideWithBundle_AdmittedIndex_DoesNotShadowRevocation(t *testing.T) {
+	b, token := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-other"})
+	b.AdmittedIndex = []string{"ticket-1"}
+	res := DecideWithBundle(context.Background(), token, b, NewMemorySeenSet(), time.Unix(1500, 0))
+	if res.Status != Invalid {
+		t.Fatalf("a revoked ticket must be Invalid even if it is in admitted_index, got %s", res.Status)
+	}
+}
+
+// TestDecideWithBundle_AdmittedIndex_DoesNotShadowWrongEvent is the same
+// ordering guarantee for the other terminal outcome.
+func TestDecideWithBundle_AdmittedIndex_DoesNotShadowWrongEvent(t *testing.T) {
+	b, _ := issueTestBundle(t, "event-1", "ticket-1", 1000, 2000, []string{"ticket-1"})
+	otherRing, otherToken := issueTestTicket(t, "event-2", "ticket-1", 1000, 2000)
+	b.IssuerKeys = otherRing
+	b.AdmittedIndex = []string{"ticket-1"}
+
+	res := DecideWithBundle(context.Background(), otherToken, b, NewMemorySeenSet(), time.Unix(1500, 0))
+	if res.Status != WrongEvent {
+		t.Fatalf("a wrong-event ticket must stay WrongEvent, got %s", res.Status)
+	}
+}
+
+// TestDecide_IgnoresAdmittedIndex_BecauseItHasNoBundle guards the stable
+// signature Decide's JS port and internal/httpapi depend on: Decide takes no
+// Bundle, so it cannot and must not gain the cross-gate check.
+func TestDecide_IgnoresAdmittedIndex_BecauseItHasNoBundle(t *testing.T) {
+	ring, token := issueTestTicket(t, "event-1", "ticket-1", 1000, 2000)
+	res := Decide(context.Background(), token, ring, "event-1", NewMemorySeenSet(), time.Unix(1500, 0))
+	if res.Status != Admitted {
+		t.Fatalf("Decide is signature+local-dedupe only, got %s (%s)", res.Status, res.Reason)
+	}
+}

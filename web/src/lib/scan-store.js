@@ -38,11 +38,15 @@ function getDB() {
 
 /**
  * Cache a scan bundle fetched from GET /api/events/:id/scan-bundle. Shape:
- * { event, issuer_keys, ticket_index[], ticket_index_present, allocation,
- * issued_at } — see internal/scan/bundle.go and docs/OFFLINE-GATES.md.
+ * { event, issuer_keys, ticket_index[], ticket_index_present,
+ * admitted_index[], allocation, issued_at } — see internal/scan/bundle.go and
+ * docs/OFFLINE-GATES.md.
  * `ticket_index_present` is the one that decides whether an EMPTY index means
- * "admit nothing" or "no data, fall back to signature-only"; `allocation` is
- * always null today (unbuilt delegated issuance).
+ * "admit nothing" or "no data, fall back to signature-only".
+ * `admitted_index` is the tickets already admitted anywhere as of the
+ * bundle's issued_at — the channel by which re-pulling a bundle carries other
+ * gates' admissions down to this device; `allocation` is always null today
+ * (unbuilt delegated issuance).
  */
 export async function saveBundle(eventId, bundle) {
     const db = await getDB();

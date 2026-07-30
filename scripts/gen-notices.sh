@@ -14,12 +14,61 @@
 # THIRD-PARTY-NOTICES.txt is committed at the repo root. It is NOT
 # hand-maintained — re-run this after changing go.mod or web/package.json.
 #
-# Degrades gracefully: if web/ has no package.json yet (frontend not
-# scaffolded), or a tool can't be installed (no network), that section is
-# skipped with an explanatory note rather than failing the whole run — this
-# script must never be the reason `make check` is red for reasons unrelated
-# to licensing.
+# Degrades gracefully for ENVIRONMENT problems: if web/ has no package.json
+# yet (frontend not scaffolded), or a tool can't be installed (no network),
+# that section is skipped with an explanatory note rather than failing the
+# whole run — this script must never be the reason `make check` is red for
+# reasons unrelated to licensing.
+#
+# It does NOT degrade for LICENSING problems, and the difference is the whole
+# point of the distinction. A dependency whose licence cannot be determined is
+# not an environment hiccup: it means this binary redistributes code whose
+# attribution requirements are unknown, and writing a notices file that simply
+# omits the entire Go section would produce a shorter, cleaner, WRONG file that
+# looks exactly like a correct one. Attribution is a redistribution obligation,
+# not a nice-to-have, so that case exits non-zero and leaves the committed
+# file untouched. Fix the dependency (or record an override with evidence —
+# see scripts/notices/go-licence-overrides.json) and re-run.
 set -uo pipefail
+
+# Exit code 4 means "the graph resolved but a module's licence is unknown" —
+# distinct from a tool/network failure, which is still a soft skip.
+#
+# ── Overrides, and the rule for adding one ──────────────────────────────────
+# scripts/notices/go-licence-overrides.json, if present, is passed to
+# go-licence-detector as -overrides. Its format is ONE JSON OBJECT PER LINE
+# (not a JSON document, and it tolerates no comments):
+#
+#   {"name": "example.com/mod", "licenceType": "Apache-2.0", "url": "https://..."}
+#
+# Record EVIDENCE, not a guess. An override is an assertion about someone
+# else's licence terms, shipped to everyone who receives this binary, and a
+# wrong entry is worse than a missing one because it looks authoritative.
+# Acceptable evidence: a LICENSE file in the upstream repository at the pinned
+# version, a clear SPDX identifier there, or a written statement from the
+# copyright holder. Cite it in the commit message, since the file itself
+# cannot carry comments.
+#
+# ── KNOWN GAP, unresolved as of this writing ────────────────────────────────
+# github.com/vul-os/kotva/bindings/go@v0.2.1 — the shared DMTAP sync engine,
+# a direct dependency of internal/scan/substrate — ships NO licence file:
+#
+#   unzip -l "$(go env GOMODCACHE)"/cache/download/github.com/vul-os/kotva/bindings/go/@v/v0.2.1.zip \
+#     | grep -i licen        → no matches
+#
+# and there is no SPDX identifier or licence statement in its README.md, its
+# go.mod, or any source file in the module. Its terms therefore cannot be
+# established from what it distributes, and NO override is recorded — assuming
+# it matches Cackle's own "MIT OR Apache-2.0" would be an assertion with
+# nothing behind it.
+#
+# Consequence, stated plainly: this script exits 4 and
+# THIRD-PARTY-NOTICES.txt cannot be regenerated until the licence is
+# established. That is a visible blocker instead of a notices file that
+# quietly stopped listing every Go dependency. The fix belongs upstream —
+# publish a LICENSE file in the kotva repository and it is picked up
+# automatically, at which point this whole note can be deleted.
+EXIT_UNKNOWN_LICENCE=4
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -47,10 +96,15 @@ if [[ -f go.mod ]]; then
 
   if [[ -n "$DETECTOR" ]]; then
     echo "==> resolving Go module graph"
+    OVERRIDES=()
+    [[ -f scripts/notices/go-licence-overrides.json ]] && \
+      OVERRIDES=(-overrides scripts/notices/go-licence-overrides.json)
+
     if go mod download 2>"$TMP/go-mod.err" \
       && go list -m -json all 2>>"$TMP/go-mod.err" | "$DETECTOR" \
            -includeIndirect \
            -rules scripts/notices/go-licence-rules.json \
+           "${OVERRIDES[@]+"${OVERRIDES[@]}"}" \
            -noticeTemplate scripts/notices/go-modules.tmpl \
            -noticeOut "$GO_NOTICES" 2>>"$TMP/go-mod.err"
     then
@@ -58,6 +112,32 @@ if [[ -f go.mod ]]; then
     else
       echo "    go module notice generation failed:" >&2
       cat "$TMP/go-mod.err" >&2 || true
+
+      # An undetectable licence is a licensing defect, not an environment one.
+      # Refuse rather than write a notices file that silently drops every Go
+      # module — the resulting file would be shorter, valid-looking, and
+      # missing attribution this binary is obliged to reproduce.
+      if grep -qi "no licence file found\|no license file found" "$TMP/go-mod.err"; then
+        cat >&2 <<'UNKNOWN'
+
+    REFUSING to write THIRD-PARTY-NOTICES.txt.
+
+    A Go module in the graph ships no licence file, so its attribution
+    requirements are unknown. Omitting the whole Go section to get a green run
+    would produce a file that looks complete and is not — and attribution is a
+    condition of redistributing this code, not an optional extra.
+
+    To resolve, either:
+      * get the upstream module to ship a LICENSE file (the correct fix), or
+      * record it in scripts/notices/go-licence-overrides.json WITH the
+        evidence for the licence you are asserting. Do not guess: asserting a
+        licence on someone else's behalf is worse than an incomplete file.
+
+    The committed THIRD-PARTY-NOTICES.txt has been left untouched.
+UNKNOWN
+        exit "$EXIT_UNKNOWN_LICENCE"
+      fi
+
       GO_STATUS="failed (see stderr above) — section omitted"
       : > "$GO_NOTICES"
     fi

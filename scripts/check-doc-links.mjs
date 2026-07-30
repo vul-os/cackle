@@ -247,6 +247,20 @@ const SIBLING_PATALA_DOCS = new Set([
     'patala-go/README.md',
 ]);
 
+// Specifications that live in ANOTHER PROJECT entirely and are cited by name
+// because that is the only honest way to cite them — KOTVA's sync capability
+// document, referenced by internal/scan/substrate, which implements the
+// mapping that document specifies. It is not vendored here (only the compiled
+// engine is, inside the Go module) so there is no repo path it could resolve
+// to, and inventing a local stub to satisfy this pass would be worse than
+// naming the real source.
+//
+// Listed EXACTLY, and one spelling only, for the same reason as the patala set
+// above: a typo, a renamed section file, or a citation of some other external
+// document still fails. Cite it as `substrate/SYNC.md`, matching the path
+// inside the KOTVA repository.
+const EXTERNAL_SPEC_DOCS = new Set(['substrate/SYNC.md']);
+
 // `[A-Za-z0-9_]` first char keeps this off `*.md` globs and bare `.md`
 // extensions in code.
 const SOURCE_CITATION_RE = /[A-Za-z0-9_][A-Za-z0-9_./-]*\.md\b/g;
@@ -316,7 +330,7 @@ async function checkSourceCitations() {
             checked++;
             if (reported.has(cited)) continue;
 
-            if (SIBLING_PATALA_DOCS.has(cited)) continue;
+            if (SIBLING_PATALA_DOCS.has(cited) || EXTERNAL_SPEC_DOCS.has(cited)) continue;
 
             const candidates = cited.includes('/')
                 ? [resolveRepoPath('', cited), resolveRepoPath(fileDir + '/', cited)]

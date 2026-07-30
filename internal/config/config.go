@@ -168,6 +168,27 @@ func defaultMediaDirFor(dbPath string) string {
 	return filepath.Join(filepath.Dir(dbPath), "media")
 }
 
+// ScanCacheDir is where the shared DMTAP sync engine's compiled WebAssembly
+// machine code is cached, derived from the database path so a self-hoster gets
+// it beside their data with zero extra configuration.
+//
+// It holds NOTHING secret and nothing durable: only wazero's compilation
+// output, which is a pure function of a module embedded in the binary. Deleting
+// it costs a few hundred milliseconds on the next reconciliation report and
+// nothing else, which is why an unwritable or missing directory is not an error
+// anywhere — it degrades startup speed, never correctness. It is deliberately
+// NOT under MediaDir, which is served over HTTP.
+//
+// An in-memory or empty DB path (tests, ephemeral runs) returns "", meaning "do
+// not cache at all" rather than scattering cache directories through whatever
+// the working directory happens to be.
+func (c *Config) ScanCacheDir() string {
+	if c == nil || c.DB == "" || c.DB == ":memory:" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(c.DB), "wasm-cache")
+}
+
 // secretFilePath derives a persisted-secret path from the database path so
 // the generated secret survives restarts without requiring extra config.
 func secretFilePath(dbPath string) string {

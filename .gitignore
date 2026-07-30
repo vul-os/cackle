@@ -9,6 +9,10 @@ web/node_modules
 node_modules
 
 # local state
+# wazero's compiled-machine-code cache, created beside CACKLE_DB on first use
+# of the reconciliation report (config.Config.ScanCacheDir). Pure build
+# output — nothing secret, nothing durable, safe to delete.
+wasm-cache/
 *.db
 *.db-shm
 *.db-wal

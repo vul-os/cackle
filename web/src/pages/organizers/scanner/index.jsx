@@ -133,11 +133,19 @@ const ScannerPage = () => {
         // empty index means "admit nothing" (all revoked / none issued), NOT
         // "no data". Only a legacy bundle lacking the flag falls back to
         // signature-only checking. This mirrors Go's DecideWithBundle exactly.
+        //
+        // admitted_index is the tickets the server already had an admission
+        // for when this bundle was built — the ONLY way this device learns
+        // about an admission that happened at a DIFFERENT gate. It needs no
+        // "present" flag: empty and absent both mean "this bundle knows of
+        // nobody already inside", and both correctly leave the decision to the
+        // local dedupe log. See internal/scan/bundle.go.
         setSession({
             event: normaliseSessionEvent(bundle.event, event),
             keyRing,
             ticketIndex: Array.isArray(bundle.ticket_index) ? bundle.ticket_index : [],
             ticketIndexPresent: bundle.ticket_index_present === true,
+            admittedIndex: Array.isArray(bundle.admitted_index) ? bundle.admitted_index : [],
         });
     };
 
@@ -153,6 +161,7 @@ const ScannerPage = () => {
                 keyRing={session.keyRing}
                 ticketIndex={session.ticketIndex}
                 ticketIndexPresent={session.ticketIndexPresent}
+                admittedIndex={session.admittedIndex}
                 gateId={gateId}
                 onExit={() => setSession(null)}
             />

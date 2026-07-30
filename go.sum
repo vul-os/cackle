@@ -19,6 +19,12 @@ github.com/oklog/ulid/v2 v2.1.1/go.mod h1:rcEKHmBBKfef9DhnvX7y1HZBYxjXb0cP5ExxNs
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
+github.com/tetratelabs/wazero v1.12.0 h1:DuWcpNu/FzgEXgGBDp8J1Spc+CWOvvtvVyjKlaZopYU=
+github.com/tetratelabs/wazero v1.12.0/go.mod h1:LvKtzl2RqO4gyF27BiXU+nKAjcV8f38U+kP/q2vgxh0=
+github.com/vul-os/kotva/bindings/go v0.2.1 h1:gJ5xPlqH67Ne3aYk0J13750HrwLgH0eZ1iWsju0Wc0A=
+github.com/vul-os/kotva/bindings/go v0.2.1/go.mod h1:vDg6WQ9Hvv0Q/Jpd9uynqWnBa7g5CvWK3B8DHFPPPHA=
+github.com/vul-os/kotva/bindings/go v0.2.2 h1:KVsu66K4n1HiH0gV6WTydtJkqwVwOm/uxl5czZky5sM=
+github.com/vul-os/kotva/bindings/go v0.2.2/go.mod h1:vDg6WQ9Hvv0Q/Jpd9uynqWnBa7g5CvWK3B8DHFPPPHA=
 golang.org/x/crypto v0.54.0 h1:YLIA59K4fiNzHzjnZt2tUJQjQtUWfWbeHBqKtk3eScw=
 golang.org/x/crypto v0.54.0/go.mod h1:KWL8ny2AZdGR2cWmzeHrp2azQPGogOv+HeQaVEXC2dk=
 golang.org/x/image v0.44.0 h1:+tDekMZED9+LrtB3G5xzRggpVh9CARjZqROla3R3R+I=

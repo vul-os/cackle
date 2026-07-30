@@ -35,6 +35,7 @@ unplugged:
   "issuer_keys": [{ "kid": "...", "public_key": "..." }],
   "ticket_index": ["<ticket_id>", "..."],
   "ticket_index_present": true,
+  "admitted_index": ["<ticket_id>", "..."],
   "allocation": null,
   "issued_at": "2026-07-20T18:00:00Z"
 }
@@ -76,6 +77,34 @@ unplugged:
     changes, or opportunistically whenever a device briefly has signal),
     the same way you'd periodically re-sync admissions in the other
     direction.
+- **`admitted_index`** — the set of ticket IDs that **already have a
+  recorded admission** for this event as of `issued_at`: the server's
+  reconciled view of "these people are already inside". It is the **only**
+  channel by which one gate ever learns about an admission that happened at a
+  *different* gate. A scan whose signature verifies, whose event matches, and
+  which is in `ticket_index`, but whose `tid` appears here, is refused as
+  `result=duplicate` with reason "ticket already admitted at another gate" —
+  and folded into the device's own dedupe log so it keeps refusing on its own
+  evidence afterwards. See `internal/scan.DecideWithBundle`.
+
+  Be precise about what this buys, because it is easy to over-read:
+  - **It narrows the window; it does not close it.** A ticket admitted at
+    gate A one minute ago is not in a bundle gate B downloaded this morning,
+    and gate B *will* admit it. Two gates that cannot see each other cannot be
+    stopped from double-admitting a ticket — that needs coordination they do
+    not have, and no merge rule invents coordination. What this field does is
+    make every re-pull collapse the window that has accumulated so far.
+  - **There is no `admitted_index_present` flag, deliberately.** An empty
+    `ticket_index` is ambiguous ("nothing issued" vs "everything revoked")
+    and needs a flag to disambiguate, because the two demand opposite
+    behaviour. An empty or absent `admitted_index` is not ambiguous: both mean
+    "this bundle knows of nobody already inside", and both must therefore
+    leave the decision to the device's local log. A flag would distinguish two
+    cases with identical correct behaviour.
+  - It is read off the reconciled `result='admitted'` rows — the single-winner
+    view the database's partial unique index enforces — not off every device's
+    belief. A gate should treat "the server says this ticket is used" as
+    authoritative, not "some device thought so".
 - **`allocation`** — **always `null` today.** The field, the `allocations`
   table and `internal/scan`'s sign/verify/count helpers exist as the seam for
   capacity delegation to sub-issuers (a signed grant letting a disconnected
@@ -93,7 +122,7 @@ doesn't already know about won't be recognised until refreshed.
 
 ## Step 2 — scanning, with no network
 
-Every scan against a locally-held bundle does up to three things, all
+Every scan against a locally-held bundle does up to four things, all
 local (`internal/scan.DecideWithBundle`):
 
 1. **Verify the capability** — `internal/tickets.Verify(token, pinned_pubkey,
@@ -104,11 +133,17 @@ local (`internal/scan.DecideWithBundle`):
    in it is rejected `result='invalid'` even though its signature is
    perfectly valid — see the `ticket_index` bullet above for exactly what
    this does and does not catch.
-3. **Check the local `admissions` table** for this `ticket_id`. First scan
+3. **Check `admitted_index`**, if the bundle has one. A ticket the server
+   already had an admission for when the bundle was built is refused
+   `result='duplicate'` ("ticket already admitted at another gate") and folded
+   into this device's own log, so it keeps being refused even after the bundle
+   is replaced. This is the only step that can know anything about a *different*
+   gate, and it only knows what was true when the bundle was downloaded.
+4. **Check the local `admissions` table** for this `ticket_id`. First scan
    wins and is recorded `result='admitted'`. Every scan after that is
    recorded as its own row, `result='duplicate'` — **never** overwriting the
-   original. A scan that fails verification (step 1) or fails the index
-   check (step 2) is recorded `result='invalid'`; a scan for the wrong
+   original. A scan that fails verification (step 1) or fails either index
+   check (steps 2 and 3) is recorded accordingly; a scan for the wrong
    event's ticket is recorded `result='wrong_event'`.
 
 Nothing in this loop touches the network. A gate can run for the length of
@@ -143,9 +178,103 @@ auditable record of what happened — and a person who is already inside.
 So: **on-device double-scan is prevented; cross-device double-scan while
 offline is detected after the fact, not stopped at the door.** If your threat
 model is one attendee lending a ticket to a friend at a second entrance
-while the venue is offline, this design does not stop it today.
+while the venue is offline, this design does not stop it today. It cannot be
+made to: preventing it requires the two gates to agree with each other at the
+moment of the scan, which is exactly the thing being offline from each other
+rules out. Any product claiming otherwise is claiming something impossible.
+Plan around detection, not prevention.
 
-The fix — a venue mesh sync between scanners, CRDT-merged over local
+### Seeing what slipped through
+
+```
+GET /api/events/{id}/admission-conflicts
+```
+
+Requires scanner auth, same as the scan routes. It reports every ticket that
+**more than one device claimed to admit**, with each gate's own account of
+what it did at the door:
+
+```json
+{
+  "conflicts": [
+    { "ticket_id": "...", "devices": 2, "extra_admissions": 1,
+      "claims": [
+        { "device_id": "device-A", "gate_id": "North", "scanned_at": "...",
+          "result": "admitted" },
+        { "device_id": "device-B", "gate_id": "South", "scanned_at": "...",
+          "result": "admitted", "server_result": "duplicate" }
+      ] }
+  ],
+  "extra_admissions": 1,
+  "algebra": "dmtap-sync-v0",
+  "engine": "...",
+  "complete": true,
+  "caveat": "..."
+}
+```
+
+- **`result` is what the device did; `server_result` is what the server
+  concluded.** They differ exactly when a claim lost reconciliation: the
+  device admitted somebody, another gate's admission was already on record,
+  and the server downgraded the stored row to `duplicate`. The downgrade is
+  correct — one ticket, one admitted row — but it is not what happened at the
+  door, and `admissions.reported_result` (migration `0002`) is what keeps both
+  facts. Without it, a gate that let a second person in is indistinguishable
+  from a gate that correctly refused a ticket its own log already had.
+- **`extra_admissions`** is the number you actually want: how many more people
+  are inside than there are tickets to account for them.
+- **`devices` is the predicate, not claim count.** Two claims from *one*
+  device is never a conflict — that device's own dedupe is atomic, so it
+  cannot have admitted twice.
+- **`complete: false`** means the answer is knowably partial (a stored row the
+  merge engine refused) and should not be read as authoritative.
+- **An empty `conflicts` list means "no conflict among the claims that reached
+  this server". It does not mean no double admissions happened.** A device
+  whose log never synced — lost, broken, flat battery — contributes nothing,
+  and a conflict it was part of looks from here like a clean single admission.
+  `caveat` says so on every response, including empty ones.
+
+The merge is the shared DMTAP Sync algebra (KOTVA `substrate/SYNC.md` §4.3
+add-only set) rather than merge logic hand-written in Cackle — see
+`internal/scan/substrate`. Claims are union-merged and nothing is ever
+dropped; the element carries the scanning device and the scan time precisely
+so that two gates' claims about the *same ticket* cannot collapse into one and
+hide the duplicate being looked for.
+
+### What adopting the shared engine costs
+
+The merge runs the suite's compiled Rust core under
+[wazero](https://wazero.io), which is pure Go — so `CGO_ENABLED=0` and
+single-static-binary cross-compilation both survive, which is the whole reason
+this route was acceptable at all. Measured on an Apple M2, `CGO_ENABLED=0
+go build -trimpath ./cmd/cackle` with and without the engine reachable:
+
+| | bytes |
+| --- | --- |
+| without the sync engine | 18,042,002 |
+| with it | 21,807,778 |
+| **delta** | **+3,765,776 (+3.59 MiB, +20.9%)** |
+| of which the embedded engine `.wasm` | 427,731 (11% of the delta) |
+| of which wazero's optimising compiler | ~89% of the delta |
+
+"Reachable" is doing real work in that sentence: the figure is from the default
+build, where `internal/httpapi` imports the package and the
+`admission-conflicts` route is registered unconditionally, so the linker cannot
+prune the call graph. A probe whose result is discarded would report a fraction
+of this and would be measuring nothing.
+
+Runtime cost is one module compilation, a few hundred milliseconds, paid
+**lazily on the first reconciliation report** rather than at boot — a
+deployment that never opens one never pays it. After that it is cached in a
+`wasm-cache/` directory beside `CACKLE_DB`, so restarts cost milliseconds.
+
+None of this touches a gate. `internal/scan` does not import the engine and
+cannot; a device scanning tickets runs local Ed25519 verification and a local
+dedupe claim, exactly as before.
+
+### Mitigations
+
+The fuller fix — a venue mesh sync between scanners, merged over local
 Wi-Fi/Bluetooth with no server involved — is **not built**; see
 [ROADMAP.md](../ROADMAP.md#later--venue-mesh-sync-between-scanners). Until it
 is, the mitigations are operational, and they are the same ones paper tickets
@@ -153,11 +282,16 @@ always needed:
 
 - Prefer one gate per event where you can. A single device (or several
   devices that stay online and share the server's table) has no gap.
-- Sync opportunistically. Every sync narrows the window in which two gates
-  can disagree, because a synced ticket comes back as a duplicate everywhere
-  after the next bundle refresh.
+- **Sync opportunistically, and re-pull the bundle when you do.** Every sync
+  plus refresh narrows the window in which two gates can disagree, because a
+  ticket admitted anywhere comes back in the next bundle's `admitted_index`
+  and is refused as a duplicate at every gate that re-pulled. Syncing *without*
+  re-pulling does not narrow anything on the device side — uploading a scan
+  tells the server, not the other gates.
 - Don't run more independent offline entrances than you can staff with tight
   communication.
+- Read `admission-conflicts` after the event, and again after any late-syncing
+  device finally checks in. The number can only grow as more logs arrive.
 
 **Revocation while offline works the same way, for the same reason.** A
 gate rejects a refunded or voided ticket only if it was already refunded
@@ -183,6 +317,18 @@ devices at one gate, or one device per entrance, all works the same way:
 each device's log merges independently, and the server's own dedupe applies
 across all of them once merged, so you get an accurate combined admission
 count as soon as every device has synced at least once.
+
+`result` is uploaded as the **device's own** verdict and stored as such in
+`admissions.reported_result`, unrewritten, even when the server downgrades the
+row it writes to `result`. Do not "helpfully" send `duplicate` for a scan your
+gate actually admitted — that erases the one fact
+`GET /api/events/{id}/admission-conflicts` needs to tell a real double
+admission from an ordinary local one.
+
+Uploading is one direction only. To bring *other* gates' admissions back down
+to this device, re-fetch the scan bundle (`admitted_index`, Step 1). Sync and
+re-pull are separate operations and only doing the first leaves the device's
+view exactly as stale as it was.
 
 ## Practical setup notes
 
@@ -212,3 +358,5 @@ count as soon as every device has synced at least once.
   `/api/scan`, and `/api/scan/sync`.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — where `internal/scan` sits in the
   wider system.
+- [SELF-HOSTING.md](SELF-HOSTING.md) — running the server yourself, including
+  as an internet-reachable node venue gates sync to.

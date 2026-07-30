@@ -33,9 +33,10 @@ func TestMigrateRunsCleanTwice(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AppliedMigrations: %v", err)
 	}
-	// The schema is a single folded baseline (0001_init), so a clean open
-	// records exactly one applied migration. The point of this test is the
-	// idempotency checks below, not the count.
+	// A clean open records every embedded migration: the folded baseline
+	// (0001_init) plus each functional change since (0002 added
+	// admissions.reported_result). The point of this test is the idempotency
+	// checks below, not the count, so the assertion is deliberately a floor.
 	if len(versions1) < 1 {
 		t.Fatalf("expected the baseline migration applied, got %v", versions1)
 	}

@@ -97,6 +97,16 @@ func Decide(ctx context.Context, cap string, ring tickets.KeyRing, eventID strin
 // signature only proves a capability was validly issued, never that it
 // wasn't later voided or refunded, and this is what closes that gap.
 //
+// It also applies b.AdmittedIndex — the set of tickets the server already had
+// an admission for when the bundle was built. That is the ONLY channel by
+// which a gate learns about an admission that happened at a different gate,
+// and it is what makes "sync opportunistically and the window shrinks" a true
+// statement rather than a hopeful one. It narrows the window; it does not close
+// it, and it cannot: a ticket admitted at another gate after this bundle was
+// downloaded is invisible here until the next re-pull. Two partitioned gates
+// cannot be prevented from double-admitting a ticket by any means, and this
+// field is not an exception to that.
+//
 // The index is authoritative when b.TicketIndexPresent is true, which the
 // server ALWAYS sets — it queried the current valid set to build the
 // bundle. Crucially, an authoritative index that happens to be EMPTY means
@@ -135,6 +145,27 @@ func DecideWithBundle(ctx context.Context, cap string, b Bundle, seen SeenSet, n
 	// falls through to signature-only admission.
 	if b.TicketIndexPresent && !ticketIndexContains(b.TicketIndex, payload.TID) {
 		return Result{Status: Invalid, Reason: "ticket revoked or not issued for this event"}
+	}
+
+	// The bundle's admitted index is the only way one gate's dedupe set ever
+	// converges toward another's. A ticket the server already had an admission
+	// for when this bundle was built is a duplicate here even though this
+	// device's own SeenSet has never seen it.
+	if ticketIndexContains(b.AdmittedIndex, payload.TID) {
+		// Fold it into the local set too, so this gate's own view converges
+		// rather than re-deriving the same answer from the bundle on every
+		// presentation — and so it still refuses after the bundle is replaced
+		// by one that (for whatever reason) no longer lists it.
+		//
+		// A MarkSeen error is NOT escalated to Invalid here, unlike in
+		// admitOrDuplicate. There, a failed dedupe store means we do not know
+		// whether this is a first scan and must refuse without being able to
+		// say why. Here we already know it is a duplicate on independent
+		// evidence, so Duplicate is both the same refusal at the door and the
+		// more accurate reason. Failing closed does not require reporting less
+		// accurately.
+		_, _ = seen.MarkSeen(ctx, payload.TID, now)
+		return Result{Status: Duplicate, Payload: payload, Reason: "ticket already admitted at another gate"}
 	}
 
 	return admitOrDuplicate(ctx, payload, seen, now)

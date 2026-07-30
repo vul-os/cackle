@@ -147,10 +147,19 @@ func (s *dbSyncSink) Apply(ctx context.Context, batch []scan.QueuedAdmission) ([
 			}
 		}
 
+		// reported_result preserves what the DEVICE said, unrewritten, next to
+		// what the server concluded. It is the whole reason a cross-gate double
+		// admission is recoverable afterwards: the downgrade above is correct
+		// (one ticket, one admitted row) but it erases the fact that this gate
+		// let somebody through, and without that fact
+		// GET /api/events/{id}/admission-conflicts cannot tell a real double
+		// admission from an ordinary same-device duplicate. See migration
+		// 0002 and reconcile_handlers.go.
 		_, err := tx.ExecContext(ctx, `
-			INSERT INTO admissions (id, ticket_id, event_id, gate_id, scanned_by, device_id, scanned_at, result, note)
-			VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
-			store.NewID(), a.TicketID, a.EventID, a.GateID, a.DeviceID, nowText(a.ScannedAt), string(result), a.Note,
+			INSERT INTO admissions (id, ticket_id, event_id, gate_id, scanned_by, device_id, scanned_at, result, reported_result, note)
+			VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+			store.NewID(), a.TicketID, a.EventID, a.GateID, a.DeviceID, nowText(a.ScannedAt),
+			string(result), string(a.Result), a.Note,
 		)
 		if err != nil {
 			if isForeignKeyErr(err) {
@@ -236,12 +245,23 @@ func (s *server) handleScanBundle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The admitted set travels with the bundle so that re-pulling one carries
+	// the OTHER gates' admissions down to this device — the only convergence
+	// channel a disconnected gate has. See scan.Bundle's doc for exactly what
+	// that does and does not prevent.
+	admittedIDs, err := s.deps.Store.ListAdmittedTicketIDsForEvent(ctx, eventID)
+	if err != nil {
+		internalError(w, s.log(), "scan-bundle admitted index", err)
+		return
+	}
+
 	bundle := scan.Bundle{
 		Event:              eventToMeta(ev),
 		IssuerKeys:         ring,
 		TicketIndex:        ticketIDs,
 		TicketIndexPresent: true, // ticketIDs is the authoritative valid set from the DB, even if empty
-		Allocation:         nil,  // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
+		AdmittedIndex:      admittedIDs,
+		Allocation:         nil, // capacity delegation to sub-issuers is roadmap work (ROADMAP.md)
 		IssuedAt:           time.Now(),
 	}
 	if err := bundle.Validate(); err != nil {
@@ -305,6 +325,13 @@ func (s *server) handleScan(w http.ResponseWriter, r *http.Request) {
 		IssuerKeys:         ring,
 		TicketIndex:        ticketIDs,
 		TicketIndexPresent: true, // ticketIDs is the authoritative valid set from the DB, even if empty
+		// AdmittedIndex is deliberately left empty on the ONLINE path, and
+		// leaving it empty loses nothing. dbSeenSet's MarkSeen writes straight
+		// into the `admissions` table under the partial unique index, so this
+		// caller already consults the live, converged admitted set — populating
+		// the index would add a second query per scan to re-derive an answer
+		// the atomic INSERT is about to give more accurately. The field exists
+		// for gates that CANNOT do that, which is the offline ones.
 	}
 	result := scan.DecideWithBundle(ctx, req.Capability, bundle, seen, scannedAt)
 

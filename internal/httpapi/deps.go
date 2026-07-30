@@ -67,6 +67,10 @@ func (d Deps) mediaDir() string {
 type server struct {
 	deps        Deps
 	webhookSeen *memorySeenStore
+	// ledgers lazily compiles the shared DMTAP sync engine on first use, once
+	// per process. Only the cross-gate reconciliation report reaches it; the
+	// admission path never does. See reconcile_handlers.go.
+	ledgers ledgerCompiler
 }
 
 func (s *server) log() *slog.Logger {
@@ -128,6 +132,12 @@ func New(deps Deps) http.Handler {
 			r.Get("/{id}/ticket-types", s.requireUser(s.handleListTicketTypes))
 			r.Post("/{id}/ticket-types", s.requireUser(s.handleCreateTicketType))
 			r.Get("/{id}/scan-bundle", s.requireUser(s.handleScanBundle))
+			// Rate-limited like the scan routes it reports on: this is the
+			// most expensive read in the product (it re-folds the event's
+			// contested admissions through the WebAssembly merge engine on
+			// every call), so on an internet-reachable host it is the one
+			// authenticated GET worth bounding.
+			r.With(rateLimit(scanLimiter)).Get("/{id}/admission-conflicts", s.requireUser(s.handleAdmissionConflicts))
 			r.Get("/{id}/attendees", s.requireUser(s.handleListEventAttendees))
 			r.Post("/{id}/images", s.requireUser(s.handleUploadImage))
 			r.Get("/{id}/payouts", s.requireUser(s.handleEventPayouts))
@@ -177,7 +187,14 @@ func New(deps Deps) http.Handler {
 		})
 
 		r.With(rateLimit(scanLimiter)).Post("/scan", s.requireUser(s.handleScan))
-		r.Post("/scan/sync", s.requireUser(s.handleScanSync))
+		// /scan/sync is rate-limited on the same bucket as /scan, which it
+		// previously was not. It is an authenticated WRITE that inserts one
+		// admissions row per batch item, and a venue's gates reach it from the
+		// public internet — an unbounded write endpoint is a strange thing to
+		// leave next to a bounded one. A batch carries many scans in a single
+		// request, so 10/sec sustained per IP is far more headroom than a real
+		// gate needs even with every scanner behind one venue NAT.
+		r.With(rateLimit(scanLimiter)).Post("/scan/sync", s.requireUser(s.handleScanSync))
 	})
 
 	// GET /media/{id} is public (uploaded event images are not secrets) and

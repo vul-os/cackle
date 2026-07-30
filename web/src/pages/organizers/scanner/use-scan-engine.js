@@ -63,15 +63,27 @@ function describeError(err) {
  * until the gate re-pulls a fresh bundle — an inherent limitation of
  * offline operation, not a bug.
  *
+ * `admittedIndex` is the bundle's `admitted_index`: the tickets the server
+ * already had an admission recorded for when this bundle was built. It is the
+ * ONLY channel by which this device learns that a ticket was admitted at a
+ * DIFFERENT gate, and it mirrors Go's DecideWithBundle. Unlike ticketIndex it
+ * needs no "present" flag — empty and absent both mean "this bundle knows of
+ * nobody already inside", and both correctly leave the answer to the local log.
+ *
  * Dedupe is per DEVICE, and it FAILS CLOSED. A second scan of the same
- * ticket on this scanner is refused here, offline, immediately; two offline
- * scanners at two entrances cannot see each other and only reconcile at sync
- * (docs/OFFLINE-GATES.md spells out exactly what that does and does not
- * stop). If the local store errors instead of answering, the scan is
- * recorded 'invalid' and refused rather than admitted — never guess in the
- * admitting direction.
+ * ticket on this scanner is refused here, offline, immediately. Two offline
+ * scanners at two entrances cannot see each other, so the same ticket
+ * presented at both IS admitted at both — that is not prevented and cannot be,
+ * because preventing it needs coordination they do not have. What narrows the
+ * window is re-pulling the bundle (admittedIndex above) and syncing; what
+ * catches what still slipped through is
+ * GET /api/events/:id/admission-conflicts after the fact.
+ * docs/OFFLINE-GATES.md spells out exactly what that does and does not stop.
+ * If the local store errors instead of answering, the scan is recorded
+ * 'invalid' and refused rather than admitted — never guess in the admitting
+ * direction.
  */
-export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, gateId }) {
+export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId }) {
     const online = useOnline();
     // Always build the set — even when empty — so an authoritative empty
     // index admits nothing. Whether it is consulted at all is gated on
@@ -79,6 +91,10 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
     const ticketIndexSet = useMemo(
         () => new Set(Array.isArray(ticketIndex) ? ticketIndex : []),
         [ticketIndex],
+    );
+    const admittedIndexSet = useMemo(
+        () => new Set(Array.isArray(admittedIndex) ? admittedIndex : []),
+        [admittedIndex],
     );
     const [tally, setTally] = useState({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
     const [pendingCount, setPendingCount] = useState(0);
@@ -165,6 +181,16 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                     // and (like any Invalid result) never record a ticket id.
                     result = 'invalid';
                     note = 'Ticket revoked or not issued for this event';
+                } else if (admittedIndexSet.has(payload.tid)) {
+                    // Signature verifies, right event, not revoked — but the
+                    // server already had an admission for it when this bundle
+                    // was built, i.e. another gate let this ticket through.
+                    // This is the only way a disconnected gate ever learns
+                    // that. Mirrors Go's DecideWithBundle.
+                    ticketId = payload.tid;
+                    holderName = payload.nm;
+                    result = 'duplicate';
+                    note = 'Ticket already admitted at another gate';
                 } else {
                     try {
                         const already = await wasAdmitted(eventId, payload.tid);
@@ -223,7 +249,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                 }, 400);
             }
         },
-        [eventId, keyRing, ticketIndexSet, ticketIndexPresent, gateId, refreshCounts, syncNow],
+        [eventId, keyRing, ticketIndexSet, ticketIndexPresent, admittedIndexSet, gateId, refreshCounts, syncNow],
     );
 
     return { online, tally, pendingCount, lastResult, isSyncing, syncNow, handleDecode, deviceId: deviceId.current };

@@ -56,6 +56,30 @@ type EventMeta struct {
 //     hand-built bundle that carries no index data at all, and only then
 //     does DecideWithBundle fall back to signature-only checking.
 //
+//   - AdmittedIndex: the set of ticket IDs that ALREADY HAVE a recorded
+//     admission for this event, as of IssuedAt — the server's converged view
+//     of "these people are already inside". This is what makes re-pulling a
+//     bundle carry the OTHER gates' admissions down to this one, and it is the
+//     only mechanism by which two gates' dedupe sets ever converge in the
+//     direction of the gates.
+//
+//     Be precise about what it buys. It does NOT prevent a double scan during
+//     a partition: a ticket admitted at gate A one minute ago is not in a
+//     bundle gate B downloaded this morning, and gate B will admit it. What it
+//     does is close the window every time a gate re-pulls — after a refresh, a
+//     ticket admitted anywhere comes back as a duplicate here. Sync
+//     opportunistically and the window shrinks; that claim is now true because
+//     of this field, and before this field existed it was documented and false.
+//
+//     Unlike TicketIndex there is no "present" flag, and the asymmetry is
+//     deliberate rather than an omission. An empty TicketIndex is genuinely
+//     ambiguous — "no tickets issued" and "every ticket revoked" demand
+//     opposite behaviour — so it needs a flag to disambiguate. An empty or
+//     absent AdmittedIndex is not ambiguous: both mean "this bundle knows of
+//     nobody already inside", and both must therefore leave admission to the
+//     local SeenSet. A flag would distinguish two cases with identical correct
+//     behaviour.
+//
 //   - Allocation: optional — present only when this specific device is a
 //     delegated sub-issuer allowed to mint tickets of its own while
 //     disconnected (see allocation.go). nil for an ordinary scan-only gate.
@@ -69,6 +93,7 @@ type Bundle struct {
 	IssuerKeys         tickets.KeyRing `json:"issuer_keys"`
 	TicketIndex        []string        `json:"ticket_index"`
 	TicketIndexPresent bool            `json:"ticket_index_present"`
+	AdmittedIndex      []string        `json:"admitted_index,omitempty"`
 	Allocation         *Allocation     `json:"allocation,omitempty"`
 	IssuedAt           time.Time       `json:"issued_at"`
 }
@@ -100,6 +125,11 @@ func (b Bundle) Validate() error {
 	for _, tid := range b.TicketIndex {
 		if tid == "" {
 			return fmt.Errorf("scan: bundle: ticket_index contains an empty ticket id")
+		}
+	}
+	for _, tid := range b.AdmittedIndex {
+		if tid == "" {
+			return fmt.Errorf("scan: bundle: admitted_index contains an empty ticket id")
 		}
 	}
 	if b.Allocation != nil && b.Allocation.EventID != b.Event.EventID {

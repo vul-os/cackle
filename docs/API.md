@@ -298,13 +298,18 @@ code an attendee presents at the gate.
 
 ```
 GET    /api/events/{id}/scan-bundle  scanner auth → {event, issuer_keys[], ticket_index[],
-                                     ticket_index_present, allocation, issued_at} —
-                                     everything a gate needs to run the whole event offline.
-                                     `allocation` is always null (unbuilt — see OFFLINE-GATES.md)
+                                     ticket_index_present, admitted_index[], allocation,
+                                     issued_at} — everything a gate needs to run the whole
+                                     event offline. `allocation` is always null
+                                     (unbuilt — see OFFLINE-GATES.md)
 POST   /api/scan                     {event_id, capability, device_id, gate_id, scanned_at}
                                      → {result, ticket, holder}
 POST   /api/scan/sync                {admissions:[...]} batch upload of offline scans;
                                      idempotent by (ticket_id, device_id, scanned_at)
+GET    /api/events/{id}/admission-conflicts
+                                     scanner auth → tickets that MORE THAN ONE DEVICE
+                                     claimed to admit, i.e. what got through two doors
+                                     while the gates were partitioned
 ```
 
 `POST /api/scan` is the **online** scan path — useful for a gate that does
@@ -332,6 +337,36 @@ ticket for a fully-cancelled event. Even a fresh `ticket_index` is only a
 snapshot as of `issued_at`: a ticket refunded after a gate downloaded its
 bundle stays admittable at that gate until it re-syncs. See
 [OFFLINE-GATES.md](OFFLINE-GATES.md) for the full reasoning.
+
+`admitted_index` is the set of ticket IDs that already have a recorded
+admission as of `issued_at` — the server's reconciled "these people are
+already inside". A capability that verifies, is in `ticket_index`, but appears
+here is reported `result: "duplicate"` with reason "ticket already admitted at
+another gate". It is the **only** channel by which one gate learns about an
+admission at a *different* gate, and it narrows the double-scan window on every
+re-pull without ever closing it: two gates that cannot see each other cannot be
+prevented from admitting the same ticket. Unlike `ticket_index` it has no
+`_present` flag, because empty and absent mean the same unambiguous thing
+("nobody known to be inside") and both correctly defer to the device's local
+log.
+
+`POST /api/scan/sync`'s per-item `result` is the **device's own** verdict and
+is stored unrewritten in `admissions.reported_result`, even when the server
+downgrades the row's `result` to `duplicate` because another gate's admission
+was already recorded. Send what your gate actually did at the door; sending
+`duplicate` for a scan you admitted erases the only evidence a double
+admission happened.
+
+`GET /api/events/{id}/admission-conflicts` reports each contested ticket with
+`devices`, `extra_admissions`, and every gate's claim (`result` = what the
+device did, `server_result` = what the server concluded, present only when they
+differ). It is an after-the-fact record and never a guard, and it is only as
+complete as the sync — every response carries a `caveat` string and a
+`complete` flag saying so, and an empty `conflicts` list means "no conflict
+among the claims that reached this server", never "no double admissions
+happened". The merge runs on the shared DMTAP Sync algebra
+(`internal/scan/substrate`), and the response names the `algebra` and `engine`
+it merged under. See [OFFLINE-GATES.md](OFFLINE-GATES.md).
 
 ## Error codes
 

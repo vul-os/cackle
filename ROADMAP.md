@@ -109,20 +109,46 @@ Today a gate deduplicates locally, against its own admissions table, and
 reconciles with the server once it's back online — which is correct for one
 scanner, but two scanners at two entrances of the same venue, both offline,
 can independently admit the same ticket. A venue mesh (scanners gossiping
-admissions over local Wi-Fi/Bluetooth, CRDT-merged, no server in the loop) is
-the fix. This is exactly the kind of problem the VulOS **Sync** substrate
-capability (CRDT op algebra + version vectors, one Rust core) exists for — if
-Cackle adopts it, it adopts the spec as-is rather than hand-rolling a second
-merge engine. **Not yet built; design not yet started.**
+admissions over local Wi-Fi/Bluetooth, merged with no server in the loop) is
+the fix. **Not yet built; the transport, peer handshake and per-device identity
+it needs do not exist.**
+
+**What HAS landed, so the remaining gap is clear rather than flattered.** The
+merge *algebra* is adopted: `internal/scan/substrate` expresses the admission
+ledger in the VulOS **Sync** substrate capability (`substrate/SYNC.md` §4.3
+add-only set, one compiled Rust core under wazero) rather than a second merge
+engine written here, and it is wired — `GET /api/events/{id}/admission-conflicts`
+computes the cross-gate reconciliation report through it. Two directions of
+convergence now work:
+
+- **up:** `POST /api/scan/sync` reconciles every device's claims into a single
+  admitted row, and `admissions.reported_result` keeps each device's own verdict
+  so a partition double-admission is *reportable* afterwards rather than erased
+  by the downgrade;
+- **down:** the scan bundle's `admitted_index` carries the reconciled admitted
+  set back to gates, so a re-pull refuses a ticket admitted at another gate.
+
+What is still missing is precisely the *peer-to-peer* leg: no gate signs its
+own claims (a browser gate has no keypair), no two Cackle instances exchange
+anything, and gates converge only via the server. So the honest status is
+unchanged where it matters — **two partitioned gates still cannot be prevented
+from double-admitting a ticket, and no mesh can change that either.** A mesh
+would shrink the window from "until the next server round-trip" to "until the
+next local gossip round"; it would not make the guarantee a prevention
+guarantee. See docs/OFFLINE-GATES.md.
 
 **Design note, recorded now so it isn't discovered the hard way later.**
 `internal/scan.ReconcileTicket` resolves a cross-device duplicate by earliest
 `scanned_at`, breaking an exact tie on `device_id`. That is deterministic and
-correct on its own. But `VULOS-PRODUCT-STANDARD.md` records that two engines
-can both converge and still disagree: flowstock breaks an exact tie on node
-id, the substrate breaks it on author public key. Cackle's `device_id` is a
-third convention, and today that is harmless — v1 gates never merge with each
-other, only with the server.
+correct on its own, and nothing in production calls it (see its own doc
+comment: the server's authority is the `admissions` unique index, and the
+report's ordering is `internal/scan/substrate`'s). But
+`VULOS-PRODUCT-STANDARD.md` records that two engines can both converge and
+still disagree: flowstock breaks an exact tie on node id, the substrate breaks
+it on author public key. Cackle's `device_id` is a third convention, and today
+that is harmless — v1 gates never merge with each other, only with the server,
+and the adopted ledger folds every claim under the *server's* author key rather
+than a per-device one.
 
 It stops being harmless the moment venue mesh sync lands. The standard's
 stated clean fix is to make a node's id *be* its public key, and Cackle is

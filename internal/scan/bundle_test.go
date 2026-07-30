@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -189,4 +190,65 @@ func containsAllocationKey(data []byte) bool {
 	}
 	_, ok := m["allocation"]
 	return ok
+}
+
+// TestBundle_Validate_RejectsEmptyAdmittedIndexEntry: a blank entry in the
+// admitted index would silently match nothing and quietly weaken the one
+// convergence channel an offline gate has, so it is a structural error.
+func TestBundle_Validate_RejectsEmptyAdmittedIndexEntry(t *testing.T) {
+	b := validBundle(t)
+	b.AdmittedIndex = []string{"ticket-1", ""}
+	if err := b.Validate(); err == nil {
+		t.Fatal("expected Validate to reject an empty admitted_index entry")
+	}
+}
+
+// TestBundle_Validate_AcceptsEmptyAndAbsentAdmittedIndex pins the documented
+// asymmetry with ticket_index: an empty admitted index is a legitimate,
+// unambiguous value meaning "nobody is inside yet", so it needs no flag and
+// must not be an error.
+func TestBundle_Validate_AcceptsEmptyAndAbsentAdmittedIndex(t *testing.T) {
+	for name, idx := range map[string][]string{"absent": nil, "empty": {}} {
+		b := validBundle(t)
+		b.AdmittedIndex = idx
+		if err := b.Validate(); err != nil {
+			t.Fatalf("%s admitted_index must be valid, got %v", name, err)
+		}
+	}
+}
+
+// TestBundle_JSONRoundTrip_AdmittedIndex keeps the wire field name stable —
+// web/src/pages/organizers/scanner/index.jsx reads `admitted_index` off this
+// exact JSON, so a rename here silently disables cross-gate convergence in the
+// browser gate with nothing failing.
+func TestBundle_JSONRoundTrip_AdmittedIndex(t *testing.T) {
+	b := validBundle(t)
+	b.AdmittedIndex = []string{"ticket-1", "ticket-2"}
+
+	raw, err := json.Marshal(b)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if !bytes.Contains(raw, []byte(`"admitted_index"`)) {
+		t.Fatalf("expected the wire field to be spelled admitted_index: %s", raw)
+	}
+
+	var decoded Bundle
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if len(decoded.AdmittedIndex) != 2 || decoded.AdmittedIndex[0] != "ticket-1" || decoded.AdmittedIndex[1] != "ticket-2" {
+		t.Fatalf("admitted_index did not round trip: %+v", decoded.AdmittedIndex)
+	}
+
+	// Omitted when empty, so an event with nobody through the door yet does
+	// not pay for the field on every bundle download.
+	b.AdmittedIndex = nil
+	raw, err = json.Marshal(b)
+	if err != nil {
+		t.Fatalf("Marshal (empty): %v", err)
+	}
+	if bytes.Contains(raw, []byte(`"admitted_index"`)) {
+		t.Fatalf("an empty admitted_index should be omitted: %s", raw)
+	}
 }
