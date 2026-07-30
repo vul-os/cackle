@@ -1,4 +1,4 @@
-# Host Pages — giving an organiser their own page, safely
+# Host Pages — giving an event its own page, safely
 
 > **In plain English:** every event already gets a decent-looking page on
 > Cackle for free, no setup. This document is for two narrower cases: (1)
@@ -18,14 +18,21 @@ build a client from this document alone, and
 corpus to check that client against — the same standard
 [TICKET-FORMAT.md](TICKET-FORMAT.md) is held to.
 
-An organiser used to get whatever Cackle rendered. Now there are three ways to
-have their own page, and they are meant to be used together:
+An event used to get whatever Cackle rendered, by default, and nothing else.
+Now there are three ways for an organiser to give **one event** its own page,
+and they are meant to be used together:
 
 | | What it is | Who it is for |
 |---|---|---|
 | **1. The default page** | A real page, built from the event record, with zero configuration | Every event, from the moment it is created |
-| **2. A host page document** | Structured content + theme, submitted over the API, rendered by Cackle at `/h/{slug}` | A host who wants their own page but not their own website |
+| **2. A host page document** | Structured content + theme, submitted over the API, rendered by Cackle at `/h/{slug}` | A host who wants their event's own look but not their own website |
 | **3. The public API** | JSON, on any origin, that you render yourself | A host who has a website and wants the event on it |
+
+Every one of these is scoped to **one event**. An organiser running ten
+events gets ten separate pages, configured one at a time — there is no page
+that lists everything one organiser runs, and this document does not build
+one. That absence is a real gap for federation, already recorded, not solved,
+here: [FEDERATION.md](FEDERATION.md#the-gap-there-is-no-per-organisation-page).
 
 Option 3 is what makes this generic — no format Cackle invents will ever be as
 expressive as "your own site" — and options 1 and 2 exist so that having a
