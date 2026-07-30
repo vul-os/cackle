@@ -247,6 +247,7 @@ const SIBLING_PATALA_DOCS = new Set([
     'PORTING.md',
     'patala-fiat/PORTING.md',
     'patala-go/README.md',
+    'docs/compensating-payments.md',
 ]);
 
 // Specifications that live in ANOTHER PROJECT entirely and are cited by name
