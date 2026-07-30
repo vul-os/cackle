@@ -19,11 +19,19 @@
 // of:
 //
 //  1. The sibling patala repo checked out next to this one
-//     (`../patala` relative to this module root — see go.mod's `replace`
-//     directive) with its Go bindings generated against a cdylib built
-//     with every fiat processor compiled in:
+//     (`../patala` relative to this module root) with its Go bindings
+//     generated against a cdylib built with every fiat processor compiled
+//     in:
 //
 //     cd ../patala/patala-go && make FEATURES=fiat-all generate
+//
+//     That local path is wired in by a **gitignored `go.work`**, created
+//     by this repo's `make go.work` target — NOT by a `replace` directive
+//     in go.mod. go.mod carried one until commit e6f4d2d, which deleted
+//     it because `go mod download` in CI and in the Docker build fails on
+//     a `replace` pointing at a sibling checkout that does not exist in
+//     the build context. go.mod is deliberately patala-free now, so the
+//     default build never fetches or touches patala.
 //
 //  2. `CGO_ENABLED=1` and a C toolchain (cc/clang/gcc) — cgo is mandatory
 //     for anything that imports patala-go; see that package's README.md
@@ -37,6 +45,26 @@
 //     exactly as patala-go's own Makefile does for its examples. See
 //     Makefile's `build-patala`/`test-patala` targets in this repo for the
 //     whole recipe as one command.
+//
+// # This path has never been built by CI, and cannot be built from a clean clone
+//
+// Stated plainly because every line above reads like a supported build and
+// it is not one. `grep -rn patala .github/workflows/` returns nothing:
+// no workflow passes `-tags patala`, so no commit in this repo's history
+// has ever been proved to compile this file. Its three prerequisites are
+// all outside the repo and none is fetchable — the sibling checkout is
+// wired by a gitignored `go.work`, the Go bindings under
+// `../patala/patala-go/bindings/patala/` are generated build output that
+// patala itself does not commit, and `build-patala` links `-lpatala_py`
+// against a cdylib built locally by `cargo`. A fresh `git clone` of this
+// repo therefore cannot build `-tags patala` by any sequence of commands
+// that does not also involve cloning and building patala by hand.
+//
+// What IS covered by the default, untagged suite: the mapping tests that
+// do not need the binding — see `patala_webhook_status_test.go` and
+// `PatalaConfigFromEnv`. Everything in THIS file is unverified by any
+// automated run. Treat it as an unbuilt integration, and do not take real
+// money through it on the strength of this comment.
 //
 // If a self-hoster does not want cgo at all but still wants real
 // processors, patala-sidecar (a loopback-only HTTP server over the same

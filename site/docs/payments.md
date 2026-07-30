@@ -223,6 +223,24 @@ This is opt-in and requires more than `go build`:
    `../patala/patala-go/bindings/patala/` — see `internal/payments/patala.go`'s
    own build comment for the full recipe.
 
+> **This path is not built by CI, and cannot be built from a clean clone.**
+> `grep -rn patala .github/workflows/` returns nothing — no workflow passes
+> `-tags patala`, so no commit here has ever been proved to compile
+> `internal/payments/patala.go`. All three prerequisites live outside this
+> repo and none of them is fetchable: the sibling checkout is wired by a
+> **gitignored `go.work`**, the Go bindings under
+> `../patala/patala-go/bindings/patala/` are generated build output patala
+> does not commit, and `make build-patala` links `-lpatala_py` against a
+> cdylib you build locally with `cargo`. Steps 1–4 above are the real recipe,
+> and it is a recipe a human runs by hand on a machine that already has
+> patala cloned — not a supported build. The parts that *are* covered by the
+> default suite are the ones that need no binding
+> (`internal/payments/patala_webhook_status_test.go`,
+> `PatalaConfigFromEnv`); everything inside `patala.go` is unverified by any
+> automated run. This is a status statement, not a plan — see
+> [Known limitations](#known-limitations) and
+> [ROADMAP.md](../ROADMAP.md).
+
 **The DEFAULT `make build`/`make test` (no `-tags patala`) are completely
 unaffected** — they never import patala-go, never need cgo, and produce
 the exact same pure-Go, `CGO_ENABLED=0` static binary as before this
