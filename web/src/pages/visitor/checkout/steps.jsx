@@ -33,7 +33,11 @@ export default function CheckoutSteps({ current, className }) {
                     const done = i < currentIndex;
                     const active = i === currentIndex;
                     return (
-                        <li key={step.key} className="flex min-w-0 flex-1 flex-col items-center last:flex-none">
+                        <li
+                            key={step.key}
+                            aria-current={active ? 'step' : undefined}
+                            className="flex min-w-0 flex-1 flex-col items-center last:flex-none"
+                        >
                             <div className="flex w-full items-center">
                                 <span
                                     aria-hidden="true"
@@ -42,19 +46,23 @@ export default function CheckoutSteps({ current, className }) {
                                         i === 0 ? 'invisible' : done || active ? 'border-primary/60' : 'border-border',
                                     )}
                                 />
+                                {/* The circle is decorative: its number
+                                    duplicates the list's own ordinal, and a
+                                    status word placed inside it announced as
+                                    "1 completed" — the state after the thing
+                                    it describes. The status rides with the
+                                    LABEL below instead, which is the text a
+                                    screen reader is reading anyway. */}
                                 <span
+                                    aria-hidden="true"
                                     className={cn(
                                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-black tabular-nums transition-colors',
                                         done && 'border-primary bg-primary text-primary-foreground',
                                         active && 'border-primary bg-background text-primary-emphasis',
                                         !done && !active && 'border-border bg-background text-muted-foreground',
                                     )}
-                                    aria-current={active ? 'step' : undefined}
                                 >
-                                    {done ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
-                                    <span className="sr-only">
-                                        {done ? 'completed: ' : active ? 'current step: ' : 'upcoming: '}
-                                    </span>
+                                    {done ? <Check className="h-4 w-4" /> : i + 1}
                                 </span>
                                 <span
                                     aria-hidden="true"
@@ -74,6 +82,7 @@ export default function CheckoutSteps({ current, className }) {
                                 )}
                             >
                                 {step.label}
+                                <span className="sr-only">{done ? ' — done' : active ? ' — you are here' : ' — still to come'}</span>
                             </span>
                         </li>
                     );

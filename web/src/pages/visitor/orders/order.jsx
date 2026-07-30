@@ -11,6 +11,7 @@ import { orders as ordersApi, events as eventsApi, tickets as ticketsApi } from 
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
 import { TAP_BUTTON, TAP_BUTTON_SM } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 
 function formatWhen(iso) {
     if (!iso) return null;
@@ -214,8 +215,11 @@ export default function OrderPage() {
                 {!loading && (error || !order) && (
                     <div className="mx-auto max-w-2xl p-4">
                         <ErrorState
-                            title="Order not found"
-                            description={error || "We couldn't find that order."}
+                            title="We can't show this order"
+                            description={humanError(
+                                error,
+                                "This order doesn't exist, or it was placed by a different account. All your orders are listed under Your orders.",
+                            )}
                             onRetry={() => setReloadToken((n) => n + 1)}
                         />
                     </div>

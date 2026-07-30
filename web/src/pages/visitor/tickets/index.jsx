@@ -4,6 +4,7 @@ import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer';
 import { Ticket } from 'lucide-react';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
@@ -160,7 +161,13 @@ export default function TicketsListPage() {
 
                 {loading && <SkeletonList rows={3} />}
 
-                {!loading && error && <ErrorState description={error} onRetry={load} />}
+                {!loading && error && (
+                    <ErrorState
+                        title="We couldn't load your tickets"
+                        description={humanError(error, 'Something went wrong on the way to the server. Check your connection and try again.')}
+                        onRetry={load}
+                    />
+                )}
 
                 {!loading && !error && tickets.length === 0 && (
                     <EmptyState

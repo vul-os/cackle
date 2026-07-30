@@ -21,6 +21,7 @@ import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
 import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 
 const PAGE_SIZE = 24;
 
@@ -237,7 +238,12 @@ export default function BrowsePage() {
 
                 <section className="container mx-auto px-4 py-10" data-surface="event-browse">
                     {state.error && (
-                        <ErrorState description={state.error} onRetry={() => setReloadToken((t) => t + 1)} className="py-20" />
+                        <ErrorState
+                            title="We couldn't load the events"
+                            description={humanError(state.error, 'Something went wrong on the way to the server. Check your connection and try again.')}
+                            onRetry={() => setReloadToken((t) => t + 1)}
+                            className="py-20"
+                        />
                     )}
 
                     {!state.error && state.loading && <SkeletonCardGrid count={8} className="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" />}

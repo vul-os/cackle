@@ -7,6 +7,7 @@ import { CalendarX2 } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer.jsx';
 import { events as eventsApi } from '@/lib/api';
+import { humanError } from '@/pages/visitor/errors';
 
 import EventGallery from './gallery';
 import EventHeader from './header';
@@ -51,7 +52,12 @@ const NotFoundView = ({ message }) => (
     <div className="min-h-screen bg-background">
         <Header />
         <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 pt-16 text-center">
-            <ErrorState icon={CalendarX2} title="Couldn't load this event" description={message} className="border-none bg-transparent" />
+            <ErrorState
+                icon={CalendarX2}
+                title="We can't show this event"
+                description={humanError(message, "This event doesn't exist, or it hasn't been published yet.")}
+                className="border-none bg-transparent"
+            />
         </div>
     </div>
 );

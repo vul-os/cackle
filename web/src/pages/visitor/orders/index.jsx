@@ -11,6 +11,7 @@ import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 
 const STATUS_STYLE = {
     pending: { className: 'bg-warning/15 text-warning-foreground', icon: Clock },
@@ -96,7 +97,11 @@ export default function OrdersPage() {
                 {state.loading && <SkeletonList rows={3} />}
 
                 {!state.loading && state.error && (
-                    <ErrorState description={state.error} onRetry={() => setReloadToken((n) => n + 1)} />
+                    <ErrorState
+                        title="We couldn't load your orders"
+                        description={humanError(state.error, 'Something went wrong on the way to the server. Check your connection and try again.')}
+                        onRetry={() => setReloadToken((n) => n + 1)}
+                    />
                 )}
 
                 {!state.loading && !state.error && state.orders.length === 0 && (

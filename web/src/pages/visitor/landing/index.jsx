@@ -15,6 +15,7 @@ import CategoryTabs from '@/pages/visitor/events/category-tabs';
 import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 
 const FEATURED_COUNT = 3;
 // The homepage is a preview, but the preview has to actually be wide enough
@@ -103,7 +104,12 @@ const LandingPage = () => {
 
                 <section className="container mx-auto px-4 py-16">
                     {state.error && (
-                        <ErrorState description={state.error} onRetry={() => setReloadToken((t) => t + 1)} className="py-20" />
+                        <ErrorState
+                            title="We couldn't load the events"
+                            description={humanError(state.error, 'Something went wrong on the way to the server. Check your connection and try again.')}
+                            onRetry={() => setReloadToken((t) => t + 1)}
+                            className="py-20"
+                        />
                     )}
 
                     {!state.error && state.loading && (

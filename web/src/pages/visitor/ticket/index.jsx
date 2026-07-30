@@ -11,6 +11,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { tickets as ticketsApi } from '@/lib/api';
 import PrintStyles from '@/pages/visitor/tickets/printing/print-styles';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
+import { humanError } from '@/pages/visitor/errors';
 
 // ── This page is read at a door ───────────────────────────────────────────
 //
@@ -115,8 +116,11 @@ export default function TicketPage() {
 
             {!loading && (error || !ticket) && (
                 <ErrorState
-                    title="Couldn't load this ticket"
-                    description={error || 'This ticket does not exist, or is not yours.'}
+                    title="We can't show this ticket"
+                    description={humanError(
+                        error,
+                        "This ticket doesn't exist, or it belongs to a different account. Check the link, or find it under My tickets.",
+                    )}
                     onRetry={() => setReloadToken((n) => n + 1)}
                 />
             )}
