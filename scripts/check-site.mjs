@@ -267,6 +267,7 @@ async function main() {
       const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
       const pg = await ctx.newPage();
       const failed = [], bad = [], errors = [];
+      const chapterExt = new Set(); // external origins seen in any docs chapter, not just the last one visited
       pg.on('requestfailed', (r) => failed.push(`${r.url()} — ${r.failure()?.errorText}`));
       pg.on('response', (r) => { if (r.status() >= 400) bad.push(`${r.status()} ${r.url()}`); });
       pg.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -321,6 +322,13 @@ async function main() {
           `every chapter is linked in the rail${missing.length ? ' — unlinked: ' + missing.join(', ') : ''}` +
           `${extra.length ? ' — links a chapter that does not exist: ' + extra.join(', ') : ''}`);
 
+        // collectExternal() below only sees whatever chapter is CURRENTLY in
+        // the DOM — and the loop's last iteration leaves that on the last
+        // slug in `rail`. Without accumulating per-chapter, an external
+        // fetch in every OTHER chapter is invisible: a shields.io badge
+        // shipped in site/docs/overview.md once passed this exact check for
+        // that reason, discovered only by hand. Collect after every chapter
+        // renders, not just after the walk ends on whichever slug is last.
         const slugs = rail;
         for (const slug of slugs) {
           await pg.evaluate((s) => { location.hash = '#' + s; }, slug);
@@ -328,6 +336,7 @@ async function main() {
             const c = document.getElementById('content');
             return c && c.textContent.trim() !== 'Loading…' && c.textContent.length > 200;
           }, null, { timeout: 8000 }).catch(() => errors.push(`docs chapter "${slug}" never rendered`));
+          for (const u of await pg.evaluate(collectExternal)) chapterExt.add(u);
         }
       }
       await pg.evaluate(() => { const t = document.getElementById('themeBtn'); if (t) t.click(); });
@@ -337,8 +346,8 @@ async function main() {
       note(bad.length === 0, where, `no response >= 400${bad.length ? ' — ' + bad.join('; ') : ''}`);
       note(errors.length === 0, where, `no console or page error${errors.length ? ' — ' + errors.join('; ') : ''}`);
 
-      const ext = await pg.evaluate(collectExternal);
-      note(ext.length === 0, where, `self-contained: no external subresource origin${ext.length ? ' — ' + ext.join('; ') : ''}`);
+      const ext = new Set([...(await pg.evaluate(collectExternal)), ...chapterExt]);
+      note(ext.size === 0, where, `self-contained: no external subresource origin${ext.size ? ' — ' + [...ext].join('; ') : ''}`);
 
       const broken = await pg.evaluate(brokenImages);
       note(broken.length === 0, where, `every <img> decoded${broken.length ? ' — ' + broken.join('; ') : ''}`);
