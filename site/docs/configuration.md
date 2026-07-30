@@ -25,7 +25,81 @@ supported — this is intentional, to keep the single-binary story simple.
 | `CACKLE_KEY_PASSPHRASE_FILE` | — | — | Path to a file holding the passphrase instead of putting it in the environment, where `docker inspect` and `/proc/<pid>/environ` can read it. A single trailing newline is ignored. |
 | `CACKLE_KEY_FILE` | — | — | Path to a file of 32+ random bytes used as key material instead of a passphrase: `head -c 32 /dev/urandom > /etc/cackle/keyfile && chmod 600 /etc/cackle/keyfile`. |
 | `CACKLE_PAYMENT_PROVIDERS` | — | unset (every registered provider enabled) | Comma-separated allowlist of optional payment providers for this deployment, e.g. `manual,stripe,paystack`. `manual` cannot be disabled and is always enabled regardless of this variable. See [PAYMENTS.md](PAYMENTS.md). |
+| `CACKLE_HOST_SCOPE` | — | `own` | Whose events your front page shows: `own`, `single` or `peers`. See [What your front page shows](#what-your-front-page-shows) below. |
+| `CACKLE_HOST_ORG` | — | — | The URL name (or id) of the one organisation this Cackle presents as. **Required** when `CACKLE_HOST_SCOPE=single`, and refused with any other scope — a setting that names a boundary must not be quietly ignored. |
+| `CACKLE_HOST_NAME` | — | — | What to call this Cackle on the front page, e.g. `The Bijou`. Unset means unnamed: with `single` the organisation's own name is used, and otherwise the heading simply carries no name. Cackle never invents one. |
 | `CACKLE_DEMO` | `--demo` | `false` | Boot with a fully seeded demo organisation, event, ticket types, and the `stub` payment provider. Zero setup, meant for evaluation, screenshots, and local development — not for anything real. |
+
+## What your front page shows
+
+> **In plain English:** this is your Cackle, on your machine. The front page
+> lists *your* events — it is not a listing site, and there is no directory
+> of other people's events anywhere in this software. This setting is only
+> about how your page presents itself when you run more than one
+> organisation on the same box.
+
+`CACKLE_HOST_SCOPE` takes one of three values.
+
+**`own` — the default.** The front page lists the published events of every
+organisation on this machine. If you run one organisation, that is simply
+your events, and the page shows no organisation labels at all. If you run
+several — a venue and a festival, say, or a hall that hosts three promoters
+— each event is labelled with the organisation it belongs to, and each label
+links to just that organisation's events.
+
+**`single` — present as one organisation.** The front page *is* one
+organisation's page. Name it with `CACKLE_HOST_ORG` (its URL name, the one
+in its web address):
+
+```bash
+CACKLE_HOST_SCOPE=single
+CACKLE_HOST_ORG=the-bijou
+CACKLE_HOST_NAME="The Bijou"
+```
+
+Any other organisation on the same machine keeps working normally — its
+events sell, its gate scans, its organisers sign in — but its events do not
+appear on this front page. This is the right setting for a single venue that
+happens to share a box with someone else, and it is a one-line change.
+
+If `CACKLE_HOST_ORG` names no organisation, the listing returns an error
+rather than falling back to showing everybody. A typo must not publish
+events you meant to keep off the page.
+
+**`peers` — reserved, and does nothing yet.** This value is accepted so that
+a setting written today keeps its meaning later, but **there is no peer event
+source in this binary**: with `peers`, Cackle behaves *exactly* as `own` —
+your own organisations' events, and nothing from anywhere else. Nothing in
+Cackle discovers other installations, and there is no global feed, no
+"organisers near you", and no directory. The listing API states this
+outright in its response (`"peers_included": false`), so nothing built on
+top of it can quietly assume otherwise.
+
+### What the listing API returns
+
+`GET /api/events` answers with the events **and** a `host` object saying
+whose they are:
+
+```json
+{
+  "events": [ … ],
+  "host": {
+    "scope": "own",
+    "name": "The Bijou",
+    "organisations": [{ "id": "…", "name": "The Bijou", "slug": "the-bijou" }],
+    "multi_org": false,
+    "peers_included": false
+  }
+}
+```
+
+`organisations` lists only organisations that currently have at least one
+published event (so an organisation still working on a draft is not named to
+the public), except under `single`, where the organisation you configured is
+always named even when it has nothing on. `multi_org` is what a page uses to
+decide whether to show organisation labels at all. `GET /api/events?host=the-bijou`
+narrows the listing to one organisation; a name that is not on this host
+answers `404`, the same as one that does not exist.
 
 ## Payment provider secrets
 
