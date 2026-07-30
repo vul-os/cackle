@@ -2,8 +2,12 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const Table = React.forwardRef(({ className, ...props }, ref) => (
-    <div className='relative w-full overflow-auto'>
+// The scroll container is the reason a wide table never makes the PAGE scroll
+// sideways: the overflow is owned here, inside the component, rather than
+// leaking to <body>. `-webkit-overflow-scrolling` is left to the UA default;
+// what matters is that the boundary exists at all.
+const Table = React.forwardRef(({ className, containerClassName, ...props }, ref) => (
+    <div className={cn('relative w-full overflow-x-auto', containerClassName)}>
         <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
 ));
@@ -20,7 +24,14 @@ const TableBody = React.forwardRef(({ className, ...props }, ref) => (
 TableBody.displayName = 'TableBody';
 
 const TableFooter = React.forwardRef(({ className, ...props }, ref) => (
-    <tfoot ref={ref} className={cn('bg-primary font-medium text-primary-foreground', className)} {...props} />
+    <tfoot
+        ref={ref}
+        // Deliberately NOT the brand fill. A totals row is a reading, not a
+        // call to action, and a full-bleed red bar under a table shouts far
+        // louder than the number it contains.
+        className={cn('border-t bg-muted font-semibold text-foreground', className)}
+        {...props}
+    />
 ));
 TableFooter.displayName = 'TableFooter';
 
@@ -28,7 +39,7 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
     <tr
         ref={ref}
         className={cn(
-            'border-b transition-colors duration-150 hover:bg-muted/50 data-[state=selected]:bg-muted',
+            'border-b transition-colors duration-150 hover:bg-muted/60 data-[state=selected]:bg-accent',
             className,
         )}
         {...props}
@@ -40,7 +51,9 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
     <th
         ref={ref}
         className={cn(
-            'h-10 px-2 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+            // text-xs is 12px — the floor. Uppercase tracking is what carries
+            // the hierarchy here instead of a smaller size.
+            'h-10 whitespace-nowrap px-3 text-left align-middle text-xs font-semibold uppercase tracking-wide text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
             className,
         )}
         {...props}
@@ -52,7 +65,7 @@ const TableCell = React.forwardRef(({ className, ...props }, ref) => (
     <td
         ref={ref}
         className={cn(
-            'p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
+            'px-3 py-2.5 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]',
             className,
         )}
         {...props}
