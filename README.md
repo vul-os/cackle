@@ -4,11 +4,13 @@
 
 # Cackle
 
-### Your gate works with no internet.
+### The wifi died at the door. People still got in.
 
-Events and ticketing in a single Go binary. Organisers create events, attendees
-buy tickets and get a signed QR, staff scan at the gate — and the gate keeps
-working even if the venue's network, or the server itself, goes down mid-event.
+Cackle is events and ticketing that keeps working when the internet doesn't.
+An organiser creates an event, sells tickets, and staff scan them at the
+gate — and the gate keeps admitting people even if the venue's network, or
+the server itself, goes down mid-event. It runs as one program you can start
+on a laptop, with no cloud account and nothing else to install.
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-F5A623.svg)](LICENSE-MIT)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://golang.org)
@@ -16,7 +18,7 @@ working even if the venue's network, or the server itself, goes down mid-event.
 [![Offline-verified](https://img.shields.io/badge/tickets-Ed25519%20offline--verified-FF4848)](docs/TICKET-FORMAT.md)
 [![Build](https://img.shields.io/github/actions/workflow/status/vul-os/cackle/ci.yml?branch=main&style=flat-square)](https://github.com/vul-os/cackle/actions)
 
-[**Quick start**](#quick-start-standalone) · [**Docs**](docs/) · [**Ticket format**](docs/TICKET-FORMAT.md) · [**Offline gates**](docs/OFFLINE-GATES.md) · [**Roadmap**](ROADMAP.md)
+[**Getting started**](docs/GETTING-STARTED.md) · [**Docs**](docs/) · [**How it works**](#how-it-works) · [**Roadmap**](ROADMAP.md)
 
 <br/>
 
@@ -27,42 +29,54 @@ working even if the venue's network, or the server itself, goes down mid-event.
 ---
 
 > [!WARNING]
-> **Experimental — work in progress.** Cackle is a ground-up refactor of an earlier
-> ticketing platform onto a single Go binary, and it is **not production-ready**.
-> APIs, the database schema, and the ticket format are all still moving; expect
-> breaking changes without migrations. Payment provider adapters are built against
-> published API documentation and are **unit-tested but not sandbox-verified** unless
-> explicitly marked otherwise in [docs/PAYMENTS.md](docs/PAYMENTS.md) — do not take
-> real money through an unverified adapter. Do not run a real event on this yet.
+> **This is experimental — not ready to run your real event on yet.** Cackle
+> is a ground-up rebuild of an earlier ticketing platform, and the pieces
+> (the API, the database, the ticket format itself) are all still moving —
+> expect breaking changes. Most payment options are built against the
+> provider's own published docs and tested against a fake version of that
+> provider, but have **not** been proven against a real one yet — see
+> [docs/PAYMENTS.md](docs/PAYMENTS.md) for exactly which ones, and don't take
+> real money through an unverified one. In short: **kick the tyres, don't
+> stake a box office on it yet.**
 
-## What is Cackle?
+## What is Cackle, in plain terms?
 
-Cackle is a **standalone, self-hostable events and ticketing platform** —
-organisers create events and ticket types, attendees browse and buy, and staff
-scan tickets at the door. It ships as **one Go binary with an embedded SQLite
-database and an embedded React frontend**: no separate database server, no
-Node process in production, no cloud account required.
+Picture the worst version of doors-open at a real event: the venue's wifi
+buckles under three hundred phones at once, or the server hiccups, and every
+other ticketing app goes quiet right when the queue is longest. Cackle is
+built so that moment is a non-event. Each scanner downloads what it needs
+**once**, before doors open, and after that it doesn't ask anyone's
+permission to let someone in — it checks the ticket itself, on the device,
+with no network required.
 
-The thing that makes it different from every incumbent ticketing platform:
-**the gate does not need the internet to admit people.** A ticket is an
-Ed25519-signed capability — a compact, self-contained token that a scanner can
-verify entirely offline against a pinned public key for that event. The
-Cackle server issues tickets and reports sales, but it is **not in the
-critical path of admission**. If the venue's Wi-Fi drops, or the box running
-Cackle dies outright, gates that already downloaded the event's scan bundle
-keep admitting people, deduping locally, and reconciling once the network
-comes back.
+Under the hood: a Cackle ticket isn't a row in a database that a scanner has
+to look up. It's a small piece of data, cryptographically signed by the
+event's own key, that a scanner can check entirely on its own — the same way
+you can check a wax seal without phoning the person who made it. The Cackle
+server still handles selling tickets and reporting on sales, but on the
+night, it's optional. If the venue's wifi drops, or the machine running
+Cackle dies outright, every gate that already grabbed the event's data keeps
+admitting people, keeps its own record of who came in, and catches the
+server up once the network is back. (The engineering name for that little
+piece of signed data is a **capability**, and the exact format is specified
+byte-for-byte in [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md), for anyone
+evaluating this closely.)
 
-Cackle is **country and currency agnostic** — there is no privileged
-country, currency, or processor. Currency is set per event. The default
-provider is `manual`: the organiser records that money arrived (bank
-transfer, cash at the door, an invoice, mobile money) with no API key and no
-compliance surface, and it works in every country. Every other
-processor — Stripe, Paystack, BTCPay, 20-odd others — is an optional,
-off-by-default adapter behind one seam (`internal/payments`). **Cackle never
-holds funds** — it hands off to a provider (or the organiser, for `manual`)
-and records the result. See [docs/PAYMENTS.md](docs/PAYMENTS.md) for the
-full adapter list and each one's verification status.
+Cackle doesn't assume you're in any particular country or that you use any
+particular payment company. Currency is set per event, and the built-in
+default way to take payment — called `manual` — is simply: the organiser
+records that the money arrived (bank transfer, cash at the door, an invoice,
+mobile money) and marks the order paid. No payment account to sign up for,
+no API key, works anywhere in the world, and **Cackle never holds your
+money** — it hands off to a payment provider (or to you, for `manual`) and
+just keeps the record. Real processors — Stripe, Paystack, BTCPay, and about
+twenty others — plug in as optional extras if you want them. See
+[docs/PAYMENTS.md](docs/PAYMENTS.md) for the full list and, importantly,
+which of them are actually proven safe to use with real money today.
+
+New here? [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) walks the whole
+thing end to end — install, your first event, a ticket sold, a ticket
+scanned at the door — with a screenshot at every step.
 
 ## Features
 
@@ -93,6 +107,10 @@ full adapter list and each one's verification status.
 Full gallery, including dark mode, in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
 ## Quick start (standalone)
+
+The condensed version — [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)
+has the same steps with what to expect after each one, a troubleshooting
+table, and a full first-event walkthrough afterward.
 
 ```bash
 git clone https://github.com/vul-os/cackle.git
