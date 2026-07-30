@@ -82,11 +82,13 @@ jobs:
         run: node scripts/check-doc-links.mjs
 
       # The same standard check-site.mjs holds site/ to, applied to the copy
-      # that actually ships inside the binary. site/ was gated from day one;
-      # web/src/ was gated by nothing, and a fabricated pricing page — an
-      # invented "our fee", a competitive superlative, one processor named as
-      # the default — lived there for months beside a landing page that got
-      # every claim right. Source-text only, no browser, no deps.
+      # that actually ships inside the binary. site/ has carried this check
+      # since day one; web/src/ was gated by nothing, and a fabricated pricing
+      # page — an invented "our fee", a competitive superlative, one processor
+      # named as the default — lived there for months beside a landing page
+      # that got every claim right. Source-text only, no browser, no deps.
+      # (check-site.mjs itself needs a real browser — see the `site` job
+      # below, where it actually runs.)
       - name: App copy states its limits and invents nothing
         run: node scripts/check-app.mjs
 
@@ -177,6 +179,44 @@ jobs:
 
       - name: Boot check — fail on uncaught exception or empty #root
         run: node scripts/boot-check.mjs --bin ./cackle --port 8089
+
+  # ── Site guard: real Chromium against site/ (the marketing + docs pages) ────
+  # check-site.mjs has existed since site/ did — as `make site-guards` and as
+  # the `site:check` npm script — but nothing in this file ever called either
+  # one. ci.yml:84's comment above talked about what check-site.mjs holds
+  # site/ to; it never ran it. That's the same "prints ok, never executes"
+  # shape every other gate in this repo has been hardened against, just one
+  # level up, at the wiring. site/ is committed static HTML/CSS/JS, not a
+  # build product of web/ or cmd/, so this job needs neither Go nor the
+  # frontend build and stands on its own rather than trailing the go/frontend
+  # jobs — same pattern as verify-script below.
+  site:
+    name: Site guard (real Chromium, site/ pages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install root devDependencies (playwright)
+        run: npm ci
+
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+
+      # Loads both pages (index.html + docs.html) at both path shapes in a
+      # real browser, proves they fetch nothing off-origin, never scroll
+      # sideways (measured per element, not from the root — see the file's
+      # own header comment for why that distinction is load-bearing), and
+      # refuses any copy that upgrades "detected" into "prevented" for
+      # cross-gate double-scan. Every detector proves it can fail before it is
+      # trusted to pass — see claimGateSelfTest/overflowGateSelfTest in the
+      # script itself.
+      - name: site/ loads clean, self-contained, no overflow, no overclaim
+        run: node scripts/check-site.mjs
 
   # A checksum guard that has quietly stopped failing is indistinguishable,
   # from a green CI run, from one that works. So verify.sh's refusals are
