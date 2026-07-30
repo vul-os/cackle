@@ -266,7 +266,9 @@ It must never become a dependency of Cackle:
 - It lives in **another product's repository**, and its own dependency
   list requires `kerf-core` — a sibling package in that same repo. You
   cannot take one without taking the tree.
-- It is not published anywhere Cackle could pin a version from.
+- Its own version is `0.1.0` and its build is `hatchling` from source in
+  that tree. Nothing in this repo, and nothing in kerf, points at a
+  published artefact Cackle could pin a version from.
 
 Depending on it would violate the suite's standalone rule, and it would
 also destroy the thing that makes kerf-pub valuable: it is a *second,
