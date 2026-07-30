@@ -12,6 +12,63 @@ import (
 	"github.com/vul-os/cackle/internal/store"
 )
 
+// orgView is a newly created org over the wire. It carries the caller's
+// own role alongside the org so a client can drop it straight into the
+// same list GET /api/auth/me returns (see orgMembershipView) without a
+// follow-up round trip.
+type orgView struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	DefaultCurrency string `json:"default_currency"`
+	Role            string `json:"role"`
+}
+
+// handleCreateOrg serves POST /api/orgs — ANY authenticated user, who
+// becomes the new org's owner.
+//
+// This is deliberately the one org route with no CanManageOrg check, and
+// that is not a hole: there is no org yet to hold a role in. The
+// authorisation rule it does enforce is the one that matters — the
+// membership row written here names ONLY the org this call just created
+// (internal/orgs.Create -> store.CreateOrgWithOwner), so creating an org
+// grants the caller exactly zero authority over any org that already
+// exists. Every other org/event route still resolves the caller's role
+// from org_members for the org NAMED IN THAT REQUEST, so a user with a
+// hundred of their own orgs is still a non-member, and still a 403,
+// everywhere else. TestCreateOrg_OwnerOfNewOrgIsStillNonMemberElsewhere
+// in org_handlers_test.go is the regression test for precisely that.
+func (s *server) handleCreateOrg(w http.ResponseWriter, r *http.Request) {
+	user, _ := userFromContext(r.Context())
+
+	var in orgs.CreateInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		badRequest(w, "invalid JSON body")
+		return
+	}
+
+	org, err := s.deps.Orgs.Create(r.Context(), in, user.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, orgs.ErrInvalidInput):
+			badRequest(w, err.Error())
+		case errors.Is(err, orgs.ErrSlugTaken):
+			conflict(w, "an organisation with that URL name already exists — pick another")
+		default:
+			internalError(w, s.log(), "create org", err)
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{"org": orgView{
+		ID:              org.ID,
+		Name:            org.Name,
+		Slug:            org.Slug,
+		DefaultCurrency: org.DefaultCurrency,
+		Role:            string(auth.RoleOwner),
+	}})
+}
+
 // handleListOrgMembers serves GET /api/orgs/{id}/members — admin+ on the
 // org.
 func (s *server) handleListOrgMembers(w http.ResponseWriter, r *http.Request) {

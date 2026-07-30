@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/vul-os/cackle/internal/auth"
+	"github.com/vul-os/cackle/internal/money"
 	"github.com/vul-os/cackle/internal/payments"
 	"github.com/vul-os/cackle/internal/store"
 )
@@ -46,6 +47,12 @@ var (
 	// to owner (or promote an accomplice) by going through an invite
 	// instead of the owner-only PATCH .../members/{user_id} route.
 	ErrRoleEscalation = errors.New("orgs: cannot invite at a role higher than your own")
+	// ErrSlugTaken is returned by Create when the requested (or derived)
+	// slug already belongs to another org. An org's slug is globally
+	// unique — it is the stable public handle for the org, exactly as an
+	// event's slug is for an event (both carry a UNIQUE constraint in
+	// migrations/0001_init.sql).
+	ErrSlugTaken = errors.New("orgs: an organisation with that URL name already exists")
 )
 
 // DefaultInviteTTL is how long a freshly created invite is valid.
@@ -139,6 +146,111 @@ type Service struct {
 // BankingProvider's doc comment).
 func New(st *store.Store, banking BankingProvider) *Service {
 	return &Service{store: st, banking: banking, now: time.Now}
+}
+
+// CreateInput is the input to Create. Slug and DefaultCurrency are
+// optional: an empty Slug is derived from Name, and an empty
+// DefaultCurrency falls back to internal/store's own plain default (see
+// store.CreateOrgWithOwner) rather than a currency this package would be
+// privileging.
+type CreateInput struct {
+	Name            string `json:"name"`
+	Slug            string `json:"slug"`
+	DefaultCurrency string `json:"default_currency"`
+}
+
+const (
+	maxOrgNameLen = 120
+	minOrgSlugLen = 2
+	maxOrgSlugLen = 60
+)
+
+// slugify reduces s to the lowercase, hyphen-separated form an org slug
+// must take. It is deliberately lossy: anything outside [a-z0-9] collapses
+// to a single hyphen, and leading/trailing hyphens are trimmed. An input
+// with no usable characters at all reduces to the empty string, which
+// Create rejects rather than papering over with a generated placeholder —
+// a slug is a public, permanent handle and the organiser should see that
+// their name produced nothing usable.
+func slugify(s string) string {
+	var b strings.Builder
+	lastHyphen := true // leading hyphens are suppressed
+	for _, r := range strings.ToLower(strings.TrimSpace(s)) {
+		switch {
+		case (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9'):
+			b.WriteRune(r)
+			lastHyphen = false
+		default:
+			if !lastHyphen {
+				b.WriteByte('-')
+				lastHyphen = true
+			}
+		}
+	}
+	out := strings.TrimSuffix(b.String(), "-")
+	if len(out) > maxOrgSlugLen {
+		out = strings.TrimSuffix(out[:maxOrgSlugLen], "-")
+	}
+	return out
+}
+
+// Create creates a brand new organisation and makes ownerUserID its
+// "owner", atomically (store.CreateOrgWithOwner — one transaction, so an
+// ownerless org can never exist).
+//
+// RBAC note, and the one place this package's usual "the caller already
+// checked" rule reads differently: there is no PRE-EXISTING org to hold a
+// role in, so the only authorisation this operation can require is that
+// the caller is an authenticated user at all — which internal/httpapi's
+// requireUser establishes before calling here. Creating a NEW org grants
+// no authority over any EXISTING one: the membership row written here
+// names the new org's id and nothing else, so every other org's
+// CanManageOrg lookup is unaffected.
+//
+// Returns ErrInvalidInput for a bad name/slug/currency and ErrSlugTaken if
+// the slug is already in use.
+func (s *Service) Create(ctx context.Context, in CreateInput, ownerUserID string) (*store.Org, error) {
+	if strings.TrimSpace(ownerUserID) == "" {
+		return nil, fmt.Errorf("%w: owner user id is required", ErrInvalidInput)
+	}
+
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return nil, fmt.Errorf("%w: name is required", ErrInvalidInput)
+	}
+	if len([]rune(name)) > maxOrgNameLen {
+		return nil, fmt.Errorf("%w: name must be at most %d characters", ErrInvalidInput, maxOrgNameLen)
+	}
+
+	// A caller-supplied slug is normalised, not merely validated: an
+	// organiser typing "Neon Nights!" into the URL-name field gets
+	// "neon-nights" rather than a rejection, and there is exactly one
+	// canonical form of any given slug in the database.
+	slug := slugify(in.Slug)
+	if slug == "" {
+		slug = slugify(name)
+	}
+	if len(slug) < minOrgSlugLen {
+		return nil, fmt.Errorf("%w: url name must contain at least %d letters or digits", ErrInvalidInput, minOrgSlugLen)
+	}
+
+	currency := strings.TrimSpace(in.DefaultCurrency)
+	if currency != "" {
+		norm, err := money.Normalize(currency)
+		if err != nil {
+			return nil, fmt.Errorf("%w: default_currency: %v", ErrInvalidInput, err)
+		}
+		currency = norm
+	}
+
+	org := &store.Org{Name: name, Slug: slug, DefaultCurrency: currency, CreatedAt: s.now()}
+	if err := s.store.CreateOrgWithOwner(ctx, org, ownerUserID); err != nil {
+		if errors.Is(err, store.ErrOrgSlugTaken) {
+			return nil, ErrSlugTaken
+		}
+		return nil, fmt.Errorf("orgs: create: %w", err)
+	}
+	return org, nil
 }
 
 // ListMembers returns every member of orgID, joined with their name/email.

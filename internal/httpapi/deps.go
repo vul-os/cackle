@@ -170,14 +170,23 @@ func New(deps Deps) http.Handler {
 
 		r.Delete("/images/{id}", s.requireUser(s.handleDeleteImage))
 
-		r.Route("/orgs/{id}", func(r chi.Router) {
-			r.Get("/events", s.requireUser(s.handleListOrgEvents))
-			r.Get("/members", s.requireUser(s.handleListOrgMembers))
-			r.Patch("/members/{user_id}", s.requireUser(s.handleUpdateOrgMemberRole))
-			r.Get("/invites", s.requireUser(s.handleListOrgInvites))
-			r.Post("/invites", s.requireUser(s.handleCreateOrgInvite))
-			r.Get("/bank-account", s.requireUser(s.handleGetBankAccount))
-			r.Put("/bank-account", s.requireUser(s.handleSetBankAccount))
+		r.Route("/orgs", func(r chi.Router) {
+			// POST /api/orgs is the only org route not gated on an
+			// EXISTING membership — there is no org yet to be a member of.
+			// requireUser is the whole gate, and the caller becomes the new
+			// org's owner. See handleCreateOrg's doc for why that grants no
+			// authority over anyone else's org.
+			r.Post("/", s.requireUser(s.handleCreateOrg))
+
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/events", s.requireUser(s.handleListOrgEvents))
+				r.Get("/members", s.requireUser(s.handleListOrgMembers))
+				r.Patch("/members/{user_id}", s.requireUser(s.handleUpdateOrgMemberRole))
+				r.Get("/invites", s.requireUser(s.handleListOrgInvites))
+				r.Post("/invites", s.requireUser(s.handleCreateOrgInvite))
+				r.Get("/bank-account", s.requireUser(s.handleGetBankAccount))
+				r.Put("/bank-account", s.requireUser(s.handleSetBankAccount))
+			})
 		})
 		r.Delete("/invites/{id}", s.requireUser(s.handleDeleteOrgInvite))
 		r.Post("/invites/accept", s.requireUser(s.handleAcceptOrgInvite))

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/vul-os/cackle/internal/money"
@@ -71,6 +72,76 @@ func (s *Store) CreateOrg(ctx context.Context, o *Org) error {
 		return fmt.Errorf("store: create org: %w", err)
 	}
 	return nil
+}
+
+// ErrOrgSlugTaken is returned by CreateOrgWithOwner when the slug is
+// already in use by another org. orgs.slug carries a UNIQUE constraint
+// (see migrations/0001_init.sql), so this is a real, DB-enforced fact
+// rather than an advisory check that a race could slip past.
+var ErrOrgSlugTaken = errors.New("store: org slug already taken")
+
+// CreateOrgWithOwner inserts a new org AND the membership row making
+// ownerUserID its "owner", in a single transaction. The two rows are
+// inseparable by design: an org with no owner is unmanageable and
+// unrecoverable (nobody can invite anyone, change payouts, or promote a
+// replacement — see orgs.ErrLastOwner), so it must never be possible for
+// the org row to land and the membership row not to. This is the same
+// discipline CreateEventWithKey applies to an event and its issuer key.
+//
+// Returns ErrOrgSlugTaken (nothing written) if the slug collides with an
+// existing org. Defaults for ID/CreatedAt/DefaultCurrency match CreateOrg,
+// including money.Normalize validation of the currency code.
+func (s *Store) CreateOrgWithOwner(ctx context.Context, o *Org, ownerUserID string) error {
+	if o.ID == "" {
+		o.ID = NewID()
+	}
+	if o.CreatedAt.IsZero() {
+		o.CreatedAt = time.Now()
+	}
+	if o.DefaultCurrency == "" {
+		o.DefaultCurrency = "USD"
+	}
+	norm, err := money.Normalize(o.DefaultCurrency)
+	if err != nil {
+		return fmt.Errorf("store: create org with owner: default_currency: %w", err)
+	}
+	o.DefaultCurrency = norm
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store: create org with owner: begin: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO orgs (id, name, slug, default_currency, created_at) VALUES (?, ?, ?, ?, ?)`,
+		o.ID, o.Name, o.Slug, o.DefaultCurrency, timeToText(o.CreatedAt),
+	); err != nil {
+		if isUniqueViolation(err) {
+			return ErrOrgSlugTaken
+		}
+		return fmt.Errorf("store: create org with owner: insert org: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO org_members (org_id, user_id, role, created_at) VALUES (?, ?, ?, ?)`,
+		o.ID, ownerUserID, "owner", timeToText(o.CreatedAt),
+	); err != nil {
+		return fmt.Errorf("store: create org with owner: insert membership: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("store: create org with owner: commit: %w", err)
+	}
+	return nil
+}
+
+// isUniqueViolation reports whether err is a SQLite UNIQUE constraint
+// failure. modernc.org/sqlite surfaces this only in the error text, so
+// this matches on it — the same technique internal/httpapi already uses
+// for the admissions partial unique index.
+func isUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 const orgSelectColumns = `SELECT id, name, slug, default_currency, created_at`
