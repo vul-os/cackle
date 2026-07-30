@@ -1,5 +1,5 @@
 .PHONY: build build-frontend build-backend dev run test lint check screenshots notices clean \
-	release-guards site-guards patala-generate build-patala test-patala run-patala
+	release-guards site-guards patala-generate check-patala build-patala test-patala run-patala
 
 BIN := cackle
 
@@ -143,8 +143,29 @@ go.work:
 	go work use .
 	go work use $(PATALA_GO_DIR)
 
+# PATALA_FEATURES (repo root) is the single checked-in source of truth for
+# which cargo features patala-py's cdylib must be built with — see that
+# file's own header for why this used to be a bare hardcoded `fiat-all` here
+# (and in two other places) until a regeneration done via patala-go's own
+# bare `make generate` silently dropped it. Everything below reads the same
+# file instead of repeating the string.
+PATALA_REQUIRED_FEATURES := $(shell grep -v '^\#' $(CURDIR)/PATALA_FEATURES | grep -v '^[[:space:]]*$$' | head -1)
+
+# check-patala-bindings.sh is the last step, not just a separate target: it
+# turns "uniffi-bindgen-go silently produced the wrong surface" (or someone
+# else's bare `make generate` racing this one) into a clear, actionable
+# failure right here, instead of a bare "undefined: patala.PatalaFiatProviders"
+# several steps later out of `go build`.
 patala-generate:
-	$(MAKE) -C $(PATALA_GO_DIR) FEATURES=fiat-all generate
+	$(MAKE) -C $(PATALA_GO_DIR) FEATURES=$(PATALA_REQUIRED_FEATURES) generate
+	$(CURDIR)/scripts/check-patala-bindings.sh $(PATALA_BINDINGS)
+
+# Standalone verification — safe to run any time, e.g. right after someone
+# else's unrelated work in the sibling patala checkout, to check whether the
+# currently-generated bindings still have what cackle needs WITHOUT
+# regenerating anything.
+check-patala:
+	$(CURDIR)/scripts/check-patala-bindings.sh $(PATALA_BINDINGS)
 
 # Build cackle WITH the patala path linked in (no embedded frontend — pair
 # with `build-frontend`/`cmd/cackle/dist` by hand if you want both; see

@@ -1,0 +1,23 @@
+# Required patala-py cargo features for Cackle's `-tags patala` build.
+#
+# internal/payments/patala.go calls patala.PatalaFiatProviders() and
+# patala.PatalaRailNewFiat(...) — both are UniFFI exports that only exist in
+# the generated Go bindings when patala-py's cdylib was built with the fiat
+# adapters compiled in. A cdylib built with the default (empty) feature set
+# only exports the Mock rail constructors, and `go build -tags patala` then
+# fails with "undefined: patala.PatalaFiatProviders" — a correct compile
+# error, but a confusing one if you don't already know this file exists.
+#
+# This is the single source of truth for that feature set. Makefile's
+# `patala-generate` target and scripts/check-patala-bindings.sh both read it,
+# so there is exactly one place to update if the required surface changes —
+# not three copies (a Makefile recipe, a doc comment, a script) that can
+# silently drift from each other the way the underlying bug here happened:
+# an earlier regeneration ran patala-go's bare `make generate` (features
+# default to empty) instead of `make FEATURES=fiat-all generate`, and nothing
+# caught the mismatch until `go build -tags patala` failed downstream.
+#
+# Do not hand-edit the generated bindings to work around a mismatch here —
+# regenerate them: `make patala-generate` (or `build-patala`/`test-patala`,
+# which depend on it) reads this file and does it correctly for you.
+fiat-all
