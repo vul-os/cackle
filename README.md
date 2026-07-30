@@ -242,6 +242,7 @@ Full reference: [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 | [docs/TICKET-FORMAT.md](docs/TICKET-FORMAT.md) | The ticket capability wire format, precise enough to implement from, and why offline verification works — read this first |
 | [docs/ticket-format-vectors.json](docs/ticket-format-vectors.json) | Frozen conformance vectors for that format — what any new implementation must reproduce |
 | [docs/OFFLINE-GATES.md](docs/OFFLINE-GATES.md) | Running a gate with no network: scan-bundle, allocations, sync |
+| [docs/FEDERATION.md](docs/FEDERATION.md) | What two organisers' boxes may share, why tickets are always bought from the publisher's own box, and the discovery/central-index features this project will not build |
 | [docs/PAYMENTS.md](docs/PAYMENTS.md) | The payment provider seam, the full adapter table + verification status, `manual` by default, why Cackle never holds funds |
 | [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) | Full screenshot gallery and how to regenerate it |
 | [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md) | Running Cackle for a real event: Docker, backups, TLS, scaling the gate |

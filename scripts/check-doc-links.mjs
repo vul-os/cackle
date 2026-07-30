@@ -51,6 +51,7 @@ const SITE_CHAPTER_BASE = {
     'ticket-format.md': 'docs/',
     'offline-gates.md': 'docs/',
     'clustering.md': 'docs/',
+    'federation.md': 'docs/',
     'api.md': 'docs/',
     'host-pages.md': 'docs/',
     'payments.md': 'docs/',

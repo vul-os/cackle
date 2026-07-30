@@ -331,6 +331,11 @@ pin survives unchanged.
 
 ## Related
 
+- [FEDERATION.md](FEDERATION.md) — the same transport, different question:
+  what two *different* operators' boxes may share, and the boundary (no
+  discovery, no directory, no central feed) that keeps this chapter's
+  "a node talks to exactly the nodes an operator typed in" true by design
+  rather than by accident.
 - [OFFLINE-GATES.md](OFFLINE-GATES.md) — the gate side, and why cross-gate
   double admission is detected rather than prevented.
 - [API.md](API.md) — every other route, including `/api/scan` and
