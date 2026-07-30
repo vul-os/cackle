@@ -30,7 +30,8 @@ import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
 import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
-import { EMPTY_HEADING, emptyDescription, hostHeading, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
+import { EMPTY_HEADING, emptyDescription, hostHeading, hostOrgs, hostSubheading, orgForEvent, orgHref, showsOrgLabels } from '@/lib/host';
+import PeerEvents from '@/pages/visitor/events/peer-events';
 
 const PAGE_SIZE = 24;
 
@@ -257,6 +258,35 @@ export default function BrowsePage() {
                             className="mt-5"
                         />
 
+                        {/* The organisations on this box, and the only way to
+                            narrow to one. Rendered strictly on `multi_org` —
+                            a single venue gets no row at all, because a row of
+                            one is a directory of one, and this box is not a
+                            directory. There is no organisation PAGE to link to
+                            (/h/{ref} resolves an event, not an org); the link
+                            is this same listing, narrowed. */}
+                        {showsOrgLabels(state.host) && (
+                            <nav className="mt-5 flex flex-wrap gap-2" aria-label="Organisations on this site">
+                                {hostOrgs(state.host).map((org) => {
+                                    const active = state.host?.org?.id === org.id;
+                                    return (
+                                        <Link
+                                            key={org.id}
+                                            to={orgHref(org)}
+                                            aria-current={active ? 'true' : undefined}
+                                            className={`inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm font-medium transition-colors sm:min-h-[36px] ${
+                                                active
+                                                    ? 'border-transparent bg-primary text-primary-foreground'
+                                                    : 'border-border bg-background text-foreground/80 hover:border-foreground/30'
+                                            }`}
+                                        >
+                                            {org.name}
+                                        </Link>
+                                    );
+                                })}
+                            </nav>
+                        )}
+
                         <div className="flex flex-wrap items-center gap-x-5">
                             {hasActiveFilters && (
                                 <button
@@ -364,6 +394,12 @@ export default function BrowsePage() {
                             )}
                         </>
                     )}
+
+                    {/* Somebody else's events, below this host's own and never
+                        mixed into them. Renders nothing at all unless this box
+                        is actually carrying a borrowed listing — see the file
+                        header for why there is no empty state here. */}
+                    {!state.error && !state.loading && <PeerEvents host={state.host} />}
                 </section>
             </main>
             <Footer />
