@@ -114,6 +114,10 @@ document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(ma
   /* Illustration inks. The drawings are two-colour prints and follow theme. */
   --il-bg:#100E15; --il-ink:#302B3D; --il-soft:#241F2F; --il-edge:#4A4358;
   --il-face:#1D1A25; --il-dot:rgba(255,255,255,.07); --il-paper:#F7F3EE;
+  /* wall/opening are a PAIR, not two independent tints: the wall must read
+     lighter than the ground and the opening darker than the wall, or the
+     doorway stops reading as a hole. Each theme picks its own two. */
+  --il-wall:#2E2839; --il-hole:#08070B;
 
   --shadow:0 1px 0 0 var(--hair) inset;
   --shadow-lift:0 1px 0 0 rgba(255,255,255,.06) inset,0 22px 50px -18px rgba(0,0,0,.8);
@@ -141,6 +145,7 @@ document.documentElement.setAttribute('data-theme',s==='light'||s==='dark'?s:(ma
 
   --il-bg:#F2ECE4; --il-ink:#14121A; --il-soft:#DED4C7; --il-edge:#C7BAA9;
   --il-face:#FFFFFF; --il-dot:rgba(20,18,26,.07); --il-paper:#FFFFFF;
+  --il-wall:#DED4C7; --il-hole:#14121A;
 
   --shadow:0 1px 2px rgba(20,18,26,.05);
   --shadow-lift:0 2px 6px -2px rgba(20,18,26,.07),0 24px 48px -20px rgba(20,18,26,.22);
@@ -325,6 +330,9 @@ h1 .off::after{
    engine that matters, but a real CSS rule cannot be argued with, and the
    labels inside a drawing must never fall back to a serif default. */
 .illo text{font-family:var(--sans)}
+/* The ticket drawing IS its own shape — a shadowed frame around a transparent
+   canvas rims a box the reader cannot see. */
+.illo-bare{box-shadow:none;border-radius:0}
 .illo-cap{margin-top:13px;font-size:13px;color:var(--t3);line-height:1.55}
 
 /* ── The gate device (interactive) ───────────────────────────────────────── */
@@ -389,8 +397,11 @@ h1 .off::after{
   display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;font-size:12.5px;color:var(--t3);
 }
 .dev-foot .q{color:var(--red-ink);font-weight:800;font-family:var(--mono)}
-.devcap{margin-top:14px;font-size:12.5px;color:var(--t3);line-height:1.55}
-.devcap code{font-size:.92em;color:var(--t2)}
+.devcap{margin-top:14px;font-size:13px;color:var(--t3);line-height:1.55}
+/* 1em, not .92em: a relative shrink on an already-small caption is what put
+   `scan.DecideWithBundle` at 11.5px, under the suite's 12px floor. The floor
+   is the constraint; the caption bends to it. */
+.devcap code{font-size:1em;color:var(--t2)}
 
 /* ── Cards / grids ───────────────────────────────────────────────────────── */
 .grid{display:grid;gap:16px;margin-top:44px}
@@ -714,56 +725,63 @@ pre .k{color:var(--red-ink)}
           <rect width="640" height="540" fill="var(--il-bg)"/>
           <rect width="640" height="540" fill="url(#halftone)"/>
 
-          <!-- the arched doorway -->
-          <path d="M126 500 V262 a134 134 0 0 1 268 0 V500 Z" fill="var(--il-soft)"/>
-          <path d="M126 500 V262 a134 134 0 0 1 268 0 V500" fill="none" stroke="var(--il-edge)" stroke-width="3"/>
-          <path d="M162 500 V266 a98 98 0 0 1 196 0 V500 Z" fill="var(--il-bg)"/>
-          <!-- warm light spilling out of the doorway -->
-          <path d="M162 500 V266 a98 98 0 0 1 196 0 V500 Z" fill="var(--red)" opacity=".13"/>
+          <!-- The doorway. Wall in the soft tone, OPENING in the dark ink in
+               both themes: the first draft filled the opening with the same
+               value as the ground, which vanished on the light theme and left
+               a pink smear where the door was meant to be. A doorway has to
+               read as a hole. -->
+          <path d="M96 500 V276 a136 136 0 0 1 272 0 V500 Z" fill="var(--il-wall)"/>
+          <path d="M96 500 V276 a136 136 0 0 1 272 0 V500" fill="none" stroke="var(--il-edge)" stroke-width="3"/>
+          <path d="M134 500 V280 a98 98 0 0 1 196 0 V500 Z" fill="var(--il-hole)"/>
+          <!-- light spilling out over the queue's heads -->
+          <path d="M134 400 V280 a98 98 0 0 1 196 0 V400 Z" fill="var(--red)" opacity=".22"/>
 
-          <!-- the queue -->
-          <g fill="var(--il-ink)">
-            <circle cx="205" cy="392" r="25"/><path d="M170 500v-40a35 35 0 0 1 70 0v40z"/>
-            <circle cx="262" cy="378" r="27"/><path d="M224 500v-46a38 38 0 0 1 76 0v46z"/>
-            <circle cx="322" cy="392" r="25"/><path d="M287 500v-40a35 35 0 0 1 70 0v40z"/>
+          <!-- the queue, lit from behind, so silhouettes read pale on the dark
+               opening and dark on the pale wall -->
+          <g fill="var(--il-wall)">
+            <circle cx="176" cy="396" r="25"/><path d="M141 500v-40a35 35 0 0 1 70 0v40z"/>
+            <circle cx="232" cy="382" r="27"/><path d="M194 500v-46a38 38 0 0 1 76 0v46z"/>
+            <circle cx="291" cy="396" r="25"/><path d="M256 500v-40a35 35 0 0 1 70 0v40z"/>
           </g>
-          <g fill="var(--il-soft)" opacity=".85">
-            <circle cx="86" cy="404" r="22"/><path d="M55 500v-36a31 31 0 0 1 62 0v36z"/>
-            <circle cx="424" cy="404" r="22"/><path d="M393 500v-36a31 31 0 0 1 62 0v36z"/>
+          <g fill="var(--il-wall)" opacity=".6">
+            <circle cx="46" cy="410" r="22"/><path d="M15 500v-36a31 31 0 0 1 62 0v36z"/>
           </g>
 
           <!-- the rope line, drawn as a perforation -->
-          <path d="M0 470 H640" stroke="var(--red)" stroke-width="3" stroke-dasharray="9 9" opacity=".5"/>
+          <path d="M0 474 H640" stroke="var(--red)" stroke-width="3" stroke-dasharray="9 9" opacity=".55"/>
 
           <!-- NO SIGNAL badge -->
-          <g transform="translate(392 44)">
-            <rect width="212" height="70" rx="16" fill="var(--il-face)" stroke="var(--red)" stroke-width="2.5"/>
-            <g transform="translate(20 16)" fill="none" stroke="var(--red)" stroke-width="3.4" stroke-linecap="round">
+          <g transform="translate(40 40)">
+            <rect width="246" height="72" rx="16" fill="var(--il-face)" stroke="var(--red)" stroke-width="2.5"/>
+            <g transform="translate(20 17)" fill="none" stroke="var(--red)" stroke-width="3.4" stroke-linecap="round">
               <path d="M2 14a26 26 0 0 1 34 0" opacity=".45"/>
               <path d="M8 22a17 17 0 0 1 22 0" opacity=".7"/>
               <path d="M14.5 30a8 8 0 0 1 9 0"/>
               <circle cx="19" cy="36" r="2.4" fill="var(--red)" stroke="none"/>
               <path d="M3 3 35 39" stroke-width="4"/>
             </g>
-            <text x="76" y="43" font-family="var(--sans)" font-size="26" font-weight="800" letter-spacing="1.5" fill="var(--red)">NO SIGNAL</text>
+            <text x="78" y="44" font-size="26" font-weight="800" letter-spacing="1.5" fill="var(--red)">NO SIGNAL</text>
           </g>
 
-          <!-- the phone, held up, screen flooded with the ADMIT verdict -->
-          <g transform="translate(352 148)">
-            <rect x="-6" y="-6" width="252" height="392" rx="34" fill="var(--il-ink)"/>
-            <rect x="0" y="0" width="240" height="380" rx="30" fill="var(--il-face)" stroke="var(--il-edge)" stroke-width="2"/>
-            <rect x="12" y="12" width="216" height="356" rx="22" fill="var(--admit)"/>
+          <!-- The phone, held up, screen flooded with the ADMIT verdict. Every
+               label here is >=22 user units: the drawing scales with the
+               column, and at a 390px viewport that is the smallest size that
+               still lands above the suite's 12px type floor. -->
+          <g transform="translate(330 128)">
+            <rect x="-7" y="-7" width="288" height="426" rx="38" fill="var(--il-ink)"/>
+            <rect x="0" y="0" width="274" height="412" rx="32" fill="var(--il-face)" stroke="var(--il-edge)" stroke-width="2"/>
+            <rect x="13" y="13" width="248" height="386" rx="24" fill="var(--admit)"/>
             <!-- the tick -->
-            <g transform="translate(120 132)">
-              <circle r="46" fill="rgba(255,255,255,.16)"/>
-              <path d="M-21 2 -6 18 22 -14" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+            <g transform="translate(137 142)">
+              <circle r="50" fill="rgba(255,255,255,.17)"/>
+              <path d="M-23 2 -7 20 24 -15" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
             </g>
-            <text x="120" y="238" text-anchor="middle" font-family="var(--sans)" font-size="38" font-weight="850" letter-spacing="-1" fill="#fff">ADMIT</text>
-            <text x="120" y="272" text-anchor="middle" font-family="var(--sans)" font-size="24" font-weight="600" fill="rgba(255,255,255,.9)">General Admission</text>
-            <path d="M34 300 H206" stroke="rgba(255,255,255,.45)" stroke-width="2.5" stroke-dasharray="8 8"/>
-            <text x="120" y="336" text-anchor="middle" font-family="var(--sans)" font-size="22" font-weight="600" fill="rgba(255,255,255,.82)">checked on this phone</text>
+            <text x="137" y="262" text-anchor="middle" font-size="46" font-weight="850" letter-spacing="-1.5" fill="#fff">ADMIT</text>
+            <text x="137" y="300" text-anchor="middle" font-size="24" font-weight="600" fill="rgba(255,255,255,.92)">General Admission</text>
+            <path d="M40 328 H234" stroke="rgba(255,255,255,.45)" stroke-width="2.5" stroke-dasharray="8 8"/>
+            <text x="137" y="366" text-anchor="middle" font-size="23" font-weight="700" fill="rgba(255,255,255,.9)">no signal needed</text>
             <!-- the hand -->
-            <path d="M18 372 q-42 26 -46 78 h300 q-6 -54 -52 -78 z" fill="var(--il-ink)"/>
+            <path d="M22 404 q-46 28 -50 82 h330 q-6 -58 -56 -82 z" fill="var(--il-ink)"/>
           </g>
         </g>
       </svg>
@@ -1210,7 +1228,7 @@ docker run -d -p 8080:8080 \
     <!-- ILLUSTRATION 2 — the anatomy of the stub, drawn, with the labels in
          HTML beside it so every one of them clears the 12px floor. -->
     <div class="anat rv">
-      <svg class="illo" viewBox="0 0 620 320" role="img" aria-labelledby="illoTicketT illoTicketD">
+      <svg class="illo illo-bare" viewBox="0 0 620 320" role="img" aria-labelledby="illoTicketT illoTicketD">
         <title id="illoTicketT">The anatomy of a Cackle ticket</title>
         <desc id="illoTicketD">A drawn ticket with a dashed perforation down the right side. The main body carries the event name and tier; the stub carries the QR code that is the ticket itself.</desc>
         <defs>
