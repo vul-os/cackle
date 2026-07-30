@@ -45,6 +45,18 @@ type Deps struct {
 	Config   *config.Config
 	WebFS    fs.FS // embedded web/dist build; nil is handled (see spa.go)
 	Logger   *slog.Logger
+	// OAuth is the optional third-party sign-in provider. NIL IS THE
+	// DEFAULT AND THE NORMAL CASE: cmd/cackle only builds one when an
+	// operator set both CACKLE_GOOGLE_CLIENT_ID and
+	// CACKLE_GOOGLE_CLIENT_SECRET. When it is nil the OAuth routes are not
+	// mounted at all (see the /auth block below), GET /api/auth/providers
+	// answers with an empty list, and the sign-in page therefore renders no
+	// button. A stock Cackle makes no outbound request to anyone.
+	//
+	// This is ORGANISER LOGIN. Nothing on the admission path may reach it —
+	// see internal/auth/oauth_handlers.go's header and the two tests that
+	// hold that line, one structural and one behavioural.
+	OAuth auth.OAuthProvider
 	// MediaDir is where uploaded event images are stored on disk (see
 	// internal/media). Falls back to cfg.MediaDir via mediaDir() if unset,
 	// so existing callers that only set Config still work.
@@ -126,6 +138,29 @@ func New(deps Deps) http.Handler {
 			r.Get("/me", s.requireUser(s.handleMe))
 			r.With(rateLimit(authLimiter)).Post("/password-reset", s.handlePasswordReset)
 			r.With(rateLimit(authLimiter)).Post("/password-update", s.handlePasswordUpdate)
+
+			// Public: which sign-in methods this box actually has. Always
+			// mounted, because the frontend must be able to ask; answers
+			// {"providers":[]} when nothing is configured, which is what
+			// stops a button rendering that could not work.
+			r.Get("/providers", s.handleListOAuthProviders)
+
+			// The OAuth routes exist ONLY on a box whose operator configured
+			// a provider. Not mounted-and-refusing: not mounted. An
+			// unconfigured box 404s these paths like any other unknown
+			// route, so there is no code here for an unconfigured
+			// deployment to reach at all.
+			//
+			// Rate-limited on the same bucket as the password routes: the
+			// callback drives an outbound request to a third party, which is
+			// the one thing in this product an anonymous caller can cause,
+			// and it must be bounded from its first commit.
+			if s.oauthProvider() != nil {
+				r.Route("/oauth/{provider}", func(r chi.Router) {
+					r.With(rateLimit(authLimiter)).Get("/start", s.handleOAuthStart)
+					r.With(rateLimit(authLimiter)).Get("/callback", s.handleOAuthCallback)
+				})
+			}
 		})
 
 		r.Route("/events", func(r chi.Router) {

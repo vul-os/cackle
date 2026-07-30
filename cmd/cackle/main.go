@@ -203,6 +203,34 @@ func run(args []string, stdout, stderr *os.File) error {
 	ordersSvc := orders.New(st, eventsSvc, registry)
 	orgsSvc := orgs.New(st, bankingProvider)
 
+	// Third-party sign-in, on the same terms as every payment adapter
+	// except `manual`: OPT-IN PER DEPLOYMENT, never a default. FromEnvGoogle
+	// returns (nil, nil) when neither CACKLE_GOOGLE_CLIENT_ID nor
+	// CACKLE_GOOGLE_CLIENT_SECRET is set, which is the normal case — the
+	// routes are then not mounted, the sign-in page renders no button, and
+	// this binary makes no outbound request to Google or anyone else.
+	//
+	// Exactly one of the two set is a REFUSAL TO START rather than a silent
+	// fallback to "off", for the same reason a half-set key passphrase is
+	// (see internal/config): an operator who believes they enabled something
+	// must be told when they have not.
+	//
+	// This is organiser/admin login only. It is structurally incapable of
+	// becoming a dependency of the gate — internal/scan imports none of it,
+	// and internal/auth's TestScanPathCannotReachOAuth fails if that ever
+	// changes. Password login is unaffected either way, which is the part
+	// that matters on a box whose internet is down.
+	googleOAuth, err := auth.FromEnvGoogle()
+	if err != nil {
+		return fmt.Errorf("configure google sign-in: %w", err)
+	}
+	var oauthProvider auth.OAuthProvider
+	if googleOAuth != nil {
+		oauthProvider = googleOAuth
+		// The provider NAME only. Never the client id, never the secret.
+		logger.Info("third-party sign-in enabled", "provider", googleOAuth.Name())
+	}
+
 	if cfg.Demo {
 		if err := demo.Seed(ctx, st, eventsSvc, ordersSvc, orgsSvc); err != nil {
 			return fmt.Errorf("demo: seed: %w", err)
@@ -226,6 +254,7 @@ func run(args []string, stdout, stderr *os.File) error {
 		Orgs:     orgsSvc,
 		Payments: registry,
 		Config:   cfg,
+		OAuth:    oauthProvider,
 		MediaDir: cfg.MediaDir,
 		WebFS:    webFS,
 		Logger:   logger,
