@@ -139,17 +139,15 @@ gate admitting it — offline. If you only want to understand what Cackle
 does, `--demo` above already showed you the shape of it. This section is for
 when you're actually about to run something.
 
-> [!IMPORTANT]
-> **A rough edge to know about before you start: there is currently no
-> button to create your first organisation.** Signing up only creates a
-> user account — attaching that account to an organisation (which is what
-> lets you create events) has to be done once, directly against the
-> database, because that piece of the product hasn't been built yet. This
-> is stated here rather than glossed over: if you hit the "No organization
-> yet" screen after signing up, this is why, not something you did wrong.
-> See [step 2](#2-the-one-time-database-step-creating-your-organisation)
-> below for the exact, one-time fix. Everything after that step works
-> through the ordinary web interface.
+> [!NOTE]
+> **Cackle sends no email.** No password-reset messages, no invite
+> messages, nothing. That is deliberate — a door that needs a mail server
+> before it works is a door that stops working when the internet does — but
+> it changes two things you might expect to be automatic. Adding someone to
+> your team is done by sending them a link yourself
+> ([step 9](#9-put-someone-on-the-door)), and a forgotten password is reset
+> by whoever runs the server
+> ([Accounts without email](CONFIGURATION.md#accounts-without-email)).
 
 ### 1. Run Cackle for real (not `--demo`)
 
@@ -168,39 +166,26 @@ CACKLE_KEY_PASSPHRASE="a passphrase only you know, twelve characters or more" \
 
 **What you should see:** a startup log with no `--demo` banner this time,
 ending in `serving on :8080`. Open `http://localhost:8080/signup` and create
-an account with your own email and a password. **What you should see:** a
-"No organization yet" page — that's the rough edge above, not a bug you
-triggered.
+an account with your own email and a password.
 
 (Running for real over the public internet, with TLS and a proper reverse
 proxy, is [SELF-HOSTING.md](SELF-HOSTING.md) — this section is about
 learning the flow locally first.)
 
-### 2. The one-time database step: creating your organisation
+### 2. Create your organisation
 
-Cackle's whole database is one SQLite file (`./cackle.db` above). Stop the
-`./cackle` process (Ctrl-C), then run:
+Signing up creates a user account and nothing else, on purpose — most
+people who sign up are buying a ticket, not selling one. So the first time
+you open the organiser console it sends you straight to **Create your
+organisation**.
 
-```bash
-sqlite3 ./cackle.db <<'SQL'
-INSERT INTO orgs (id, name, slug, created_at)
-  VALUES ('org_1', 'My Venue', 'my-venue', datetime('now'));
-INSERT INTO org_members (org_id, user_id, role, created_at)
-  VALUES ('org_1',
-          (SELECT id FROM users WHERE email = 'you@example.com'),
-          'owner', datetime('now'));
-SQL
-```
+Give it a name ("My Venue"). The URL name underneath is filled in for you
+(`my-venue`) and you can change it; it's what your public event addresses
+hang off, so pick something you'll still be happy with next year. Pick your
+default currency.
 
-Replace `you@example.com` with the email you just signed up with, and
-`My Venue` / `my-venue` with your own organisation's name and a URL-safe
-slug (letters, numbers, hyphens). If your system doesn't have the `sqlite3`
-command, this is a good moment to ask a technically-minded friend for five
-minutes — it's two lines, and you only ever run it once per organisation.
-
-Restart `./cackle` with the same command as step 1, sign back in, and
-**what you should see:** the organiser dashboard instead of the dead end —
-your organisation, no events yet.
+**What you should see:** the organiser dashboard — your organisation, no
+events yet. You are its owner.
 
 ### 3. Create your event
 
@@ -266,7 +251,36 @@ That QR code isn't a lookup key into a database — it *is* the ticket. It's a
 compact, signed piece of data that a scanner can check entirely on its own,
 which is what makes the next two steps possible.
 
-### 9. Before doors: load the scanner
+### 9. Put someone on the door
+
+You probably aren't scanning tickets yourself all night. Whoever is needs
+their own account, at the **Scanner** role: they can see your events, pull
+a scan bundle and admit people, and nothing else — no editing events, no
+orders, no money, no team.
+
+Go to **Team**, type their email, choose **Scanner**, and press **Create
+invite link**.
+
+**Cackle does not send that link — you do.** There is no mail server in
+this binary, so the page shows you the link and you pass it on however you
+already talk to your staff: WhatsApp, SMS, or reading it out. That is the
+same reasoning as `manual` payments in step 6 — nothing to configure, no
+third party, works on a venue laptop with no internet.
+
+Three things worth knowing:
+
+- **The link is shown once.** Cackle only keeps a scrambled copy of it, so
+  it can't be looked up again. Lost it? Revoke the invite on the same page
+  and make another — it takes five seconds.
+- **It only works for the email address you invited.** Forwarding it to
+  somebody else achieves nothing. Tell them which address to sign in with.
+- **It stops working after seven days.** The page tells you the exact date.
+
+They open the link, sign in (or sign up with that address), press **Accept
+invite**, and they're on your team. **What you should see** on your Team
+page: their name in the members list, at Scanner.
+
+### 10. Before doors: load the scanner
 
 On the device you'll use at the door, sign in and open the **Scanner**
 page, pick your event, and press **Download**.
@@ -279,7 +293,7 @@ public key, the current list of valid tickets — and stores it on the
 device. Do this **before** the doors open, with time to spare, not while a
 queue is forming.
 
-### 10. At the door: scan it, wifi or no wifi
+### 11. At the door: scan it, wifi or no wifi
 
 Press **Scan** and point the device at the ticket's QR code.
 
@@ -290,7 +304,7 @@ trick, that's the entire feature. The scanner checks the ticket's signature
 itself, checks it against the list it downloaded in step 9, and checks its
 own local record of who it's already let in. None of that needs a network.
 
-### 11. What happens later, once you're back online
+### 12. What happens later, once you're back online
 
 Sync the device's admission log back to the server whenever it next has a
 connection (a phone briefly finding signal, a laptop plugged in at the

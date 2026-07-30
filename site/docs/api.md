@@ -34,6 +34,31 @@ POST   /api/auth/password-reset    {email}
 POST   /api/auth/password-update   {token,password}
 ```
 
+**Password reset needs an operator, not a mailbox.** `POST
+/api/auth/password-reset` mints a single-use, one-hour token and answers
+`{"ok":true}` whether or not the address exists — it is deliberately
+unable to tell a caller which, so it cannot be used to enumerate
+accounts. It also **never returns the token**, and **nothing delivers
+it**: Cackle contains no SMTP client, no provider SDK and no sender of
+any kind, so a token minted through this route is unreachable by anybody
+unless you add delivery yourself. The built-in console therefore does not
+call it.
+
+The path that works on a self-hosted box is the operator running, on the
+machine itself:
+
+```
+cackle reset-password -email someone@example.com
+```
+
+which prints `<base-url>/update-password?token=…` to hand over. Same
+token machinery, same one-hour single-use expiry, and using it signs that
+account out everywhere. An unknown address is an error there rather than
+a silent success — an operator with the database in front of them has
+nothing to enumerate and needs to be told they mistyped. Add `-db` /
+`-base-url` (or `CACKLE_DB` / `CACKLE_BASE_URL`) when the defaults are
+wrong; the link must use an address the recipient can actually reach.
+
 ## Events
 
 ```
@@ -227,6 +252,7 @@ DELETE /api/ticket-types/{id}
 ## Org management
 
 ```
+POST   /api/orgs                {name,slug?,default_currency?}  → {org:{id,name,slug,default_currency,role}}   any authenticated user
 GET    /api/orgs/{id}/members                       → {members:[{user_id,name,email,role}]}   admin+ auth
 PATCH  /api/orgs/{id}/members/{user_id}  {role}     → {member:{user_id,name,email,role}}       owner auth
 POST   /api/orgs/{id}/invites   {email,role}        → {invite_id,token,expires_at}             admin+ auth
@@ -240,6 +266,20 @@ GET    /api/banks                                   → {banks:[{name,slug,code,
 
 GET    /api/events/{id}/payouts                     → {payouts:{gross_minor,fees_minor,net_minor,currency,status,rows:[{id,amount_minor,currency,status,provider_ref,created_at,paid_at}]}}   admin+ auth
 ```
+
+**Creating an org** is the one route in this section that is not gated on
+an existing membership, because there is no org yet to hold a role in.
+Any authenticated user may call it and becomes the new org's `owner`; the
+membership row it writes names only the org it just created, so creating
+an org grants exactly zero authority over any org that already exists
+(`internal/httpapi.handleCreateOrg`, regression-tested by
+`TestCreateOrg_OwnerOfNewOrgIsStillNonMemberElsewhere`). `name` is
+required. `slug` is optional and **normalised, not merely validated** —
+`"Neon Nights!"` becomes `neon-nights` — and falls back to a slug derived
+from `name` when omitted; a name that reduces to fewer than two usable
+characters is `invalid_request` rather than silently given a generated
+placeholder. A slug already in use is `conflict`. `default_currency` is
+optional and validated against the ISO 4217 table.
 
 **Member role changes** are owner-only — one bar higher than every other
 member/invite route in this table (admin+), since a role change can itself
@@ -266,6 +306,61 @@ cannot be redeemed by the wrong account; a mismatch is `forbidden`, not
 `invalid_request`. Accepting adds (or updates) the caller's membership at
 the invite's role; accepting twice, or after expiry, or after the invite
 was deleted, is `invalid_request`.
+
+### Delivering an invite — there is no email
+
+**Cackle does not send email.** Not "mail is unconfigured": there is no
+SMTP client, no provider SDK and no sender of any kind in this
+repository. So `POST /api/orgs/{id}/invites` returning the plaintext
+token is not a convenience — **it is the only delivery mechanism there
+is**, and a client that discards that response has minted an invite
+nobody can ever redeem. The built-in console did exactly that for a long
+time while telling the user an invite had been sent, which meant no
+organisation could add a `scanner` and therefore nobody could staff a
+door.
+
+The flow a client must implement:
+
+```
+POST /api/orgs/{id}/invites  {email,role}
+  → {invite_id, token, expires_at}
+
+link = <the origin the invitee can reach this server on> + "/accept-invite?token=" + token
+```
+
+Show that link to the inviter and let them send it themselves — the same
+principle as the `manual` payment provider (see [PAYMENTS.md](PAYMENTS.md)):
+no API key, no third party, no compliance surface, works in every country
+and on a venue LAN with no internet. The built-in console does this on
+the Team page (`web/src/pages/organizers/team/invite-link.js`), including
+the copy-to-clipboard fallback for the plain-`http://` case where the
+browser Clipboard API is unavailable.
+
+Notes that bind on any client:
+
+- **Show it once.** Only the sha256 hash is persisted, so no route can
+  ever return the token again — re-display is not a feature that was
+  skipped, it is one that cannot exist without keeping a bearer
+  credential in plaintext at rest. `GET .../invites` lists pending
+  invites and deliberately carries no token. If a link is lost, `DELETE
+  /api/invites/{id}` and issue a new one.
+- **State the expiry.** `expires_at` is 7 days out
+  (`orgs.DefaultInviteTTL`).
+- **Don't persist it.** It is a bearer credential; the console holds it
+  in component state and never in browser storage.
+- **The link carries the token in a query string**, and the server's
+  request logger records `r.URL.Path` and never `RawQuery`, so it does
+  not reach the log. `TestInvite_TokenIsReturnedOnceAndNeverLogged` pins
+  that.
+- The invitee must be signed in as the address the invite names, so a
+  forwarded link is useless to anyone else. Tell them that up front
+  rather than letting it surface as a `forbidden` after they have already
+  made an account.
+
+`internal/httpapi/invite_staffing_test.go` drives the whole path over
+HTTP — invite at `scanner`, accept, download a scan bundle, admit a real
+capability — and then asserts that same scanner is refused on ten
+admin/owner-gated routes.
 
 **Bank account** details are masked on read — `account_number_last4` only,
 never the full number — and the full number is never written to a log

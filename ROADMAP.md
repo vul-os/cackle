@@ -22,15 +22,25 @@ point.
 - Per-event sales/admission stats
 - `--demo` mode: fully seeded, zero setup
 
-**Known rough edge: there is no self-serve way to create an organisation.**
-Signup (`POST /api/auth/signup`) creates a user account only — there is no
-`POST /api/orgs` and no UI flow that attaches a new user to a new
-organisation. The only ways to get one today are `--demo`'s seed data, or a
-direct database insert into `orgs`/`org_members` (see
-[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md#2-the-one-time-database-step-creating-your-organisation)
-for the exact, one-time workaround). Once an organisation exists, everything
-downstream of it — events, ticket types, publishing, selling, scanning —
-works through the ordinary web interface. **Not yet built.**
+- **Organisations, teams and roles** — `POST /api/orgs` (the caller becomes
+  its owner) with a create-organisation screen a brand new account is sent
+  to; `owner`/`admin`/`scanner` roles enforced on every mutating org and
+  event route; single-use expiring invites so an owner can put someone on
+  the door, see
+  [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md#9-put-someone-on-the-door)
+
+**Cackle sends no email, and does not pretend to.** There is no SMTP
+client, no provider SDK and no sender of any kind in the binary. The two
+places a hosted product would normally send one hand you a link instead:
+a team invite is copied off the Team page and passed on by the inviter,
+and a password reset is minted by the operator with `cackle
+reset-password` (see
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md#accounts-without-email)).
+That is a design position, not a gap — a door that needs a mail server
+before it works is a door that stops working when the internet does — but
+it is listed here because it is a real difference from what most people
+expect. **Optional SMTP delivery is not built**, and nothing in the
+product implies it is.
 
 Everything below this line is **not yet built** — each is marked with what it
 would take and why it isn't v1.

@@ -11,7 +11,7 @@
 > ["What offline double-scan protection actually gives you"](#what-offline-double-scan-protection-actually-gives-you)
 > below before you staff an event around it. If you just want the fast
 > walkthrough with pictures, see
-> [GETTING-STARTED.md](GETTING-STARTED.md#9-before-doors-load-the-scanner).
+> [GETTING-STARTED.md](GETTING-STARTED.md#10-before-doors-load-the-scanner).
 
 This is the operational guide for the thing Cackle is actually for: staffing
 a door with a scanner that keeps working after the venue's Wi-Fi, the

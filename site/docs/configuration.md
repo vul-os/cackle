@@ -19,7 +19,7 @@ supported — this is intentional, to keep the single-binary story simple.
 | `CACKLE_ADDR` | `--addr` | `:8080` | HTTP listen address. |
 | `CACKLE_DB` | `--db` | `./cackle.db` | Path to the SQLite database file. Created (and migrated) on first boot if it doesn't exist. |
 | `CACKLE_MEDIA_DIR` | `--media-dir` | `<db dir>/media` | Directory uploaded event images are stored under. Defaults to a `media` folder beside the database file. Must be writable and should be included in backups alongside the database. |
-| `CACKLE_BASE_URL` | `--base-url` | derived from `--addr` (e.g. `http://localhost:8080`) | The public URL Cackle is reachable at. Used to build links in emails and payment provider callback URLs. Defaults to a localhost URL derived from the listen address, which is fine for local development — but set this to your real domain before taking payments, or the payment callback round-trip points at localhost and breaks. |
+| `CACKLE_BASE_URL` | `--base-url` | derived from `--addr` (e.g. `http://localhost:8080`) | The public URL Cackle is reachable at. Used for payment provider callback URLs and for the reset link `cackle reset-password` prints (see [Accounts without email](#accounts-without-email) below). Never used for email — Cackle sends none. Defaults to a localhost URL derived from the listen address, which is fine for local development — but set this to your real domain before taking payments, or the payment callback round-trip points at localhost and breaks. |
 | `CACKLE_SESSION_SECRET` | — | auto-generated, persisted | Secret used to sign session tokens. If unset, Cackle generates one on first boot and persists it to a `.cackle_session_secret` file (mode `0600`) beside the database file, so subsequent restarts don't invalidate every session. Set it explicitly in any multi-instance deployment so all instances share one secret. |
 | `CACKLE_KEY_PASSPHRASE` | — | **none — required** | Operator passphrase (minimum 12 characters) that unlocks the event signing keys, which are encrypted at rest. Cackle **refuses to start** without key material: there is no plaintext mode and no generated fallback. Set exactly one of this, `CACKLE_KEY_PASSPHRASE_FILE` or `CACKLE_KEY_FILE` — setting two is an error, and setting one to an empty value is an error rather than "unset". Back it up separately from `CACKLE_DB`; losing it means that database can never issue another ticket (already-issued tickets and every gate keep working). See [SELF-HOSTING.md](SELF-HOSTING.md#configuring-the-key-material). |
 | `CACKLE_KEY_PASSPHRASE_FILE` | — | — | Path to a file holding the passphrase instead of putting it in the environment, where `docker inspect` and `/proc/<pid>/environ` can read it. A single trailing newline is ignored. |
@@ -43,6 +43,44 @@ a default, never committed, never logged. A few examples (see
 | PayPal | `CACKLE_PAYPAL_CLIENT_ID`, `CACKLE_PAYPAL_CLIENT_SECRET`, `CACKLE_PAYPAL_WEBHOOK_ID`, `CACKLE_PAYPAL_ENV` |
 | BTCPay Server | `CACKLE_BTCPAY_BASE_URL`, `CACKLE_BTCPAY_API_KEY`, `CACKLE_BTCPAY_STORE_ID`, `CACKLE_BTCPAY_WEBHOOK_SECRET` |
 | LNbits | `CACKLE_LNBITS_BASE_URL`, `CACKLE_LNBITS_API_KEY`, `CACKLE_LNBITS_WEBHOOK_SECRET` |
+
+## Accounts without email
+
+**Cackle sends no email.** There is no SMTP client, no provider SDK and no
+sender of any kind in the binary, and nothing to configure to change that.
+That is a deliberate consequence of the same choice that makes `manual` the
+default payment provider: a gate that has to reach a third party before it
+can work is a gate that stops working when the internet does.
+
+Two things a hosted product would normally do by email are done by handing
+somebody a link instead.
+
+**Adding staff to your organisation.** On the Team page, "Create invite
+link" produces a link. Send it to them yourself — WhatsApp, SMS, read it
+out. It is shown once (the server keeps only a hash of it), works for seven
+days, and only works for the email address you invited. If you lose it,
+revoke the invite and make another. This is how you add a `scanner`, which
+is how you staff a door.
+
+**Resetting a password.** There is no self-service reset, because there is
+nowhere to send one. You, the operator, run this on the machine Cackle is
+installed on:
+
+```bash
+cackle reset-password -email someone@example.com
+```
+
+It prints a link, valid once and for one hour. Give it to them; they choose
+their own password, and every existing session for that account is signed
+out. Add `-db` if your database is not at `./cackle.db`, and `-base-url` (or
+set `CACKLE_BASE_URL`) if the link must point at something other than the
+default — the address in the link has to be one the recipient can actually
+reach, which on a venue LAN is usually not `localhost`.
+
+The `POST /api/auth/password-reset` HTTP route still exists and still mints
+a token, but nothing delivers it and the response never contains it, so it
+is unusable unless you build delivery yourself. See
+[API.md](API.md#auth).
 
 ## Notes
 
