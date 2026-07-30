@@ -382,9 +382,17 @@ func TestInvite_TokenIsReturnedOnceAndNeverLogged(t *testing.T) {
 
 	// 3. Accepting really does consume it, so a link that leaks later is
 	//    worth nothing.
-	other, _ := h.signupUser("door-scanner-once@example.com.other@example.com", "other-password-123", "Other")
-	rec = h.do(http.MethodPost, "/api/invites/accept", other, map[string]any{"token": g.inviteToken})
-	if rec.Code == http.StatusOK {
-		t.Fatal("a spent invite token was accepted a second time")
+	//
+	//    Replayed by the SAME account that redeemed it, deliberately. A
+	//    replay by anyone else is refused by the email-match guard
+	//    (ErrEmailMismatch) before single-use is ever consulted, so it
+	//    would pass with the single-use marking removed entirely — this
+	//    test asserted exactly that until a mutation run caught it. The
+	//    invited account is the only caller for whom the single-use rule
+	//    is the sole thing standing in the way.
+	rec = h.do(http.MethodPost, "/api/invites/accept", g.scannerToken, map[string]any{"token": g.inviteToken})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("replaying a spent invite token: expected 400, got %d body %s", rec.Code, rec.Body.String())
 	}
+	assertErrorShape(t, rec)
 }
