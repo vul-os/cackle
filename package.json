@@ -13,6 +13,7 @@
     "docs:check": "node scripts/sync-docs.mjs --check",
     "docs:links": "node scripts/check-doc-links.mjs",
     "site:check": "node scripts/check-site.mjs",
+    "app:check": "node scripts/check-app.mjs",
     "site:og": "node scripts/make-og-card.mjs"
   },
   "devDependencies": {

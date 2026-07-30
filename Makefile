@@ -76,6 +76,7 @@ lint:
 	cd web && npm run lint
 	node scripts/sync-docs.mjs --check
 	node scripts/check-doc-links.mjs
+	node scripts/check-app.mjs
 
 # The release verifier's refusals, exercised rather than assumed: 24 synthetic
 # origins each broken in exactly one way, asserting the exit code AND that a
@@ -85,6 +86,13 @@ lint:
 release-guards:
 	bash scripts/verify.sh --selftest
 
+# `lint` now also runs scripts/check-app.mjs. It is here rather than in
+# site-guards because it needs no browser — it is a source-text gate — and
+# because the copy inside the binary deserves to fail as early as a gofmt slip
+# does. site/ had a claim gate from day one; web/src/ had none, which is how a
+# page inventing a 0.85% fee Cackle cannot charge shipped next to a landing
+# page that was scrupulously honest.
+#
 # site/ is the only thing here a customer reads before they read anything else,
 # and it is the only thing no gate covered. This one loads both pages in a real
 # browser at both path shapes, proves they fetch nothing off-origin and never

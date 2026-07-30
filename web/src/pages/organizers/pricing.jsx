@@ -9,11 +9,15 @@ import { BUILD_STATUS_LABEL, NO_FEE_STATEMENT } from '@/components/honesty/claim
 /**
  * What this page used to be, and why none of it is here any more.
  *
- * It advertised "2% → 0.85% — the lowest fees in the market", a fee breakdown
- * with a line item labelled "Our Fee (0.85%)", hardcoded ZAR Paystack card
- * rates, South African VAT at 15%, PayShap, and "Powered by Paystack" stated
- * as fact. Every one of those was invented. Checked against the code before
- * rewriting:
+ * It advertised a headline drop to a sub-1% rate, a superlative about where
+ * that rate sat among competitors, a calculator whose first line item was a
+ * percentage cut labelled as ours, card rates for one country's currency and
+ * one processor, that country's sales-tax rate, its domestic instant-payment
+ * rail, and a single processor named as the product's payment engine. Every
+ * one of those was invented. (The exact wording is in the commit that removed
+ * it, and deliberately not repeated here — scripts/check-app.mjs scans this
+ * file's source text, so quoting a fabrication back would trip the gate that
+ * exists to keep it gone.) Checked against the code before rewriting:
  *
  *   - There is no fee anywhere. `grep -rn 'platform_fee|service_fee|our_fee|
  *     application_fee|commission' internal/ cmd/ --include='*.go'` returns

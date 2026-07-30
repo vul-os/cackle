@@ -81,6 +81,15 @@ jobs:
       - name: Docs links resolve
         run: node scripts/check-doc-links.mjs
 
+      # The same standard check-site.mjs holds site/ to, applied to the copy
+      # that actually ships inside the binary. site/ was gated from day one;
+      # web/src/ was gated by nothing, and a fabricated pricing page — an
+      # invented "our fee", a competitive superlative, one processor named as
+      # the default — lived there for months beside a landing page that got
+      # every claim right. Source-text only, no browser, no deps.
+      - name: App copy states its limits and invents nothing
+        run: node scripts/check-app.mjs
+
       - name: Install
         working-directory: web
         run: npm ci
