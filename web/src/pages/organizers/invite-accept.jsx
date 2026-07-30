@@ -9,17 +9,27 @@ import { useAuth } from '@/context/use-auth';
 import { toast } from '@/components/ui/use-toast';
 
 /**
- * Lands here from an invite email's link (`/accept-invite?token=...`).
- * `ProtectedRoute` (see routes.jsx) already handles the "not signed in yet"
- * case by bouncing to /login with a returnTo back to this URL — by the
- * time this component renders, the caller is authenticated and all that's
- * left is the explicit "yes, join" confirmation.
+ * Lands here from the invite link an organiser sent by hand
+ * (`/accept-invite?token=...`). Cackle sends no email: the owner copies
+ * this link off their Team page and passes it on over WhatsApp, SMS or
+ * whatever they already use — see `team/invite-link.js` for why.
+ *
+ * `ProtectedRoute` (see routes.jsx) already handles the "not signed in
+ * yet" case by bouncing to /login, storing `pathname + search` so the
+ * token survives a signup detour — by the time this component renders,
+ * the caller is authenticated and all that's left is the explicit "yes,
+ * join" confirmation.
+ *
+ * The server additionally requires that the signed-in account's own email
+ * matches the address the invite names, so a forwarded link cannot be
+ * redeemed by the wrong person. That is stated up front here rather than
+ * left to surface as a 403 after they have already made an account.
  */
 const AcceptInvitePage = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
     const navigate = useNavigate();
-    const { refresh } = useAuth();
+    const { refresh, user } = useAuth();
     const [status, setStatus] = useState('idle'); // idle | accepting | done
     const [error, setError] = useState(null);
 
@@ -41,7 +51,10 @@ const AcceptInvitePage = () => {
     if (!token) {
         return (
             <div className="mx-auto max-w-md py-16">
-                <ErrorState title="Missing invite link" description="This link is missing its invite token. Ask whoever invited you to resend it." />
+                <ErrorState
+                    title="Missing invite link"
+                    description="This link is missing its invite code — it was probably cut short when it was sent. Ask whoever invited you to send you the whole link again."
+                />
             </div>
         );
     }
@@ -54,7 +67,10 @@ const AcceptInvitePage = () => {
                         <MailCheck className="h-6 w-6" />
                     </div>
                     <CardTitle>Join the team</CardTitle>
-                    <CardDescription>You&apos;ve been invited to help organise events on Cackle.</CardDescription>
+                    <CardDescription>
+                        You&apos;ve been invited to help run events on Cackle. You must be signed in as the email address the
+                        invite was sent to — {user?.email ? `you are signed in as ${user.email}.` : 'sign in with that address first.'}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {error && <p className="text-center text-sm font-medium text-destructive">{error}</p>}

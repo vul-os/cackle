@@ -16,6 +16,8 @@ import { toast } from '@/components/ui/use-toast';
 import { Users, Mail, Clock, X, ShieldAlert, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { orgMembers as orgMembersApi } from '@/lib/api';
+import { buildInviteUrl } from './invite-link';
+import InviteLinkCard from './invite-link-card';
 
 const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', scanner: 'Scanner' };
 const INVITABLE_ROLES = ['admin', 'scanner'];
@@ -40,6 +42,13 @@ const TeamPage = () => {
 
     const [state, setState] = useState({ members: [], invites: [], loading: true, error: null });
     const [inviting, setInviting] = useState(false);
+    // The one plaintext copy of a freshly minted invite token, held in
+    // component state and nowhere else — never in browser storage of any
+    // kind. It is a bearer credential, and a credential written to disk on
+    // a shared venue laptop outlives the person who created it. A reload
+    // loses it, which is the correct trade: revoke and re-invite is one
+    // click. invite-link.test.js asserts this file touches no storage API.
+    const [newInvite, setNewInvite] = useState(null);
     const [revokingId, setRevokingId] = useState(null);
     const [roleChangingId, setRoleChangingId] = useState(null);
 
@@ -68,15 +77,36 @@ const TeamPage = () => {
         load();
     }, [load]);
 
+    // Creating an invite mints a token the server returns EXACTLY ONCE and
+    // then only ever holds a hash of. This used to discard that response
+    // and toast a delivery confirmation — nothing was ever delivered,
+    // because Cackle contains no mail code at all, so the invite was
+    // unredeemable and no org could ever add a scanner. Keep the token,
+    // show the link, and describe what actually happened.
     const handleInvite = async (data) => {
         setInviting(true);
         try {
-            await orgMembersApi.invite(activeOrg.id, data);
-            toast({ title: 'Invite sent', description: `${data.email} has been invited as ${ROLE_LABEL[data.role]}.` });
+            const created = await orgMembersApi.invite(activeOrg.id, data);
+            const token = created?.token;
+            if (!token) {
+                // The server changed shape under us. Say so rather than
+                // report success on an invite nobody can ever redeem.
+                throw new Error('The server did not return an invite link. Nothing was sent — try again.');
+            }
+            setNewInvite({
+                url: buildInviteUrl(window.location.origin, token),
+                email: data.email,
+                role: data.role,
+                expiresAt: formatExpiry(created.expires_at),
+            });
+            toast({
+                title: 'Invite link ready',
+                description: `Copy it and send it to ${data.email} yourself — Cackle does not send email.`,
+            });
             form.reset({ email: '', role: 'scanner' });
             load();
         } catch (err) {
-            toast({ title: 'Could not send invite', description: err.message, variant: 'destructive' });
+            toast({ title: 'Could not create invite', description: err.message, variant: 'destructive' });
         } finally {
             setInviting(false);
         }
@@ -133,13 +163,26 @@ const TeamPage = () => {
                 </div>
             </div>
 
+            {newInvite && (
+                <InviteLinkCard
+                    url={newInvite.url}
+                    email={newInvite.email}
+                    roleLabel={ROLE_LABEL[newInvite.role] ?? newInvite.role}
+                    expiresAt={newInvite.expiresAt}
+                    onDismiss={() => setNewInvite(null)}
+                />
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-base">
                         <UserPlus className="h-4 w-4" />
                         Invite someone
                     </CardTitle>
-                    <CardDescription>They&apos;ll receive a link to join {activeOrg?.name}.</CardDescription>
+                    <CardDescription>
+                        You&apos;ll get a link to send them yourself — Cackle does not send email. Anyone with the link can join{' '}
+                        {activeOrg?.name} at the role you pick, so treat it like a key.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Form {...form}>
@@ -180,8 +223,8 @@ const TeamPage = () => {
                                     </FormItem>
                                 )}
                             />
-                            <Button type="submit" disabled={inviting}>
-                                {inviting ? 'Sending…' : 'Send invite'}
+                            <Button type="submit" disabled={inviting} className="min-h-11">
+                                {inviting ? 'Creating…' : 'Create invite link'}
                             </Button>
                         </form>
                     </Form>
@@ -255,6 +298,10 @@ const TeamPage = () => {
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base">Pending invites</CardTitle>
+                    <CardDescription>
+                        Invites that nobody has accepted yet. Their links can&apos;t be shown again — if one was lost, revoke it
+                        here and invite them again.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {state.loading ? (
