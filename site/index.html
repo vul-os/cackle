@@ -712,12 +712,20 @@ pre .k{color:var(--red-ink)}
            the palette wired to CSS variables so it follows the theme. -->
       <svg class="illo" viewBox="0 0 640 540" role="img" aria-labelledby="illoGateT illoGateD">
         <title id="illoGateT">A phone at a gate with no signal, still reading ADMIT</title>
-        <desc id="illoGateD">A queue waits at an arched doorway at night. A hand holds a phone whose screen has flooded green and reads ADMIT ONE. In the corner, the wifi symbol is struck through and labelled NO SIGNAL — and the door opens anyway.</desc>
+        <desc id="illoGateD">Night at a venue door. Light spills from an arched doorway and three people wait inside it, behind a rope drawn as a ticket perforation. To the right stands a phone whose screen has flooded green and reads ADMIT, General Admission, no signal needed. A badge in the corner shows the wifi symbol struck through and labelled NO SIGNAL.</desc>
         <defs>
           <pattern id="halftone" width="14" height="14" patternUnits="userSpaceOnUse">
             <circle cx="3" cy="3" r="1.5" fill="var(--il-dot)"/>
             <circle cx="10" cy="10" r="1.5" fill="var(--il-dot)"/>
           </pattern>
+          <!-- Warm light falling out of the doorway. It sits OVER --il-paper,
+               which is light in both themes, so the opening reads as a lit
+               hole rather than taking its value from the theme. -->
+          <linearGradient id="doorGlow" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--red)" stop-opacity=".26"/>
+            <stop offset=".55" stop-color="var(--red)" stop-opacity=".10"/>
+            <stop offset="1" stop-color="var(--red)" stop-opacity="0"/>
+          </linearGradient>
           <clipPath id="frameClip"><rect x="0" y="0" width="640" height="540" rx="22"/></clipPath>
         </defs>
 
@@ -725,34 +733,44 @@ pre .k{color:var(--red-ink)}
           <rect width="640" height="540" fill="var(--il-bg)"/>
           <rect width="640" height="540" fill="url(#halftone)"/>
 
-          <!-- The doorway. Wall in the soft tone, OPENING in the dark ink in
-               both themes: the first draft filled the opening with the same
-               value as the ground, which vanished on the light theme and left
-               a pink smear where the door was meant to be. A doorway has to
-               read as a hole. -->
-          <path d="M96 500 V276 a136 136 0 0 1 272 0 V500 Z" fill="var(--il-wall)"/>
-          <path d="M96 500 V276 a136 136 0 0 1 272 0 V500" fill="none" stroke="var(--il-edge)" stroke-width="3"/>
-          <path d="M134 500 V280 a98 98 0 0 1 196 0 V500 Z" fill="var(--il-hole)"/>
-          <!-- light spilling out over the queue's heads -->
-          <path d="M134 400 V280 a98 98 0 0 1 196 0 V400 Z" fill="var(--red)" opacity=".22"/>
+          <!-- THE DOORWAY, stage left. It occupies x 74–274 so that it never
+               collides with the phone at x 352 — an earlier draft overlapped
+               the two and the phone read as damage to the wall rather than as
+               a separate object. The opening is LIT (paper + a warm falloff)
+               because a venue at night spills light onto the queue; that also
+               gives the silhouettes in front of it something to be dark
+               against. -->
+          <path d="M74 486 V300 a100 100 0 0 1 200 0 V486 Z" fill="var(--il-wall)"/>
+          <path d="M102 486 V306 a72 72 0 0 1 144 0 V486 Z" fill="var(--il-paper)"/>
+          <path d="M102 486 V306 a72 72 0 0 1 144 0 V486 Z" fill="url(#doorGlow)"/>
+          <path d="M74 486 V300 a100 100 0 0 1 200 0 V486" fill="none" stroke="var(--il-edge)" stroke-width="3" stroke-linejoin="round"/>
 
-          <!-- the queue, lit from behind, so silhouettes read pale on the dark
-               opening and dark on the pale wall -->
-          <g fill="var(--il-wall)">
-            <circle cx="176" cy="396" r="25"/><path d="M141 500v-40a35 35 0 0 1 70 0v40z"/>
-            <circle cx="232" cy="382" r="27"/><path d="M194 500v-46a38 38 0 0 1 76 0v46z"/>
-            <circle cx="291" cy="396" r="25"/><path d="M256 500v-40a35 35 0 0 1 70 0v40z"/>
-          </g>
-          <g fill="var(--il-wall)" opacity=".6">
-            <circle cx="46" cy="410" r="22"/><path d="M15 500v-36a31 31 0 0 1 62 0v36z"/>
+          <!-- The queue, as dark silhouettes against that light. These were
+               previously filled --il-wall, THE SAME VALUE AS THE WALL BEHIND
+               THEM, so they only resolved where they happened to cross the
+               dark opening and dissolved into the wall everywhere else. A
+               silhouette needs a contrasting ground to exist at all.
+
+               Every figure is kept wholly inside the lit opening (x 102–246).
+               That is not composition fussiness: in the DARK theme --il-ink
+               (#302B3D) and --il-wall (#2E2839) are 2% apart in luminance, so
+               any part of a figure that strays onto the wall disappears. The
+               lit opening is the only ground these read against in both
+               themes, so they are not allowed to leave it. -->
+          <g fill="var(--il-ink)">
+            <circle cx="132" cy="392" r="21"/><path d="M103 486v-46a29 29 0 0 1 58 0v46z"/>
+            <circle cx="174" cy="378" r="23"/><path d="M142 486v-52a32 32 0 0 1 64 0v52z"/>
+            <circle cx="216" cy="394" r="20"/><path d="M188 486v-44a28 28 0 0 1 56 0v44z"/>
           </g>
 
-          <!-- the rope line, drawn as a perforation -->
-          <path d="M0 474 H640" stroke="var(--red)" stroke-width="3" stroke-dasharray="9 9" opacity=".55"/>
+          <!-- The rope, drawn as a perforation. It stops 46 units short of
+               each edge: bled to the full width it read as a stray rule
+               escaping the frame rather than as a barrier in the scene. -->
+          <path d="M46 500 H594" stroke="var(--red)" stroke-width="3" stroke-dasharray="9 9" stroke-linecap="round" opacity=".6"/>
 
           <!-- NO SIGNAL badge -->
-          <g transform="translate(40 40)">
-            <rect width="246" height="72" rx="16" fill="var(--il-face)" stroke="var(--red)" stroke-width="2.5"/>
+          <g transform="translate(40 36)">
+            <rect width="258" height="72" rx="16" fill="var(--il-face)" stroke="var(--red)" stroke-width="2.5"/>
             <g transform="translate(20 17)" fill="none" stroke="var(--red)" stroke-width="3.4" stroke-linecap="round">
               <path d="M2 14a26 26 0 0 1 34 0" opacity=".45"/>
               <path d="M8 22a17 17 0 0 1 22 0" opacity=".7"/>
@@ -760,29 +778,42 @@ pre .k{color:var(--red-ink)}
               <circle cx="19" cy="36" r="2.4" fill="var(--red)" stroke="none"/>
               <path d="M3 3 35 39" stroke-width="4"/>
             </g>
-            <text x="78" y="44" font-size="26" font-weight="800" letter-spacing="1.5" fill="var(--red)">NO SIGNAL</text>
+            <text x="82" y="44" font-size="26" font-weight="800" letter-spacing="1.5" fill="var(--red)">NO SIGNAL</text>
           </g>
 
-          <!-- The phone, held up, screen flooded with the ADMIT verdict. Every
-               label here is >=22 user units: the drawing scales with the
+          <!-- THE PHONE, held up, screen flooded with the ADMIT verdict.
+               Geometry is bounded ON PURPOSE: the body is x 346–610, y 88–466
+               inside a 640×540 frame, so it keeps a ≥30-unit margin on the
+               right and never reaches the bottom edge. The previous draft ran
+               its ink backing to y=547 and the hand to y=614 — both past the
+               540-unit floor — so the clip cut them mid-shape and the phone
+               read as broken out of its box. Only the forearm is allowed to
+               leave the frame, which is what grounds the hand in the scene.
+
+               Every label is >=22 user units: the drawing scales with the
                column, and at a 390px viewport that is the smallest size that
                still lands above the suite's 12px type floor. -->
-          <g transform="translate(330 128)">
-            <rect x="-7" y="-7" width="288" height="426" rx="38" fill="var(--il-ink)"/>
-            <rect x="0" y="0" width="274" height="412" rx="32" fill="var(--il-face)" stroke="var(--il-edge)" stroke-width="2"/>
-            <rect x="13" y="13" width="248" height="386" rx="24" fill="var(--admit)"/>
+          <g>
+            <rect x="346" y="94" width="258" height="372" rx="34" fill="var(--il-ink)"/>
+            <rect x="352" y="88" width="258" height="372" rx="34" fill="var(--il-face)" stroke="var(--il-edge)" stroke-width="2"/>
+            <rect x="365" y="101" width="232" height="346" rx="24" fill="var(--admit)"/>
             <!-- the tick -->
-            <g transform="translate(137 142)">
-              <circle r="50" fill="rgba(255,255,255,.17)"/>
-              <path d="M-23 2 -7 20 24 -15" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+            <g transform="translate(481 205)">
+              <circle r="46" fill="rgba(255,255,255,.17)"/>
+              <path d="M-21 2 -6 18 22 -14" fill="none" stroke="#fff" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>
             </g>
-            <text x="137" y="262" text-anchor="middle" font-size="46" font-weight="850" letter-spacing="-1.5" fill="#fff">ADMIT</text>
-            <text x="137" y="300" text-anchor="middle" font-size="24" font-weight="600" fill="rgba(255,255,255,.92)">General Admission</text>
-            <path d="M40 328 H234" stroke="rgba(255,255,255,.45)" stroke-width="2.5" stroke-dasharray="8 8"/>
-            <text x="137" y="366" text-anchor="middle" font-size="23" font-weight="700" fill="rgba(255,255,255,.9)">no signal needed</text>
-            <!-- the hand -->
-            <path d="M22 404 q-46 28 -50 82 h330 q-6 -58 -56 -82 z" fill="var(--il-ink)"/>
+            <text x="481" y="300" text-anchor="middle" font-size="44" font-weight="850" letter-spacing="-1.4" fill="#fff">ADMIT</text>
+            <text x="481" y="336" text-anchor="middle" font-size="24" font-weight="600" fill="rgba(255,255,255,.92)">General Admission</text>
+            <path d="M397 360 H565" stroke="rgba(255,255,255,.45)" stroke-width="2.5" stroke-dasharray="8 8"/>
+            <text x="481" y="402" text-anchor="middle" font-size="23" font-weight="700" fill="rgba(255,255,255,.9)">no signal needed</text>
           </g>
+          <!-- NO HAND. A grip band plus a tapering forearm was drawn here and
+               it read unmistakably as a vase or a plinth in both themes — the
+               phone appeared to be standing on a pedestal rather than held.
+               A flat two-ink print has no depth cues to sell a foreshortened
+               arm, so the phone is left as an object, grounded by its own
+               offset ink backing and by the rope perforation passing behind
+               it. Do not re-add an arm without checking the render. -->
         </g>
       </svg>
       <p class="illo-cap">The door is not asking anybody's permission. Everything the phone needs to answer was downloaded before the first guest arrived.</p>
