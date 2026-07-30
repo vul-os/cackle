@@ -23,8 +23,10 @@ type Config struct {
 	Addr string
 	// DB is the path to the SQLite database file (or ":memory:").
 	DB string
-	// BaseURL is the externally-visible base URL, used for links (password
-	// reset emails, payment redirect callbacks, etc).
+	// BaseURL is the externally-visible base URL, used for links: payment
+	// redirect callbacks, and the password-reset link `cackle
+	// reset-password` prints for an operator to pass on by hand. It is
+	// not used for email — Cackle sends none.
 	BaseURL string
 	// SessionSecret is 32+ bytes of key material used to authenticate
 	// anything that needs a server-side secret beyond the per-session

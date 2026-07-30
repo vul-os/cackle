@@ -56,7 +56,10 @@ const UpdatePassword = () => {
                     <CardContent>
                     {!token && (
                         <Alert variant="destructive" className="mb-4">
-                            <AlertDescription>This link is missing its reset token. Request a new one from the sign-in page.</AlertDescription>
+                            <AlertDescription>
+                                This link is missing its reset code — it was probably cut short when it was sent. Ask whoever runs
+                                this Cackle server for a new link; the &ldquo;Forgot password&rdquo; page has the command they need.
+                            </AlertDescription>
                         </Alert>
                     )}
                     <form onSubmit={handleSubmit} className="space-y-4">

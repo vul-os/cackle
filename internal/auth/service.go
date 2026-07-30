@@ -25,6 +25,12 @@ var (
 	ErrWeakPassword       = errors.New("auth: password too short")
 	ErrSessionInvalid     = errors.New("auth: session invalid or expired")
 	ErrResetTokenInvalid  = errors.New("auth: reset token invalid, expired, or already used")
+
+	// ErrNoSuchUser is returned ONLY by MintPasswordResetToken, the
+	// operator-facing path, and must never reach an HTTP response: the
+	// public reset route is deliberately unable to tell a caller whether
+	// an account exists. See RequestPasswordReset.
+	ErrNoSuchUser = errors.New("auth: no account with that email address")
 )
 
 const (
@@ -229,34 +235,63 @@ func (s *Service) LogoutAll(ctx context.Context, userID string) error {
 // nonexistent email is not an error: the returned token is simply empty.
 // Callers (internal/httpapi) must not distinguish these cases in the HTTP
 // response.
+//
+// Nothing delivers this token. Cackle has no mail code — no SMTP client,
+// no provider SDK, no sender of any kind — so the HTTP route that calls
+// this cannot hand the token to anybody, which is exactly why the
+// operator-facing MintPasswordResetToken below exists: on a self-hosted
+// box the person who can reset your password is standing right there.
 func (s *Service) RequestPasswordReset(ctx context.Context, email string) (token string, err error) {
+	token, _, err = s.MintPasswordResetToken(ctx, email)
+	switch {
+	case errors.Is(err, ErrNoSuchUser), errors.Is(err, ErrInvalidEmail):
+		// Deliberately indistinguishable from success. See above.
+		return "", nil
+	case err != nil:
+		return "", err
+	}
+	return token, nil
+}
+
+// MintPasswordResetToken is RequestPasswordReset for a caller who is
+// entitled to know whether the account exists: the operator of the box,
+// running `cackle reset-password` at the console. An unknown address is
+// ErrNoSuchUser here rather than a silent empty string, because an
+// operator who mistypes an address needs to be told, and there is nothing
+// to enumerate — they already have the database open in front of them.
+//
+// Returns the plaintext token and the moment it stops working. Only the
+// token's hash is persisted, so this value exists exactly once; the
+// caller is responsible for putting it in front of the right human.
+func (s *Service) MintPasswordResetToken(ctx context.Context, email string) (token string, expiresAt time.Time, err error) {
 	norm, err := normalizeEmail(email)
 	if err != nil {
-		return "", nil
+		return "", time.Time{}, ErrInvalidEmail
 	}
 
 	u, err := s.store.GetUserByEmail(ctx, norm)
 	if errors.Is(err, store.ErrNotFound) {
-		return "", nil
+		return "", time.Time{}, ErrNoSuchUser
 	}
 	if err != nil {
-		return "", fmt.Errorf("auth: password reset lookup: %w", err)
+		return "", time.Time{}, fmt.Errorf("auth: password reset lookup: %w", err)
 	}
 
 	plaintext, hash, err := newToken()
 	if err != nil {
-		return "", err
+		return "", time.Time{}, err
 	}
+	expires := s.now().Add(s.passwordResetTTL)
 	rec := &store.PasswordResetToken{
 		TokenHash: hash,
 		UserID:    u.ID,
-		ExpiresAt: s.now().Add(s.passwordResetTTL),
+		ExpiresAt: expires,
 		CreatedAt: s.now(),
 	}
 	if err := s.store.CreatePasswordResetToken(ctx, rec); err != nil {
-		return "", fmt.Errorf("auth: password reset create: %w", err)
+		return "", time.Time{}, fmt.Errorf("auth: password reset create: %w", err)
 	}
-	return plaintext, nil
+	return plaintext, expires, nil
 }
 
 // ResetPassword consumes a password reset token and sets a new password.

@@ -8,10 +8,13 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,7 +41,29 @@ func main() {
 	}
 }
 
+// subcommands are the operator-side jobs that are not "serve HTTP". They
+// are dispatched before flag parsing, on the plain first argument, so
+// `cackle -demo` and `cackle --addr :9000` keep working exactly as they
+// did — a flag starts with '-' and can never be mistaken for one of
+// these.
+var subcommands = map[string]func(args []string, stdout, stderr io.Writer) error{
+	"reset-password": resetPasswordCmd,
+}
+
 func run(args []string, stdout, stderr *os.File) error {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		cmd, ok := subcommands[args[0]]
+		if !ok {
+			names := make([]string, 0, len(subcommands))
+			for name := range subcommands {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			return fmt.Errorf("unknown subcommand %q (known: %s)", args[0], strings.Join(names, ", "))
+		}
+		return cmd(args[1:], stdout, stderr)
+	}
+
 	fs := flag.NewFlagSet("cackle", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
