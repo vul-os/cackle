@@ -14,19 +14,28 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BrandLockup } from '@/components/brand/wordmark';
 
-const TopBar = ({ onMenuClick }) => {
+const TopBar = ({ onMenuClick, toggleButtonRef }) => {
     const { user, signOut, orgs, activeOrg, switchOrg } = useAuth();
     const { theme, setTheme } = useTheme();
 
     return (
         <nav className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-elevated sm:px-6">
             <div className="flex items-center gap-3">
+                {/* This is the ONLY route to the side nav on a phone, on all
+                    14 console pages, and gate staff work the door on a phone.
+                    It measured 22×22 — under WCAG 2.2 AA's 24×24 floor and
+                    less than a quarter of the 44×44 target the platform HIGs
+                    ask for. The hit area is now 44×44 while the glyph stays
+                    at 22, so nothing about the chrome looks heavier; the
+                    negative margin keeps the icon optically flush with the
+                    wordmark rather than pushed in by its own padding. */}
                 <button
-                    className="-m-1 rounded-md p-1 text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
+                    ref={toggleButtonRef}
+                    className="-ml-2.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background sm:hidden"
                     onClick={onMenuClick}
                     aria-label="Open navigation menu"
                 >
-                    <Menu size={22} />
+                    <Menu size={22} aria-hidden="true" />
                 </button>
                 {/* The console chrome is a fixed ink shell in both themes, so
                     the wordmark is pinned to its on-dark tone rather than

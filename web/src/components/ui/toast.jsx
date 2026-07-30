@@ -65,7 +65,10 @@ const ToastClose = React.forwardRef(({ className, ...props }, ref) => (
       // Never opacity-0 on a touch device: `group-hover` does not exist
       // there, and a close button that only appears on hover is a close
       // button a phone user cannot find.
-      "absolute right-1 top-1 rounded-md p-1 text-foreground/60 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100 group-[.destructive]:text-destructive-foreground/70 group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus-visible:ring-destructive-foreground",
+      // 16px glyph + p-1 measured 24×24 — exactly on WCAG 2.2 AA's floor,
+      // with nothing left over. The glyph stays 16px; the box is now 44×44
+      // (36 above sm, where there is a pointer to aim with).
+      "absolute right-0.5 top-0.5 inline-flex h-11 w-11 items-center justify-center rounded-md text-foreground/60 transition-opacity hover:text-foreground sm:right-1 sm:top-1 sm:h-9 sm:w-9 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:opacity-0 sm:focus-visible:opacity-100 sm:group-hover:opacity-100 group-[.destructive]:text-destructive-foreground/70 group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus-visible:ring-destructive-foreground",
       className
     )}
     toast-close=""

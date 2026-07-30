@@ -242,8 +242,19 @@ const CreateEventWizard = () => {
                             : 'Pick a date on the next step to save your draft — after that you can leave and come back anytime.'}
                     </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={handleExit} aria-label="Exit and return to events">
-                    <X className="h-5 w-5" />
+                {/* Measured 20×36 at 390px: `size="icon"` sets a 36px square,
+                    but this button is the flex row's last child next to a
+                    heading that wants every pixel, so it was being squeezed to
+                    20px wide. `shrink-0` stops the squeeze and h-11/w-11 takes
+                    the escape hatch out of a wizard to a full 44×44 tap. */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11 shrink-0"
+                    onClick={handleExit}
+                    aria-label="Exit and return to events"
+                >
+                    <X className="h-5 w-5" aria-hidden="true" />
                 </Button>
             </div>
 
