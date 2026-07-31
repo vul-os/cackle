@@ -10,7 +10,6 @@ import { ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout } from 'luci
 import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 
 const STATUS_STYLE = {
@@ -92,7 +91,7 @@ export default function OrdersPage() {
                         <h1 className="font-display text-display-sm font-extrabold tracking-tight sm:text-display-md">Your orders</h1>
                         <p className="mt-1.5 text-sm text-muted-foreground">Every order you&apos;ve placed, newest first.</p>
                     </div>
-                    <Button variant="outline" className={TAP_BUTTON} onClick={() => navigate('/tickets')}>
+                    <Button variant="outline" onClick={() => navigate('/tickets')}>
                         <Layout className="mr-2 h-4 w-4" aria-hidden="true" />
                         My tickets
                     </Button>
@@ -114,7 +113,7 @@ export default function OrdersPage() {
                         title="No orders yet"
                         description="Once you buy tickets, the order and its tickets show up here."
                         action={
-                            <Button className={TAP_BUTTON} onClick={() => navigate('/events')}>
+                            <Button onClick={() => navigate('/events')}>
                                 What&apos;s on
                             </Button>
                         }

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { payments as paymentsApi } from '@/lib/api';
 import PaymentStatusPage from './status';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { Ticket, Receipt, RotateCcw } from 'lucide-react';
 
 /**
@@ -68,7 +67,7 @@ export default function PaymentConfirmationPage() {
                         See my tickets
                     </Link>
                 </Button>
-                <Button variant="outline" className={TAP_BUTTON} asChild>
+                <Button variant="outline" asChild>
                     <Link to="/orders">
                         <Receipt className="mr-2 h-4 w-4" aria-hidden="true" />
                         View the order
@@ -86,7 +85,7 @@ export default function PaymentConfirmationPage() {
                         Try again
                     </Button>
                 )}
-                <Button variant="outline" className={TAP_BUTTON} asChild>
+                <Button variant="outline" asChild>
                     <Link to="/orders">
                         <Receipt className="mr-2 h-4 w-4" aria-hidden="true" />
                         Check my orders

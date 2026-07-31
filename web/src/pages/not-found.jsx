@@ -47,16 +47,12 @@ const NotFoundPage = () => {
                 </p>
             </div>
 
-            {/* Every control here is a real 44x44 tap target (WCAG 2.5.5) at
-                every width, not just below `sm` — as likely to be hit by a
-                thumb on a mistyped link as by a mouse, and there is nothing
-                crowding these that a tighter size would buy room for. */}
             <div className="flex flex-wrap items-center justify-center gap-3">
-                <Button className="h-11 min-w-[44px] px-6" onClick={() => navigate(inConsole ? '/admin' : '/')}>
+                <Button className="min-w-[44px] px-6" onClick={() => navigate(inConsole ? '/admin' : '/')}>
                     {inConsole ? 'Go to dashboard' : 'Go home'}
                 </Button>
                 {!inConsole && (
-                    <Button variant="outline" className="h-11 min-w-[44px] px-6" asChild>
+                    <Button variant="outline" className="min-w-[44px] px-6" asChild>
                         <Link to="/events">
                             <Ticket className="mr-2 h-4 w-4" aria-hidden="true" />
                             Browse what&apos;s on

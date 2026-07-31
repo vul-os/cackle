@@ -75,7 +75,7 @@ const InviteLinkCard = ({ url, email, roleLabel, expiresAt, onDismiss }) => {
                         onFocus={(e) => e.target.select()}
                         className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
-                    <Button type="button" onClick={handleCopy} className="min-h-11 shrink-0 sm:w-36">
+                    <Button type="button" onClick={handleCopy} className="shrink-0 sm:w-36">
                         {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
                         {copied ? 'Copied' : 'Copy link'}
                     </Button>

@@ -1,32 +1,22 @@
 // Touch-target scale for the visitor storefront.
 //
-// The shared `ui/button` scale tops out at 36px (`default`) and 32px (`sm`),
-// and `ui/input` at 40px. Those are pointer sizes. Every one of these pages
-// is bought on a phone — the audit at 390px found 115 distinct controls
-// under 44x44 across the funnel, including the quantity steppers, the
-// checkout submit and the whole footer nav.
+// This used to carry four class fragments (`TAP_BUTTON`, `TAP_BUTTON_SM`,
+// `TAP_ICON`, `TAP_FIELD`) that reimplemented the same 44px-below-`sm` ramp
+// `ui/button`, `ui/input` and `ui/select` now build in — the header used to
+// say the seam existed "because ui/ is owned elsewhere". That premise no
+// longer holds: `Button`'s `default` (h-11 sm:h-9), `sm` (h-11 sm:h-8) and
+// `icon` (h-11 w-11 sm:h-9 sm:w-9) sizes, plus `Input` and `SelectTrigger`
+// (h-11 sm:h-9), are exactly those four fragments. Passing them as a
+// `className` was redundant with the primitive's own default, so all four
+// were deleted rather than kept as a second name for the same ramp.
 //
-// 44x44 is the floor here (WCAG 2.5.5 / the platform HIG minimum), applied
-// only below `sm` so a mouse-driven desktop still gets the tighter,
-// better-proportioned component scale. These are class fragments rather
-// than component variants because ui/ is owned elsewhere; passing a
-// className is the seam that exists.
+// What is left is the one thing that was never a primitive-size fragment:
+// a raw `<a>` needs its OWN touch-target treatment, because `ui/` has no
+// link component to carry one.
 //
 // The one deliberate exception is a link inside a running sentence — WCAG
 // 2.5.8's inline exception — where growing the target would break the line
 // box of the prose around it.
-
-/** A normal button (`size="default"`, h-9) that is also a phone tap target. */
-export const TAP_BUTTON = 'h-11 sm:h-9';
-
-/** A compact button (`size="sm"`, h-8) that is also a phone tap target. */
-export const TAP_BUTTON_SM = 'h-11 sm:h-8';
-
-/** An icon-only square control. */
-export const TAP_ICON = 'h-11 w-11 sm:h-9 sm:w-9';
-
-/** A text field or select trigger (h-10 by default). */
-export const TAP_FIELD = 'h-11 sm:h-10';
 
 /** A standalone navigation link in a list — not prose. */
 export const TAP_LINK = 'inline-flex min-h-[44px] min-w-[44px] items-center sm:min-h-0 sm:min-w-0';

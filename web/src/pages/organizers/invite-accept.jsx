@@ -77,7 +77,7 @@ const AcceptInvitePage = () => {
                     {status === 'done' ? (
                         <p className="text-center text-sm text-muted-foreground">You&apos;re in — taking you to the dashboard…</p>
                     ) : (
-                        <Button className="min-h-11 w-full" onClick={handleAccept} disabled={status === 'accepting'}>
+                        <Button className="w-full" onClick={handleAccept} disabled={status === 'accepting'}>
                             {status === 'accepting' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Accept invite
                         </Button>

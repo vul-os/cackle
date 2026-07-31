@@ -11,7 +11,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { tickets as ticketsApi } from '@/lib/api';
 import PrintStyles from '@/pages/visitor/tickets/printing/print-styles';
 import { Separator } from '@/components/ui/separator';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 
 // ── This page is read at a door ───────────────────────────────────────────
@@ -155,18 +154,18 @@ function TicketCard({ ticket }) {
     return (
         <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
-                <Button variant="ghost" className={`-ml-2 ${TAP_BUTTON}`} asChild>
+                <Button variant="ghost" className="-ml-2" asChild>
                     <Link to="/tickets">
                         <ChevronLeft className="mr-2 h-4 w-4" aria-hidden="true" />
                         Back to tickets
                     </Link>
                 </Button>
                 <div className="flex gap-2">
-                    <Button variant="outline" className={TAP_BUTTON} onClick={() => window.print()}>
+                    <Button variant="outline" onClick={() => window.print()}>
                         <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
                         Print
                     </Button>
-                    <Button variant="outline" className={TAP_BUTTON} asChild>
+                    <Button variant="outline" asChild>
                         <a href={ticketsApi.pdfUrl(ticket.id)} target="_blank" rel="noopener noreferrer">
                             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                             PDF

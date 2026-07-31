@@ -116,7 +116,7 @@ function Hero({ query, onSearch }) {
                                 value={value}
                                 onChange={(e) => setValue(e.target.value)}
                                 placeholder="Search these events"
-                                className="h-11 border-0 bg-transparent pl-10 text-brand-ink placeholder:text-brand-ink/50 focus-visible:ring-1 focus-visible:ring-brand-ink/40"
+                                className="border-0 bg-transparent pl-10 text-brand-ink placeholder:text-brand-ink/50 focus-visible:ring-1 focus-visible:ring-brand-ink/40"
                             />
                         </div>
                         <Button type="submit" size="lg" className="shrink-0 px-5 sm:px-8">

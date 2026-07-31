@@ -269,13 +269,9 @@ const ScannerPage = () => {
                                         </div>
                                         {event.venue_name && <p className="text-sm text-muted-foreground">{event.venue_name}</p>}
                                     </div>
-                                    {/* h-11 (44px): these are the buttons a
-                                        gate operator taps at the door, fast
-                                        and often gloved — not a desk control. */}
                                     <div className="flex gap-2">
                                         <Button
                                             variant="outline"
-                                            className="h-11 px-4"
                                             onClick={() => handleDownload(event)}
                                             disabled={!online || downloadingId === event.id}
                                         >
@@ -287,7 +283,6 @@ const ScannerPage = () => {
                                             {isCached ? 'Refresh' : 'Download'}
                                         </Button>
                                         <Button
-                                            className="h-11 px-4"
                                             onClick={() => handleEnterScanMode(event)}
                                             disabled={!isCached && !online}
                                         >

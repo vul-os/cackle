@@ -166,7 +166,6 @@ const SignIn = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.email)}
                             aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="email-error">{fieldErrors.email}</FieldError>
                     </div>
@@ -186,7 +185,6 @@ const SignIn = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.password)}
                             aria-describedby={fieldErrors.password ? 'password-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="password-error">{fieldErrors.password}</FieldError>
                     </div>
@@ -213,7 +211,7 @@ const SignIn = () => {
                 <div className="flex flex-col border-t border-border pt-2">
                     <Button
                         variant="link"
-                        className="min-h-11 w-full text-sm"
+                        className="w-full text-sm"
                         onClick={() => navigate('/signup')}
                         disabled={isLoading}
                     >
@@ -221,7 +219,7 @@ const SignIn = () => {
                     </Button>
                     <Button
                         variant="link"
-                        className="min-h-11 w-full text-sm text-muted-foreground"
+                        className="w-full text-sm text-muted-foreground"
                         onClick={() => navigate('/password-reset')}
                         disabled={isLoading}
                     >

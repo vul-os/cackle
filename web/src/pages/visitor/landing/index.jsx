@@ -14,7 +14,6 @@ import EventCard from '@/pages/visitor/events/event-card';
 import CategoryTabs from '@/pages/visitor/events/category-tabs';
 import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 import { EMPTY_HEADING, emptyDescription, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
 
@@ -156,7 +155,7 @@ const LandingPage = () => {
                                         answers. */}
                                     <p className="mt-1 text-muted-foreground">{hostSubheading(state.host)}</p>
                                 </div>
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/events">
                                         See what else is on
                                         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />

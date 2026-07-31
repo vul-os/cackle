@@ -56,7 +56,6 @@ import CategoryTabs from '@/pages/visitor/events/category-tabs';
 import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
-import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 import { EMPTY_HEADING, emptyDescription, hostHeading, hostOrgs, hostSubheading, orgForEvent, orgHref, showsOrgLabels } from '@/lib/host';
 import { orgPageHref } from '@/lib/org-page';
@@ -237,7 +236,7 @@ export default function BrowsePage() {
                                     value={searchValue}
                                     onChange={(e) => setSearchValue(e.target.value)}
                                     placeholder="Search these events"
-                                    className={`pl-10 ${TAP_FIELD}`}
+                                    className="pl-10"
                                 />
                             </div>
 
@@ -249,7 +248,7 @@ export default function BrowsePage() {
                                         setLimit(PAGE_SIZE);
                                     }}
                                 >
-                                    <SelectTrigger className={`w-[150px] ${TAP_FIELD}`} aria-label="Filter by date">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by date">
                                         <SelectValue placeholder="Any time" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -262,7 +261,7 @@ export default function BrowsePage() {
                                 </Select>
 
                                 <Select value={priceFilter} onValueChange={setPriceFilter}>
-                                    <SelectTrigger className={`w-[150px] ${TAP_FIELD}`} aria-label="Filter by price">
+                                    <SelectTrigger className="w-[150px]" aria-label="Filter by price">
                                         <SelectValue placeholder="Any price" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -274,7 +273,7 @@ export default function BrowsePage() {
                                     </SelectContent>
                                 </Select>
 
-                                <Button type="submit" className={TAP_BUTTON}>Search</Button>
+                                <Button type="submit">Search</Button>
                             </div>
                         </form>
 
@@ -408,7 +407,7 @@ export default function BrowsePage() {
                             }
                             action={
                                 hasActiveFilters ? (
-                                    <Button variant="outline" className={TAP_BUTTON} onClick={clearFilters}>
+                                    <Button variant="outline" onClick={clearFilters}>
                                         Clear filters
                                     </Button>
                                 ) : undefined
@@ -423,7 +422,7 @@ export default function BrowsePage() {
                             title="No events match that price range"
                             description="Try a wider price filter."
                             action={
-                                <Button variant="outline" className={TAP_BUTTON} onClick={() => setPriceFilter('any')}>
+                                <Button variant="outline" onClick={() => setPriceFilter('any')}>
                                     Reset price filter
                                 </Button>
                             }
@@ -453,7 +452,7 @@ export default function BrowsePage() {
 
                             {state.events.length >= limit && (
                                 <div className="mt-10 flex justify-center">
-                                    <Button variant="outline" className={TAP_BUTTON} onClick={() => setLimit((l) => l + PAGE_SIZE)}>
+                                    <Button variant="outline" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
                                         Load more events
                                     </Button>
                                 </div>

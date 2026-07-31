@@ -13,7 +13,6 @@ import BillingForm from './billing-form';
 import OrderSummary from './order-summary';
 import PaymentRedirectPage from './redirect';
 import CheckoutSteps from './steps';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 // Deliberately permissive: this is a client-side sanity check that catches
 // an empty box and a missing @, not an attempt to decide what a valid
@@ -174,10 +173,10 @@ const CheckoutPage = () => {
                         description="This event isn't in your cart any more — it may have been cleared, or already paid for."
                         action={
                             <div className="flex flex-wrap justify-center gap-3">
-                                <Button className={TAP_BUTTON} asChild>
+                                <Button asChild>
                                     <Link to="/cart">Back to cart</Link>
                                 </Button>
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/orders">See my orders</Link>
                                 </Button>
                             </div>
@@ -194,7 +193,7 @@ const CheckoutPage = () => {
                 <CheckoutSteps current="details" className="mb-10" />
 
                 <div className="mb-8">
-                    <Button variant="ghost" className={`-ml-2 ${TAP_BUTTON}`} asChild>
+                    <Button variant="ghost" className="-ml-2" asChild>
                         <Link to="/cart">
                             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
                             Back to cart

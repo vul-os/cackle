@@ -116,7 +116,6 @@ const UpdatePassword = () => {
                             disabled={isLoading || !token}
                             aria-invalid={Boolean(fieldErrors.newPassword)}
                             aria-describedby={fieldErrors.newPassword ? 'newPassword-error' : 'newPassword-hint'}
-                            className="min-h-11"
                         />
                         {fieldErrors.newPassword ? (
                             <FieldError id="newPassword-error">{fieldErrors.newPassword}</FieldError>
@@ -141,7 +140,6 @@ const UpdatePassword = () => {
                             disabled={isLoading || !token}
                             aria-invalid={Boolean(fieldErrors.confirmNewPassword)}
                             aria-describedby={fieldErrors.confirmNewPassword ? 'confirmNewPassword-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="confirmNewPassword-error">{fieldErrors.confirmNewPassword}</FieldError>
                     </div>
@@ -161,13 +159,13 @@ const UpdatePassword = () => {
                 </form>
 
                 <div className="border-t border-border pt-2">
-                    <Button variant="link" className="min-h-11 w-full text-sm" onClick={() => navigate('/login')} disabled={isLoading}>
+                    <Button variant="link" className="w-full text-sm" onClick={() => navigate('/login')} disabled={isLoading}>
                         Back to sign in
                     </Button>
                     {!token && (
                         <Button
                             variant="link"
-                            className="min-h-11 w-full text-sm text-muted-foreground"
+                            className="w-full text-sm text-muted-foreground"
                             onClick={() => navigate('/password-reset')}
                         >
                             Get a new link

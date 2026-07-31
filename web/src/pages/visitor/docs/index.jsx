@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, WifiOff, QrCode, ShieldCheck, ArrowRight, ExternalLink } from 'lucide-react';
-import { TAP_BUTTON, TAP_LINK } from '@/pages/visitor/ui-scale';
+import { TAP_LINK } from '@/pages/visitor/ui-scale';
 
 // Layman first, engineer second, on the same page. The person reading this
 // runs a music venue, a conference, a church hall or a night market — so the
@@ -131,13 +131,13 @@ const DocsPage = () => (
                                 </Step>
                             </ol>
                             <div className="flex flex-wrap gap-3 pt-1">
-                                <Button className={TAP_BUTTON} asChild>
+                                <Button asChild>
                                     <Link to="/tickets">
                                         My tickets
                                         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
                                     </Link>
                                 </Button>
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/events">What&apos;s on</Link>
                                 </Button>
                             </div>
@@ -303,7 +303,7 @@ const DocsPage = () => (
                                 Configuration, the API and the ticket format are documented in the repository.
                             </p>
                             <div className="pt-1">
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <a href="https://github.com/vul-os/cackle" target="_blank" rel="noopener noreferrer">
                                         Read the source
                                         <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" aria-hidden="true" />

@@ -7,7 +7,6 @@ import { useCart } from '@/context/use-cart';
 import { format } from 'date-fns';
 import { Money } from '@/components/ui/money';
 import { Separator } from '@/components/ui/separator';
-import { TAP_ICON } from '@/pages/visitor/ui-scale';
 
 // No `isMobile` prop any more: the trigger used to shrink to `size="sm"`
 // (32px) on exactly the screens where it needed to be BIGGER. It is one
@@ -23,7 +22,7 @@ const CartDropdown = () => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className={`relative ${TAP_ICON}`}
+                    className="relative"
                     aria-label={itemCount === 0 ? 'Cart, empty' : `Cart, ${itemCount} ticket${itemCount === 1 ? '' : 's'}`}
                 >
                     <ShoppingCart className="h-5 w-5" aria-hidden="true" />

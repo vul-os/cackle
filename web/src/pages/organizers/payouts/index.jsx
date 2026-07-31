@@ -265,7 +265,7 @@ const BankAccountCard = () => {
                                         </p>
                                     </div>
                                 </div>
-                                <Button variant="outline" size="sm" className="min-h-11" onClick={() => setEditing(true)}>
+                                <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
                                     Update
                                 </Button>
                             </div>
@@ -294,7 +294,7 @@ const BankAccountCard = () => {
                                             <FormItem>
                                                 <FormLabel>Account number</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} className="min-h-11" inputMode="numeric" placeholder="e.g. 62812345678" disabled={saving} />
+                                                    <Input {...field} inputMode="numeric" placeholder="e.g. 62812345678" disabled={saving} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -307,18 +307,18 @@ const BankAccountCard = () => {
                                             <FormItem>
                                                 <FormLabel>Account holder name</FormLabel>
                                                 <FormControl>
-                                                    <Input {...field} className="min-h-11" placeholder="As it appears on the account" disabled={saving} />
+                                                    <Input {...field} placeholder="As it appears on the account" disabled={saving} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
                                     <div className="flex gap-2">
-                                        <Button type="submit" className="min-h-11" disabled={saving}>
+                                        <Button type="submit" disabled={saving}>
                                             {saving ? 'Saving…' : 'Save bank details'}
                                         </Button>
                                         {state.account && (
-                                            <Button type="button" variant="outline" className="min-h-11" onClick={() => setEditing(false)} disabled={saving}>
+                                            <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
                                                 Cancel
                                             </Button>
                                         )}

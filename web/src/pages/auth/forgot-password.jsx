@@ -62,7 +62,6 @@ const ForgotPassword = () => {
                         value={email}
                         placeholder="you@example.com"
                         onChange={(e) => setEmail(e.target.value)}
-                        className="min-h-11"
                     />
                 </div>
 
@@ -76,7 +75,7 @@ const ForgotPassword = () => {
                             onFocus={(e) => e.target.select()}
                             className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         />
-                        <Button type="button" variant="outline" onClick={handleCopy} className="min-h-11 shrink-0 sm:w-28">
+                        <Button type="button" variant="outline" onClick={handleCopy} className="shrink-0 sm:w-28">
                             {copied ? 'Copied' : 'Copy'}
                         </Button>
                     </div>
@@ -87,7 +86,7 @@ const ForgotPassword = () => {
                 </div>
 
                 <div className="border-t border-border pt-2">
-                    <Button variant="outline" className="min-h-11 w-full" onClick={() => navigate('/login')}>
+                    <Button variant="outline" className="w-full" onClick={() => navigate('/login')}>
                         Back to sign in
                     </Button>
                 </div>

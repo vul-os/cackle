@@ -6,7 +6,6 @@ import { Separator } from '@/components/ui/separator';
 import { BookOpen, Github, Ticket, Building2, ArrowRight, ExternalLink } from 'lucide-react';
 import Footer from '@/pages/visitor/landing/footer.jsx';
 import Header from '@/pages/visitor/header.jsx';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 // ── Why there is no contact form on this page ─────────────────────────────
 //
@@ -64,7 +63,7 @@ const ContactPage = () => (
                             icon={Ticket}
                             title="A ticket you bought, a refund, or getting in on the night"
                             action={
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/orders">
                                         Find my order
                                         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -81,7 +80,7 @@ const ContactPage = () => (
                             icon={Building2}
                             title="You want to sell tickets with Cackle"
                             action={
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/pricing">
                                         See what it costs
                                         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -97,7 +96,7 @@ const ContactPage = () => (
                             icon={BookOpen}
                             title="How something works, or what it cannot do"
                             action={
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <Link to="/docs">
                                         Read the docs
                                         <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -113,7 +112,7 @@ const ContactPage = () => (
                             icon={Github}
                             title="A bug, or a question about the software itself"
                             action={
-                                <Button variant="outline" className={TAP_BUTTON} asChild>
+                                <Button variant="outline" asChild>
                                     <a href={REPO_ISSUES} target="_blank" rel="noopener noreferrer">
                                         Open an issue
                                         <ExternalLink className="ml-2 h-3.5 w-3.5 opacity-70" aria-hidden="true" />

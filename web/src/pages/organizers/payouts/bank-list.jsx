@@ -46,7 +46,6 @@ const BankSelect = ({ value, onChange, disabled }) => {
     if (failed || (banks.length === 0 && !loading)) {
         return (
             <Input
-                className="min-h-11"
                 placeholder="Bank code"
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value)}
@@ -57,7 +56,7 @@ const BankSelect = ({ value, onChange, disabled }) => {
 
     return (
         <Select value={value || undefined} onValueChange={onChange} disabled={disabled || loading}>
-            <SelectTrigger className="min-h-11">
+            <SelectTrigger>
                 <SelectValue placeholder={loading ? 'Loading banks…' : 'Choose your bank'} />
             </SelectTrigger>
             <SelectContent>

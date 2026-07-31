@@ -12,7 +12,6 @@ import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer';
 import CheckoutSteps from '@/pages/visitor/checkout/steps';
 import { REDIRECT_STORAGE_KEY } from '@/pages/auth/auth-redirect';
-import { TAP_BUTTON, TAP_ICON } from '@/pages/visitor/ui-scale';
 
 function whenLabel(iso) {
     if (!iso) return null;
@@ -67,7 +66,7 @@ const CartPage = () => {
                         title="Your cart is empty"
                         description="Nothing in here yet. Have a look at what's on — most events are a couple of taps away."
                         action={
-                            <Button className={TAP_BUTTON} asChild>
+                            <Button asChild>
                                 <Link to="/events">
                                     What&apos;s on
                                     <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
@@ -148,7 +147,6 @@ const CartPage = () => {
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            className={TAP_ICON}
                                                             onClick={() => updateQuantity(item.ticket_type_id, item.quantity - 1)}
                                                             aria-label={`One fewer ${item.ticket_type.name}`}
                                                         >
@@ -165,7 +163,6 @@ const CartPage = () => {
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
-                                                            className={TAP_ICON}
                                                             onClick={() => updateQuantity(item.ticket_type_id, item.quantity + 1)}
                                                             aria-label={`One more ${item.ticket_type.name}`}
                                                         >
@@ -183,7 +180,7 @@ const CartPage = () => {
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            className={`${TAP_ICON} text-muted-foreground hover:text-destructive`}
+                                                            className="text-muted-foreground hover:text-destructive"
                                                             onClick={() => removeItem(item.ticket_type_id)}
                                                             aria-label={`Remove ${item.ticket_type.name} from cart`}
                                                         >
@@ -229,7 +226,7 @@ const CartPage = () => {
                 )}
 
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
-                    <Button variant="outline" className={TAP_BUTTON} asChild>
+                    <Button variant="outline" asChild>
                         <Link to="/events">
                             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
                             Keep browsing

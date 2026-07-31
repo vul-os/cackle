@@ -3,7 +3,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
-import { TAP_FIELD } from '@/pages/visitor/ui-scale';
 
 /**
  * The two things Cackle needs to issue a ticket, and nothing else. No
@@ -21,7 +20,7 @@ const Field = ({ id, label, hint, error, ...inputProps }) => (
         <Input
             id={id}
             name={id}
-            className={`${TAP_FIELD} ${error ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+            className={error ? 'border-destructive focus-visible:ring-destructive' : undefined}
             aria-invalid={error ? 'true' : undefined}
             aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
             {...inputProps}

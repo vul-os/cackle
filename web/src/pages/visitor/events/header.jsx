@@ -2,7 +2,6 @@ import React from 'react';
 import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 
 // This sits on top of an arbitrary cover PHOTO, not the app's own
 // background, so it uses the `media-ink` / `media-ground` tokens
@@ -42,7 +41,7 @@ const EventHeader = ({ title, venueName, category }) => {
                     <div className="ml-auto">
                         <Button
                             variant="outline"
-                            className={`border-media-ink/20 bg-media-ink/10 text-media-ink backdrop-blur-md hover:bg-media-ink/20 hover:text-media-ink ${TAP_BUTTON}`}
+                            className="border-media-ink/20 bg-media-ink/10 text-media-ink backdrop-blur-md hover:bg-media-ink/20 hover:text-media-ink"
                             onClick={handleShare}
                         >
                             <Share2 className="mr-2 h-4 w-4" />

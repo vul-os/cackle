@@ -3,7 +3,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin, ExternalLink } from 'lucide-react';
-import { TAP_BUTTON_SM } from '@/pages/visitor/ui-scale';
 
 // ── Why this file does not draw a map by default ──────────────────────────
 //
@@ -53,7 +52,7 @@ const LocationSection = ({ venueName, address, lat, lng }) => {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <h2 className="font-display text-xl font-bold tracking-tight">Getting there</h2>
                     {directionsHref && (
-                        <Button variant="outline" size="sm" className={TAP_BUTTON_SM} asChild>
+                        <Button variant="outline" size="sm" asChild>
                             <a href={directionsHref} target="_blank" rel="noopener noreferrer">
                                 <MapPin className="mr-2 h-4 w-4" aria-hidden="true" />
                                 Open in maps

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer';
 import { Ticket } from 'lucide-react';
-import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -175,7 +174,7 @@ export default function TicketsListPage() {
                         title="No tickets yet"
                         description="Once an order is paid, its tickets appear here — one QR code each, ready for the door."
                         action={
-                            <Button className={TAP_BUTTON} asChild>
+                            <Button asChild>
                                 <Link to="/events">What&apos;s on</Link>
                             </Button>
                         }
@@ -188,7 +187,7 @@ export default function TicketsListPage() {
                         title="No tickets match your filters"
                         description="Try clearing a filter or your search."
                         action={
-                            <Button variant="outline" className={TAP_BUTTON} onClick={() => setFilters(DEFAULT_FILTERS)}>
+                            <Button variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
                                 Clear filters
                             </Button>
                         }

@@ -93,8 +93,9 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
+                                size="icon"
                                 aria-label={`Switch organisation — currently ${activeOrg?.name || 'none selected'}`}
-                                className="h-11 w-11 shrink-0 gap-2 px-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:w-auto sm:px-4"
+                                className="shrink-0 gap-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:w-auto sm:px-4"
                             >
                                 <Building2 size={18} />
                                 <span className="hidden max-w-[140px] truncate sm:inline">{activeOrg?.name || 'Select org'}</span>
@@ -119,18 +120,15 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                     </DropdownMenu>
                 )}
 
-                {/* Both icon buttons below measured 36×36 — Button's `icon`
-                    size, unchanged, elsewhere in the app. `h-11 w-11` raises
-                    the hit area to 44×44 while the Sun/Moon/User glyphs keep
-                    their own `size` prop, so nothing about the drawn icon
-                    changes. `-mx-1` gives back the 4px each side that the
-                    larger box would otherwise add to the row, so the icons
-                    stay where they were relative to each other and to the
-                    account menu's edge instead of pushing outward. */}
+                {/* `-mx-1` gives back the 4px each side that Button's `icon`
+                    size (44×44 below `sm`, 36×36 from `sm` up) would
+                    otherwise add to the row, so the icons stay where they
+                    were relative to each other and to the account menu's
+                    edge instead of pushing outward. */}
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="-mx-1 h-11 w-11 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="-mx-1 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     aria-label="Toggle theme"
                 >
@@ -143,7 +141,7 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="-mx-1 h-11 w-11 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                className="-mx-1 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                 aria-label="Account menu"
                             >
                                 <User size={20} />

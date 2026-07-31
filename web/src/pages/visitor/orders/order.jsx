@@ -10,7 +10,6 @@ import Header from '@/pages/visitor/header';
 import { orders as ordersApi, events as eventsApi, tickets as ticketsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
-import { TAP_BUTTON, TAP_BUTTON_SM } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 
 function formatWhen(iso) {
@@ -208,7 +207,7 @@ export default function OrderPage() {
             <Header />
             <main id="main" className="flex-1 pt-24">
                 <div className="mx-auto max-w-4xl px-4 py-4">
-                    <Button variant="ghost" onClick={() => navigate('/orders')} className={`-ml-2 flex items-center gap-2 ${TAP_BUTTON}`}>
+                    <Button variant="ghost" onClick={() => navigate('/orders')} className="-ml-2 flex items-center gap-2">
                         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                         Back to orders
                     </Button>
@@ -345,7 +344,7 @@ export default function OrderPage() {
                                 <CardHeader className="flex flex-row items-center justify-between">
                                     <CardTitle className="text-lg">Your tickets</CardTitle>
                                     {Array.isArray(myTickets) && myTickets.length > 0 && (
-                                        <Button variant="outline" size="sm" className={TAP_BUTTON_SM} onClick={() => navigate('/tickets')}>
+                                        <Button variant="outline" size="sm" onClick={() => navigate('/tickets')}>
                                             View all tickets
                                         </Button>
                                     )}

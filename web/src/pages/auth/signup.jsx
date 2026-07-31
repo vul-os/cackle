@@ -133,7 +133,6 @@ const SignUp = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.name)}
                             aria-describedby={fieldErrors.name ? 'name-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="name-error">{fieldErrors.name}</FieldError>
                     </div>
@@ -153,7 +152,6 @@ const SignUp = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.email)}
                             aria-describedby={fieldErrors.email ? 'email-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="email-error">{fieldErrors.email}</FieldError>
                     </div>
@@ -172,7 +170,6 @@ const SignUp = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.password)}
                             aria-describedby={fieldErrors.password ? 'password-error' : 'password-hint'}
-                            className="min-h-11"
                         />
                         {fieldErrors.password ? (
                             <FieldError id="password-error">{fieldErrors.password}</FieldError>
@@ -197,7 +194,6 @@ const SignUp = () => {
                             disabled={isLoading}
                             aria-invalid={Boolean(fieldErrors.confirmPassword)}
                             aria-describedby={fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
-                            className="min-h-11"
                         />
                         <FieldError id="confirmPassword-error">{fieldErrors.confirmPassword}</FieldError>
                     </div>
@@ -225,7 +221,7 @@ const SignUp = () => {
                 <div className="border-t border-border pt-2">
                     <Button
                         variant="link"
-                        className="min-h-11 w-full text-sm"
+                        className="w-full text-sm"
                         onClick={() => navigate('/login')}
                         disabled={isLoading}
                     >
