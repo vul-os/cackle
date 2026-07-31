@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -59,10 +60,23 @@ import (
 // happens before the request is built.
 
 const (
-	// maxFeedEvents bounds one feed answer. A publisher with more published
-	// events than this serves the soonest ones and says so; the alternative is
-	// an unbounded response an authenticated peer can ask for repeatedly.
+	// maxFeedEvents bounds ONE PAGE of a feed answer. A publisher with more
+	// published events than this serves the first page, says the answer is
+	// incomplete, and says where the next page starts; the alternative is an
+	// unbounded response an authenticated peer can ask for repeatedly.
 	maxFeedEvents = 200
+
+	// maxFeedPages bounds how many pages ONE triggered pull will walk, so a
+	// publisher that never says "that is all" cannot hold this node's operator
+	// request open forever or fill its memory.
+	//
+	// maxFeedPages × maxFeedEvents = 1600 listings, and that product is the
+	// honest, stated limit of a single fetch. A programme longer than that is
+	// truncated — but it is truncated OUT LOUD: the pull reports complete:false
+	// and the peer row records the bound by name, so an operator reads "there are
+	// more" rather than quietly showing a short programme. It is not silently
+	// unreachable the way everything past listing 200 used to be.
+	maxFeedPages = 8
 
 	// maxFeedBody caps a feed answer before it is read. Smaller than
 	// maxSyncBody: a feed is text about events, not a batch of signed envelopes.
@@ -112,24 +126,138 @@ type feedResponse struct {
 	// against by the time this is decoded.
 	Node   string          `json:"node"`
 	Events []feedEventWire `json:"events"`
-	// Complete is false when the publisher had more published events than one
-	// answer carries. It is reported rather than paged: a programme is a display
-	// surface, not a ledger, and an operator who wants all of a very large one
-	// is better served by knowing it was truncated.
-	Complete bool   `json:"complete"`
-	Caveat   string `json:"caveat"`
+	// Complete is false when the publisher had more published events than this
+	// page carries. It is the truth about THIS answer and nothing else: a caller
+	// that stops on a false here has an incomplete mirror and knows it.
+	Complete bool `json:"complete"`
+	// NextCursor is where the next page starts, and it is set exactly when
+	// Complete is false. It is opaque to the caller — the caller's only correct
+	// use of it is to hand it straight back — but it is not opaque to the
+	// PUBLISHER, which parses it against an allow-list before it goes near a
+	// query, because it arrives from another machine like everything else here.
+	NextCursor string `json:"next_cursor,omitempty"`
+	Caveat     string `json:"caveat"`
+}
+
+// --- the cursor --------------------------------------------------------------
+
+// feedCursor is a position in one publisher's feed: an organisation, and an event
+// within it. Both halves are ULID primary keys.
+//
+// # Why this and not an offset
+//
+// An offset into a mutable set is not a position, it is a guess. Unpublish one
+// event behind a peer's cursor and every later row slides one place forward: the
+// next page starts one row too late, exactly one event is never sent, and nothing
+// anywhere reports it. Publish one behind the cursor and a row is sent twice.
+//
+// # Why the event id and not the start time
+//
+// `starts_at` would keep the feed in "soonest first" order, which is tempting,
+// but it is a column an organiser edits. Reschedule a show mid-walk and the row
+// crosses the cursor — moved later it is skipped for good, moved earlier it
+// arrives twice and the subscriber refuses it as a duplicate. An id is assigned
+// once at creation and never rewritten. The order it defines is total (unique
+// keys), immutable (nothing updates them) and dense enough to seek. Nothing about
+// display is lost: the subscriber sorts its cache by starts_at when it reads it.
+//
+// # Why the org id is in it at all
+//
+// One peer key can be enrolled for several organisations on this node, and the
+// answer is the union across the ones that opted in. A union needs its own total
+// order or the page boundary is ambiguous, so the orgs are walked in id order and
+// the cursor names which one it is inside.
+type feedCursor struct {
+	OrgID   string
+	EventID string
+}
+
+// feedCursorSep separates the two halves. A full stop, because it appears in no
+// ULID and needs no escaping in a query string — the signature covers the raw
+// query, so a cursor that round-trips through URL encoding differently on the two
+// sides would break the request signature rather than merely paginate wrongly.
+const feedCursorSep = "."
+
+// maxFeedCursorPart bounds each half. Both are this node's own ids (26-character
+// ULIDs); 64 leaves room for an id format that changes without leaving room for a
+// peer to send a megabyte.
+const maxFeedCursorPart = 64
+
+func (c feedCursor) String() string {
+	if c.OrgID == "" {
+		return ""
+	}
+	return c.OrgID + feedCursorSep + c.EventID
+}
+
+// parseFeedCursor reads a cursor that arrived from another machine.
+//
+// An allow-list, for the same reason feedSlug is one: this value becomes half of
+// a SQL predicate and the whole of a page boundary. Anything that is not two
+// non-empty, bounded, plain-alphanumeric halves is refused whole rather than
+// trimmed into something usable. An empty string is not an error — it is the
+// start of the feed, which is what a first page asks for.
+func parseFeedCursor(raw string) (feedCursor, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return feedCursor{}, nil
+	}
+	if len(s) > 2*maxFeedCursorPart+len(feedCursorSep) {
+		return feedCursor{}, errors.New("cursor is implausibly long")
+	}
+	org, event, found := strings.Cut(s, feedCursorSep)
+	if !found {
+		return feedCursor{}, errors.New("cursor is not a position in a feed")
+	}
+	for _, part := range []string{org, event} {
+		if part == "" || len(part) > maxFeedCursorPart {
+			return feedCursor{}, errors.New("cursor has an empty or over-long half")
+		}
+		for _, r := range part {
+			ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_'
+			if !ok {
+				return feedCursor{}, errors.New("cursor is not a plain identifier pair")
+			}
+		}
+	}
+	return feedCursor{OrgID: org, EventID: event}, nil
+}
+
+// after reports whether c is strictly past other. It is what the SUBSCRIBER uses
+// to refuse a peer that answers with a cursor pointing backwards or standing
+// still — either would make the walk repeat itself until the page bound stopped
+// it, fetching the same rows over and over.
+func (c feedCursor) after(other feedCursor) bool {
+	if c.OrgID != other.OrgID {
+		return c.OrgID > other.OrgID
+	}
+	return c.EventID > other.EventID
 }
 
 // --- publish: GET /api/sync/feed --------------------------------------------
 
-// handlePeerFeed serves this node's PUBLISHED events to an enrolled peer whose
-// operator has turned publishing on for that key.
+// handlePeerFeed serves one page of this node's PUBLISHED events to an enrolled
+// peer whose operator has turned publishing on for that key.
 //
-// Two independent gates, and the second is the new one: the caller must
-// authenticate as an enrolled peer (authenticatePeer, exactly as every other
+// Two independent gates, and the second is the one this route adds: the caller
+// must authenticate as an enrolled peer (authenticatePeer, exactly as every other
 // peer route does), AND at least one of that key's enrolments must have
 // feed_publish set. An enrolment on its own is not consent to be listed
 // elsewhere.
+//
+// # Paging
+//
+// `?cursor=` names where to resume; absent, the page starts at the beginning.
+// The answer carries `complete` and, when it is false, the `next_cursor` to hand
+// back. The cursor rides the same signed envelope as everything else on
+// /api/sync — it is part of the raw query the request signature covers, so a
+// cursor cannot be rewritten in flight any more than a body can — and it
+// introduces no second credential, no second transport and no second trust model.
+//
+// The union across a key's opted-in organisations is walked in ORG ID order and,
+// within an organisation, in EVENT ID order. Both are immutable primary keys, so
+// the boundary between two pages stays where it was put even while the programme
+// on either side of it is edited. See feedCursor for why that matters.
 func (s *server) handlePeerFeed(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	body, ok := readCappedBody(w, r)
@@ -156,30 +284,72 @@ func (s *server) handlePeerFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	from, err := parseFeedCursor(r.URL.Query().Get("cursor"))
+	if err != nil {
+		// Refused, not reset. Silently restarting a walk on a cursor this node
+		// cannot read would make a broken subscriber loop over page one forever
+		// and call it a mirror.
+		badRequest(w, "cursor is not one this node issued: "+err.Error())
+		return
+	}
+
 	signer, id, err := s.syncIdentity(ctx)
 	if err != nil {
 		internalError(w, s.log(), "feed identity", err)
 		return
 	}
 
-	resp := feedResponse{Node: id.PublicKey, Events: make([]feedEventWire, 0), Complete: true, Caveat: feedCaveat}
+	// The organisations this key may see, in a fixed order. Sorted because the
+	// union needs a total order for a page boundary to mean anything, and deduped
+	// because two enrolments of one key for one organisation must not list its
+	// events twice.
+	orgIDs := make([]string, 0, len(publishing))
+	seenOrg := make(map[string]struct{}, len(publishing))
 	for _, p := range publishing {
-		org, err := s.deps.Store.GetOrgByID(ctx, p.OrgID)
+		if _, dup := seenOrg[p.OrgID]; dup {
+			continue
+		}
+		seenOrg[p.OrgID] = struct{}{}
+		orgIDs = append(orgIDs, p.OrgID)
+	}
+	sort.Strings(orgIDs)
+
+	resp := feedResponse{Node: id.PublicKey, Events: make([]feedEventWire, 0), Complete: true, Caveat: feedCaveat}
+	var last feedCursor
+	full := false
+	for _, orgID := range orgIDs {
+		if full {
+			break
+		}
+		// Organisations already walked past are skipped whole. An organisation
+		// whose consent was withdrawn mid-walk simply contributes nothing from
+		// here on, which is the correct answer rather than an error: the peer gets
+		// less than it asked for, never more.
+		if orgID < from.OrgID {
+			continue
+		}
+		afterID := ""
+		if orgID == from.OrgID {
+			afterID = from.EventID
+		}
+
+		org, err := s.deps.Store.GetOrgByID(ctx, orgID)
 		if err != nil {
 			internalError(w, s.log(), "feed org", err)
 			return
 		}
-		// One over the bound, so "the list ends here" and "the page is full" are
-		// distinguishable rather than guessed — the same reason handleSyncPull
-		// reads limit+1.
-		evs, err := s.deps.Store.PublishedEventsForOrg(ctx, p.OrgID, maxFeedEvents+1)
+		// One over what is left of the page, so "the list ends here" and "the page
+		// is full" are distinguishable rather than guessed — the same reason
+		// handleSyncPull reads limit+1.
+		evs, err := s.deps.Store.PublishedEventsAfterForOrg(ctx, orgID, afterID, maxFeedEvents-len(resp.Events)+1)
 		if err != nil {
 			internalError(w, s.log(), "feed events", err)
 			return
 		}
-		if len(evs) > maxFeedEvents {
-			evs = evs[:maxFeedEvents]
+		if len(resp.Events)+len(evs) > maxFeedEvents {
+			evs = evs[:maxFeedEvents-len(resp.Events)]
 			resp.Complete = false
+			full = true
 		}
 		for _, ev := range evs {
 			resp.Events = append(resp.Events, feedEventWire{
@@ -195,7 +365,14 @@ func (s *server) handlePeerFeed(w http.ResponseWriter, r *http.Request) {
 				Timezone:  ev.Timezone,
 				Category:  ev.Category,
 			})
+			last = feedCursor{OrgID: orgID, EventID: ev.ID}
 		}
+	}
+	if !resp.Complete {
+		// The cursor is the LAST ROW ACTUALLY SENT, never a count and never a
+		// row that was read and dropped. That is what makes resuming exact: the
+		// next page begins strictly after something the caller has.
+		resp.NextCursor = last.String()
 	}
 	s.writeSignedJSON(w, r, signer, http.StatusOK, resp)
 }
@@ -268,12 +445,20 @@ type feedPullResult struct {
 	// Fetched is how many listings the peer offered; Stored how many survived
 	// this node's own validation and were cached. They differ when a publisher
 	// sent something malformed, and Refused names why.
-	Fetched  int      `json:"fetched"`
-	Stored   int      `json:"stored"`
-	Refused  []string `json:"refused,omitempty"`
-	Complete bool     `json:"complete"`
-	Error    string   `json:"error,omitempty"`
-	Caveat   string   `json:"caveat"`
+	Fetched int      `json:"fetched"`
+	Stored  int      `json:"stored"`
+	Refused []string `json:"refused,omitempty"`
+	// Pages is how many requests the walk actually made. It is reported so an
+	// operator (and a test) can tell "this peer has one page of events" from
+	// "this node stopped after one page", which is the distinction the old
+	// single-answer feed could not express at all.
+	Pages int `json:"pages"`
+	// Complete is false when this node does NOT now hold the peer's whole
+	// published programme — because the walk hit its page bound, or because it
+	// was cut short. It is never true on a guess.
+	Complete bool   `json:"complete"`
+	Error    string `json:"error,omitempty"`
+	Caveat   string `json:"caveat"`
 }
 
 // handlePullPeerFeed serves POST /api/sync/peers/{id}/feed: fetch this peer's
@@ -313,15 +498,33 @@ func (s *server) handlePullPeerFeed(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, status, out)
 }
 
-// pullFeedFromPeer performs one feed fetch and replaces the cache.
+// pullFeedFromPeer walks a peer's feed to the end — or to this node's stated page
+// bound, whichever comes first — and replaces the cache with what it got.
 //
-// The peer's answer is verified against the PINNED key by callPeer before a byte
-// of it is decoded, so a node answering at the right address under a different
-// key gets nothing cached and nothing re-pinned. Everything after that is this
-// node distrusting the CONTENT of an answer it has authenticated: the sender is
-// who it claims, which says nothing about whether what it sent is well-formed.
+// Every page is verified against the PINNED key by callPeer before a byte of it
+// is decoded, so a node answering at the right address under a different key gets
+// nothing cached and nothing re-pinned, on page seven exactly as on page one.
+// Everything after that is this node distrusting the CONTENT of an answer it has
+// authenticated: the sender is who it claims, which says nothing about whether
+// what it sent is well-formed — and paging hands a publisher one new thing to be
+// malformed about, namely where the next page starts.
+//
+// # Four ways a walk stops, and only one of them is "finished"
+//
+//  1. The peer says complete. Done, and the mirror is whole.
+//  2. The page bound is reached. Stored, reported INCOMPLETE with the bound
+//     named — a stated limit, not a silent truncation.
+//  3. The peer answers with a cursor that does not move strictly forward, or
+//     with none at all while claiming to be incomplete, or with a page bigger
+//     than this node asked for. Refused and named.
+//  4. A page fails outright (unreachable, unsigned, wrong key). Refused.
+//
+// In cases 3 and 4 NOTHING IS WRITTEN. The cache is replaced wholesale, so
+// committing a half-finished walk would delete listings the peer still publishes
+// and show an operator a truncated programme as if it were the whole one. A
+// refusal costs the refresh, never the listings already held.
 func (s *server) pullFeedFromPeer(ctx context.Context, p store.SyncPeer) feedPullResult {
-	out := feedPullResult{PeerID: p.ID, Peer: p.PublicKey, Complete: true, Caveat: feedCaveat}
+	out := feedPullResult{PeerID: p.ID, Peer: p.PublicKey, Caveat: feedCaveat}
 
 	signer, _, err := s.syncIdentity(ctx)
 	if err != nil {
@@ -337,33 +540,81 @@ func (s *server) pullFeedFromPeer(ctx context.Context, p store.SyncPeer) feedPul
 		},
 	}
 
-	var resp feedResponse
-	if err := s.callPeer(ctx, client, p, signer, http.MethodGet, "/api/sync/feed", nil, nil, &resp); err != nil {
-		out.Error = err.Error()
-		s.recordFeedOutcome(ctx, p, out)
-		return out
-	}
-	out.Complete = resp.Complete
-	out.Fetched = len(resp.Events)
-
-	rows := make([]store.PeerEvent, 0, len(resp.Events))
-	seen := make(map[string]struct{}, len(resp.Events))
+	// Bounded by construction: at most maxFeedPages iterations, each accepting at
+	// most maxFeedEvents listings whose every display field is length-capped by
+	// peerEventFromWire. The most a hostile peer can make this node hold is
+	// maxFeedPages × maxFeedEvents bounded rows.
+	rows := make([]store.PeerEvent, 0, maxFeedEvents)
+	seen := make(map[string]struct{}, maxFeedEvents)
 	now := time.Now()
-	for _, e := range resp.Events {
-		row, err := peerEventFromWire(p, e, now)
+	var cursor feedCursor
+
+	for out.Pages < maxFeedPages {
+		query := map[string]string{}
+		if c := cursor.String(); c != "" {
+			query["cursor"] = c
+		}
+		var resp feedResponse
+		if err := s.callPeer(ctx, client, p, signer, http.MethodGet, "/api/sync/feed", query, nil, &resp); err != nil {
+			out.Error = err.Error()
+			s.recordFeedOutcome(ctx, p, out)
+			return out
+		}
+		out.Pages++
+
+		// A page larger than this node's own page size is refused before it is
+		// walked. The far side's limit is the far side's business; this is the
+		// bound THIS node relies on to keep the walk's memory a product of two
+		// constants it controls.
+		if len(resp.Events) > maxFeedEvents {
+			out.Error = fmt.Sprintf("peer sent %d listings in one page; this node asks for at most %d",
+				len(resp.Events), maxFeedEvents)
+			s.recordFeedOutcome(ctx, p, out)
+			return out
+		}
+		out.Fetched += len(resp.Events)
+
+		for _, e := range resp.Events {
+			row, err := peerEventFromWire(p, e, now)
+			if err != nil {
+				out.Refused = append(out.Refused, err.Error())
+				continue
+			}
+			// The unique index would catch this, but as a 500 rather than as a
+			// sentence. A publisher repeating an id — within a page or across two
+			// of them — is a malformed answer, not a database fault.
+			if _, dup := seen[row.RemoteEventID]; dup {
+				out.Refused = append(out.Refused, "peer listed event "+row.RemoteEventID+" twice")
+				continue
+			}
+			seen[row.RemoteEventID] = struct{}{}
+			rows = append(rows, row)
+		}
+
+		if resp.Complete {
+			out.Complete = true
+			break
+		}
+		if resp.NextCursor == "" {
+			out.Error = "peer said its feed was incomplete but did not say where the next page starts"
+			s.recordFeedOutcome(ctx, p, out)
+			return out
+		}
+		next, err := parseFeedCursor(resp.NextCursor)
 		if err != nil {
-			out.Refused = append(out.Refused, err.Error())
-			continue
+			out.Error = "peer answered with a cursor this node cannot read: " + err.Error()
+			s.recordFeedOutcome(ctx, p, out)
+			return out
 		}
-		// The unique index would catch this, but as a 500 rather than as a
-		// sentence. A publisher repeating an id is a malformed answer, not a
-		// database fault.
-		if _, dup := seen[row.RemoteEventID]; dup {
-			out.Refused = append(out.Refused, "peer listed event "+row.RemoteEventID+" twice")
-			continue
+		// Strictly forward or not at all. A cursor that repeats or points
+		// backwards would walk this node over the same rows until the page bound
+		// stopped it, and would do it while looking perfectly well-formed.
+		if !next.after(cursor) {
+			out.Error = "peer's next cursor does not move forward, so following it would repeat the same page"
+			s.recordFeedOutcome(ctx, p, out)
+			return out
 		}
-		seen[row.RemoteEventID] = struct{}{}
-		rows = append(rows, row)
+		cursor = next
 	}
 
 	if err := s.deps.Store.ReplacePeerEvents(ctx, p.ID, rows); err != nil {
@@ -379,11 +630,19 @@ func (s *server) pullFeedFromPeer(ctx context.Context, p store.SyncPeer) feedPul
 
 func (s *server) recordFeedOutcome(ctx context.Context, p store.SyncPeer, out feedPullResult) {
 	status := fmt.Sprintf("showing %d of %d listings", out.Stored, out.Fetched)
+	if out.Pages > 1 {
+		status += fmt.Sprintf(" over %d pages", out.Pages)
+	}
 	if n := len(out.Refused); n > 0 {
 		status += fmt.Sprintf(", refused %d", n)
 	}
 	if !out.Complete {
-		status += " (peer had more than this node asks for)"
+		// The bound is named with its number. "Truncated" on its own tells an
+		// operator nothing they can act on; this tells them the fetch stopped at a
+		// limit of this node's, that there is more on the other side, and that
+		// fetching again is what gets it.
+		status += fmt.Sprintf(" — stopped at this node's limit of %d pages of %d, and there are more; fetch again",
+			maxFeedPages, maxFeedEvents)
 	}
 	if out.Error != "" {
 		status = "refused: " + out.Error

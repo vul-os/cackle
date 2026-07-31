@@ -553,7 +553,11 @@ func (s *server) callPeer(ctx context.Context, client *http.Client, p store.Sync
 	target := p.URL + path
 	if len(query) > 0 {
 		first := true
-		for _, k := range []string{"after", "limit"} { // fixed order: the signature covers the raw query
+		// Fixed order: the signature covers the raw query, so the string built
+		// here and the string the far side verifies must be byte-identical. A
+		// map's iteration order is not, which is why this is a list and why a new
+		// parameter is added TO the list rather than left to range over the map.
+		for _, k := range []string{"after", "cursor", "limit"} {
 			v, ok := query[k]
 			if !ok {
 				continue
