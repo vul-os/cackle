@@ -1,4 +1,4 @@
-# Host Pages — giving an event its own page, safely
+# Host Pages — giving an event, and an organiser, a page of their own
 
 > **In plain English:** every event already gets a decent-looking page on
 > Cackle for free, no setup. This document is for two narrower cases: (1)
@@ -28,11 +28,17 @@ and they are meant to be used together:
 | **2. A host page document** | Structured content + theme, submitted over the API, rendered by Cackle at `/h/{slug}` | A host who wants their event's own look but not their own website |
 | **3. The public API** | JSON, on any origin, that you render yourself | A host who has a website and wants the event on it |
 
-Every one of these is scoped to **one event**. An organiser running ten
-events gets ten separate pages, configured one at a time — there is no page
-that lists everything one organiser runs, and this document does not build
-one. That absence is a real gap for federation, already recorded, not solved,
-here: [FEDERATION.md](FEDERATION.md#the-gap-there-is-no-per-organisation-page).
+Every one of those three is scoped to **one event**. An organiser running ten
+events gets ten separate pages, configured one at a time.
+
+There is now also a fourth thing, which is not one of those three and is
+configured by nobody: **[the organisation page](#the-organisation-page)**, at
+`/o/{slug}`, listing everything one organiser currently has on sale here. It
+is what you link to when the answer is "everything by this organiser" rather
+than "this event" — and it is what another operator's box links back to when
+it displays a borrowed listing (see [FEDERATION.md](FEDERATION.md)). This
+document used to record its absence as a gap; that section is now the
+description of the thing instead.
 
 Option 3 is what makes this generic — no format Cackle invents will ever be as
 expressive as "your own site" — and options 1 and 2 exist so that having a
@@ -207,6 +213,113 @@ Three properties, each enforced somewhere specific:
    possible; without it the only way to see your own page would be to publish
    the event first.
 
+## The organisation page
+
+> **In plain English:** every organiser on this box gets one address that
+> shows everything they currently have on sale. You do not set it up and you
+> cannot edit it — it is just your name and your events, kept up to date on its
+> own. It is the address to put on a poster or send to somebody.
+
+```
+GET /o/{slugOrID}     HTML page — the organisation's published events
+```
+
+`GET /h/{ref}` resolves **one event**. `/o/{ref}` resolves an **organisation**,
+and lists the events it currently has on sale, each one linking to its own
+`/h/` page.
+
+### Why a separate `/o/` and not something inside `/h/`
+
+An event slug is validated only as **non-empty** (`internal/events`,
+`Service.Create` and `Service.Update`). There is no character set, no length
+rule, no reserved prefix and no reserved word. So nothing inside `/h/` can be
+set aside for organisations: `/h/@acme`, `/h/org:acme` and `/h/~acme` are all
+slugs an event may legitimately hold today, and reserving one would either lose
+to the event that already has it or break that event on the day the reservation
+shipped. A collision cannot be made impossible inside a namespace whose keys
+are unconstrained.
+
+Two top-level prefixes make it impossible rather than merely unlikely. Event
+slugs are only ever looked up under `/h/`, organisation references only ever
+under `/o/`, and the two resolvers never see each other's input. **An event may
+have exactly the same slug as an organisation**, and both addresses keep
+working — there is a test that does precisely this.
+
+Within `/o/`, the reference is a slug **or** an organisation id, resolved by the
+same rule `GET /api/events?host=` uses (`narrowToHostOrg`, which the page
+route calls rather than reimplementing). Slugs are unique and ids are ULIDs, so
+at most one row can match; the shared lookup makes the outcome deterministic
+either way.
+
+### What it shows, and what it must never show
+
+| | Rule | Enforced by |
+|---|---|---|
+| Which organisations have a page | Only those **already in this host's display scope** | `hostScope` + `narrowToHostOrg` — the same set `GET /api/events` labels its events with |
+| Which events are listed | **Published only** — never a draft, never a cancelled event | `store.ListPublishedEvents`, `status = 'published'` in the SQL |
+| Whose events are listed | That organisation's, and no other | the query is restricted to the resolved organisation's id |
+
+Three separate guards at three separate layers. Each is disabled on its own in
+`internal/httpapi/org_page_test.go`'s companion mutation runs, and each turns a
+different test red, so none of them is standing behind another.
+
+**An organisation outside this host's display scope answers `404` — the same
+`404`, byte for byte and header for header, as one that does not exist.** This
+is the anti-enumeration property, and it is the reason the route exists in the
+shape it does: without it, `/o/` would be a way to walk a box and find out which
+organisations live on it, including ones that have published nothing. The same
+rule already governs `?host=` on the JSON listing; the page shares its
+implementation rather than carrying a second copy.
+
+**An organisation whose events are all drafts therefore has no page at all.**
+It is not in `store.ListPublicHostOrgs` (which returns only organisations with
+at least one published event), so it is not in scope, so it answers exactly as
+a nonexistent one does — to a stranger and to its own owner alike. This route
+reads no session and has no preview mode; there is no authorisation check here
+to get wrong, because it does not make one.
+
+There is **one deliberate exception**, and it is not a way around the rule
+above. Under `CACKLE_HOST_SCOPE=single` the configured organisation is in scope
+*by configuration*, published events or not, exactly as `hostScope` already
+treats it for the listing — a venue between programmes is still that venue. Its
+page therefore exists and shows *"Nothing on sale right now"* rather than
+`404`. The operator has named that organisation as the identity of the whole
+box; `GET /api/events` already returns it.
+
+### It is not a profile, and nothing discovers it
+
+The organisation page carries the organisation's **name** and its published
+events. Nothing else — no member, no contact, no bank account, no default
+currency, no created-at, no id. It is served `X-Robots-Tag: noindex`, like
+every other host page. Nothing indexes these pages, nothing lists them, and
+there is no route that enumerates them: you reach one from a link somebody
+already had.
+
+### How it is rendered
+
+Not as a host page document. An organisation page **has no author** — nobody
+submits one, there is no editor, and nothing on it is host-chosen — so there is
+no document to validate and no theming to attack. Modelling it as a `Document`
+would have meant inventing a second document format for a page nobody writes;
+and a `links` block could not have expressed it anyway, since `href` admits only
+absolute `http`/`https`/`mailto` URLs (see [`href` rules](#href-rules-exact)),
+never a relative `/h/{slug}`.
+
+So `internal/pages/org.html` is a fixed template over fixed fields. It shares
+the CSP, the response headers, the sandbox and the escaping discipline of the
+event page, and shares no trust assumption with it, because there is no host
+input to trust. It has no subresources at all — not even a `/media` image — so
+a visitor's browser makes exactly one request for it. Colour contrast is
+measured out of the shipped stylesheet in both light and dark themes by
+`TestOrgPage_ContrastMeetsWCAG_AA`, and the measuring code is itself calibrated
+against a pair whose answer is known.
+
+Where it is linked from, in the app: the browse page once the listing has been
+narrowed to one organisation, and an event page's *"Presented by …"* line on a
+box that hosts more than one organisation. A single-venue box gets neither — the
+whole site already is that organisation, and a link to "their own page" would
+lead to a second copy of the listing the visitor is standing on.
+
 ## The document format
 
 ```json
@@ -336,11 +449,17 @@ time, rather than shipping a page with a dead link.
 ## The HTTP API
 
 ```
-GET    /h/{slugOrID}                  HTML page — public once published, organiser-only preview while draft
-GET    /api/events/{slugOrID}/page    JSON — same visibility rule as above
+GET    /h/{slugOrID}                  HTML page for ONE EVENT — public once published, organiser-only preview while draft
+GET    /o/{slugOrID}                  HTML page for ONE ORGANISATION — its published events; see "The organisation page"
+GET    /api/events/{slugOrID}/page    JSON — same visibility rule as /h/
 PUT    /api/events/{slugOrID}/page    admin+ on the event's org — body IS the document
 DELETE /api/events/{slugOrID}/page    admin+ — reverts to the default page
 ```
+
+`/o/` has no JSON counterpart and no management route: there is nothing to
+manage. The nearest JSON equivalent is `GET /api/events?host={slugOrID}`, which
+narrows the listing to the same organisation by the same rule — see
+[API.md](API.md).
 
 `GET` returns:
 
@@ -523,6 +642,15 @@ implementation will have something to check itself against on the day it exists.
   (`internal/httpapi/middleware.go`).
 - **No custom domain per event.** That is a reverse-proxy and certificate
   concern, not an application one.
+- **No editing the organisation page.** It is the organisation's name and its
+  published events, and there is no document, theme or label to submit for it.
+  An organiser who wants a designed landing page for their whole programme has
+  the same answer as for a designed event page: build it on their own site and
+  read the JSON (`GET /api/events?host={slug}`).
+- **No way to list the organisations on a box.** There is no directory route,
+  `/o/` cannot be walked (an out-of-scope organisation is indistinguishable
+  from a nonexistent one), and the organisations named in the
+  `GET /api/events` envelope are only ever those with something published.
 - **No separate draft state for the page itself.** A page is stored or it is
   not; there is no page-level draft/published pair to keep in sync. The
   *event's* own draft state already provides private-until-ready, and while the
