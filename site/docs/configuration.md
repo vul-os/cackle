@@ -34,9 +34,10 @@ supported — this is intentional, to keep the single-binary story simple.
 
 > **In plain English:** this is your Cackle, on your machine. The front page
 > lists *your* events — it is not a listing site, and there is no directory
-> of other people's events anywhere in this software. This setting is only
-> about how your page presents itself when you run more than one
-> organisation on the same box.
+> of other people's events anywhere in this software. This setting decides
+> how your page presents itself when you run more than one organisation on
+> the same box, and whether it also shows the events of an organiser you
+> added by hand.
 
 `CACKLE_HOST_SCOPE` takes one of three values.
 
@@ -66,14 +67,38 @@ If `CACKLE_HOST_ORG` names no organisation, the listing returns an error
 rather than falling back to showing everybody. A typo must not publish
 events you meant to keep off the page.
 
-**`peers` — reserved, and does nothing yet.** This value is accepted so that
-a setting written today keeps its meaning later, but **there is no peer event
-source in this binary**: with `peers`, Cackle behaves *exactly* as `own` —
-your own organisations' events, and nothing from anywhere else. Nothing in
-Cackle discovers other installations, and there is no global feed, no
-"organisers near you", and no directory. The listing API states this
-outright in its response (`"peers_included": false`), so nothing built on
-top of it can quietly assume otherwise.
+**`peers` — also show the organisers you added by hand.** Everything `own`
+shows, plus the events of organisers you enrolled yourself, in a separate
+section below your own, behind a dashed line. Those events are never mixed in
+with yours: they have no price and no "buy" button, because you cannot sell
+somebody else's ticket. Each one is a signpost with a link to that
+organiser's own site, where their tickets are actually sold.
+
+**Cackle still finds nobody for you.** There is no directory, no global feed,
+no "organisers near you", and nothing that searches. An organiser appears
+here only because you typed in their address and their key, and only because
+you pressed fetch.
+
+**Two switches, and you need both.** They are separate on purpose:
+
+1. **Per organiser**, on the Peers screen: *do I fetch this organiser's
+   events at all?* Off until you turn it on for that organiser.
+2. **This setting**: *do the events I fetched go on my public front page?*
+   Off until you set `CACKLE_HOST_SCOPE=peers`.
+
+So if you have added an organiser and fetched their events but your scope is
+still `own` (the default), **nothing of theirs appears on your public page,
+and that is correct rather than broken**. Fetching someone's programme and
+publishing it on your own front page are two different decisions, and Cackle
+makes you take both. Set the scope when you want visitors to see them:
+
+```bash
+CACKLE_HOST_SCOPE=peers
+```
+
+The listing API reports which of the two you are in
+(`"peers_included": true` under `peers`, `false` under `own` and `single`),
+so anything built on top of Cackle reads the same answer your page does.
 
 ### What the listing API returns
 
@@ -97,7 +122,11 @@ whose they are:
 published event (so an organisation still working on a draft is not named to
 the public), except under `single`, where the organisation you configured is
 always named even when it has nothing on. `multi_org` is what a page uses to
-decide whether to show organisation labels at all. `GET /api/events?host=the-bijou`
+decide whether to show organisation labels at all. `peers_included` is `true`
+only under the `peers` scope, and it is a page's permission to show borrowed
+listings at all — the `events` array itself is always your own events, under
+every scope, because a borrowed listing is not something this machine sells.
+`GET /api/events?host=the-bijou`
 narrows the listing to one organisation; a name that is not on this host
 answers `404`, the same as one that does not exist.
 

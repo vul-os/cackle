@@ -141,18 +141,36 @@ read it that way rather than as an oversight. Pinned by
 `TestHostScope_HostParamNarrowsToOneOrganisation` and
 `TestHostScope_HostParamOutOfScopeIs404` in `internal/httpapi`.
 
-**`peers_included` is `false` in every scope today, `peers` included, and
-stays that way until a peer event source exists.** `CACKLE_HOST_SCOPE=peers`
-is an accepted value that behaves **exactly like `own`** —
-`config.HostScope.IncludesPeerEvents()` returns `false` unconditionally, so
-setting it does not add any other box's events to this listing today. It
-exists as the name an operator can set early and the one predicate a real
-peer-listing feature would have to flip, not as a working feature yet.
-Pinned by `TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo`. See
-[Peer feeds](#peer-feeds) below for the federation feature that *does*
-exist, and
+**`peers_included` is `true` under `CACKLE_HOST_SCOPE=peers` and `false`
+under `own` and `single`.** It is the operator's answer to "may this host
+display borrowed listings publicly" —
+`config.HostScope.IncludesPeerEvents()` is `scope == "peers"` and nothing
+else.
+
+**It does not mean the `events` array contains any.** That array is this
+box's own published events under every scope. A borrowed listing has no
+price and cannot be bought here, so it is never merged into a list of things
+that are; borrowed listings are read separately from
+[`GET /api/peer-events`](#peer-feeds), and `peers_included` is a client's
+permission to render what that route returns. `false` means do not display
+them, whatever the peer-events route hands back — and a client that cannot
+read the envelope at all must degrade to not displaying them, never to
+displaying them.
+
+Note the two independent switches: `feed_subscribe`, per peer, decides
+whether this box *fetches* a publisher's programme; this scope decides
+whether what was fetched is *shown to the public*. Both default to off, so an
+operator who has enrolled a publisher and pulled its feed still displays
+nothing until they set the scope. Pinned by
+`TestHostScope_PeersDisplaysBorrowedListingsAndSaysSo` and
+`TestHostScope_SingleDoesNotDisplayBorrowedListings`. See
+[Peer feeds](#peer-feeds) below for the routes themselves, and
 [FEDERATION.md](FEDERATION.md#3-host-display-scoping--built--and-peer-event-feeds--check-before-you-cite)
-for the fuller design this scope is a placeholder inside.
+for the fuller design this scope sits inside.
+
+**None of this is discovery.** Nothing here finds a peer. There is no
+directory, no index, no rendezvous and no proximity lookup anywhere in the
+stack; every publisher was enrolled by hand, by key, by an operator.
 
 ### Money
 
@@ -693,6 +711,17 @@ every renderer must show beside the listing: *"Hosted by another
 organiser. Tickets are sold on their own site, not here."* There is no
 price and no ticket type anywhere in this shape — see
 [FEDERATION.md](FEDERATION.md#1-what-federation-means-here) rule 3.
+
+**Rows from this route are not permission to display them.** That is the
+second switch, and it lives on the host envelope: show borrowed listings on
+a public page only when `GET /api/events` reports
+`"peers_included": true` ([above](#whose-events-these-are--host-scoping)).
+An operator can subscribe to a peer, pull it, and still be running the
+default `own` scope, in which case this route answers rows and the front
+page must show none of them. Cackle's own browse page holds that line in
+`web/src/pages/visitor/events/peer-scope.js`, gated on the single envelope
+reader in `web/src/lib/host.js`; a client that skips it is publishing
+another organiser's programme on an operator's page without being asked to.
 
 Every answer on this surface — publish, pull, and the read-back — carries
 a `caveat` string repeating that these are somebody else's events, hosted

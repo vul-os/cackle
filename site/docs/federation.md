@@ -197,7 +197,7 @@ read as a global marketplace when it is one organiser's server.
 | --- | --- |
 | `own` | **the default** — the published events of every organisation on this box |
 | `single` | presents the box as ONE organisation, named by `CACKLE_HOST_ORG`; fails closed at startup if that org cannot be resolved |
-| `peers` | **accepted, and backed by nothing today** |
+| `peers` | everything `own` shows, **plus** the borrowed listings this box is carrying — see the note below for the two switches that stand in front of them |
 
 `GET /api/events` answers with a `host` envelope naming the
 organisations whose events these are, and `GET /api/events?host=<org-slug>`
@@ -209,13 +209,33 @@ probe which orgs exist on a box. Both behaviours are tested —
 `TestHostScope_HostParamNarrowsToOneOrganisation` and
 `TestHostScope_HostParamOutOfScopeIs404` in `internal/httpapi`.
 
-> **`peers` does nothing yet, and the wire says so.**
-> `config.HostScope.IncludesPeerEvents()` returns **false for every
-> scope, `peers` included**, and `GET /api/events` reports
-> `"peers_included": false`. `peers` behaves exactly as `own`. It exists
-> as the single predicate the peer work has to flip, and as a name an
-> operator can set early — not as a working feature. Pinned by
-> `TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo`.
+> **`peers` is the DISPLAY switch, and it is the second of two.**
+> `config.HostScope.IncludesPeerEvents()` is `scope == "peers"`, and
+> `GET /api/events` carries the answer as `peers_included`.
+>
+> Rule 2 of §1 says two independent switches, both defaulting to off, and
+> this is where the second one lives:
+>
+> 1. `feed_subscribe`, per peer (migration 0007) — does this box **pull**
+>    that publisher's programme at all?
+> 2. `CACKLE_HOST_SCOPE=peers` — is what was pulled **displayed to the
+>    public**?
+>
+> An operator who has enrolled a publisher and pulled its feed still shows
+> nothing publicly until they set the scope. That is the design, not a
+> gap: reading another organiser's programme is not the same decision as
+> putting it on your own front page.
+>
+> The `events` array is untouched by either switch — it is this box's own
+> events under every scope. A borrowed listing has no price and cannot be
+> bought here, so it is never merged into a list of things that are; it is
+> read from `GET /api/peer-events` and rendered in its own section below
+> the host's own events. Pinned by
+> `TestHostScope_PeersDisplaysBorrowedListingsAndSaysSo` and
+> `TestHostScope_SingleDoesNotDisplayBorrowedListings`.
+>
+> This scope finds nobody. It changes what is shown, never what is
+> reachable — there is no discovery anywhere under it.
 
 ### The gap: there is no per-organisation page
 
