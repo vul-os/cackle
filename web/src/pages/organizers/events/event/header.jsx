@@ -12,16 +12,29 @@ export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmi
                 Back to Events
             </Button>
 
-            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 items-center gap-3">
+            {/* The title gets its OWN row at every width.
+                It used to share a `md:flex-row` line with the action group. The
+                title column was `flex-1` (flex-basis 0) and the action group was
+                a 7-button `flex-wrap` box whose flex base size is its
+                single-line max-content width — so the row was over-full, every
+                pixel of shrink came out of the zero-basis title, and the input
+                rendered 18px wide at both 768 and 1440: an organiser editing an
+                event could not see which event they were editing. Stacking is
+                the fix that holds for a short title AND a long one, because the
+                title's width no longer depends on how many actions exist. */}
+            <div className="mb-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
                     <Input
                         value={editForm.title}
                         onChange={(e) => handleInputChange('title', e.target.value)}
-                        className="h-auto border-transparent bg-transparent p-2 font-display text-2xl font-bold hover:border-border focus-visible:ring-1 md:text-3xl"
+                        className="h-auto min-w-0 flex-1 border-transparent bg-transparent p-2 font-display text-2xl font-bold hover:border-border focus-visible:ring-1 md:text-3xl"
                         placeholder="Event Title"
+                        aria-label="Event title"
                         disabled={isSubmitting}
                     />
-                    <Badge variant={editForm.status === 'published' ? 'default' : 'secondary'}>{editForm.status}</Badge>
+                    <Badge className="shrink-0" variant={editForm.status === 'published' ? 'default' : 'secondary'}>
+                        {editForm.status}
+                    </Badge>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {editForm.status !== 'published' && editForm.id && (
