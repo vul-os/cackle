@@ -9,8 +9,14 @@ import ReactMarkdown from 'react-markdown';
 // the flat event editor (details.jsx) and the "basics" step of the create
 // wizard, so the two don't drift into two slightly-different editors.
 
+// Eight 44px buttons in a row do not fit a 390px phone (8 * 44px + 7 * 4px
+// gap = 380px against ~340px of usable card width) — rather than shrink
+// them below a real touch target, or let them wrap and eat vertical space
+// from the textarea below, the row scrolls horizontally. `overflow-x-auto`
+// on a container whose content genuinely exceeds it is the one thing that
+// legitimately forgives an "overflowing" child.
 const MarkdownToolbar = ({ onAction }) => (
-    <div className="flex items-center gap-1 border-b border-border bg-muted/40 p-1">
+    <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/40 p-1">
         {[
             { icon: Heading1, action: ['# ', ''], title: 'Heading 1' },
             { icon: Heading2, action: ['## ', ''], title: 'Heading 2' },
@@ -21,7 +27,7 @@ const MarkdownToolbar = ({ onAction }) => (
             { icon: Quote, action: ['\n> ', ''], title: 'Quote' },
             { icon: LinkIcon, action: ['[', '](url)'], title: 'Link' },
         ].map(({ icon: Icon, action, title }) => (
-            <Button key={title} type="button" variant="ghost" size="sm" onClick={() => onAction(...action)} className="h-8 w-8 p-0" title={title}>
+            <Button key={title} type="button" variant="ghost" onClick={() => onAction(...action)} className="h-11 w-11 shrink-0 p-0" title={title}>
                 <Icon className="h-4 w-4" />
                 <span className="sr-only">{title}</span>
             </Button>
