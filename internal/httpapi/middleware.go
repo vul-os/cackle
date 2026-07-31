@@ -28,8 +28,30 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// worker-src carries `blob:` because the gate scanner's QR decoder runs in a
+// Worker built from a Blob. qr-scanner (a bundled, vendored dependency) does
+// exactly this in qr-scanner-worker.min.js:
+//
+//	export const createWorker = () =>
+//	    new Worker(URL.createObjectURL(new Blob([...], {type:"application/javascript"})))
+//
+// and reaches for it whenever the browser has no usable native
+// BarcodeDetector — Firefox and Safari everywhere, plus Chromium on Apple
+// Silicon macOS, which qr-scanner routes to the worker on purpose. Without
+// this directive worker-src falls back to script-src ('self'), the browser
+// refuses the worker ("Creating a worker from 'blob:…' violates … script-src
+// 'self'"), and the camera opens but never decodes a ticket — staff fall back
+// to typing codes by hand at the door.
+//
+// `blob:` here is not a widening of what code may be fetched from where. A
+// blob: URL is minted by this document at runtime and is same-origin and
+// opaque: it names bytes this page already holds, cannot be forged by a
+// third party, and is unreachable to any other origin. No remote host becomes
+// loadable because of it. script-src stays 'self' precisely so a blob: is
+// still refused for a page-level <script>; only the Worker case is allowed.
 const contentSecurityPolicy = "default-src 'self'; " +
 	"script-src 'self'; " +
+	"worker-src 'self' blob:; " +
 	"style-src 'self' 'unsafe-inline'; " +
 	"img-src 'self' data: blob:; " +
 	"font-src 'self' data:; " +

@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,87 @@ func TestSecurityHeadersPresentOnEveryResponse(t *testing.T) {
 			t.Errorf("expected %s header to be set, got none", header)
 		}
 	}
+}
+
+// TestCSP_AllowsBlobWorkerForGateScanner pins the one directive the gate
+// scanner cannot work without. qr-scanner's decode engine is a Worker built
+// from a Blob (qr-scanner-worker.min.js: `new
+// Worker(URL.createObjectURL(new Blob([...])))`), used on every browser with
+// no usable native BarcodeDetector. worker-src has NO fallback of its own —
+// it falls back to script-src, which is 'self' — so deleting this directive
+// silently reverts the scanner to "camera opens, nothing ever decodes" and
+// the door falls back to manual entry. Observed as:
+//
+//	Creating a worker from 'blob:…' violates the following Content Security
+//	Policy directive: "script-src 'self'". Note that 'worker-src' was not
+//	explicitly set, so 'script-src' is used as a fallback.
+//
+// MUTATION: delete the `worker-src 'self' blob:` line from
+// contentSecurityPolicy and this fails, naming the script-src fallback.
+// MUTATION: "fix" it instead by widening script-src to `'self' blob:` — the
+// tempting wrong answer, which does make the worker load — and it still
+// fails, because blob: belongs in worker-src alone. MUTATION: keep
+// worker-src but drop blob: from it and this fails. MUTATION: add
+// 'unsafe-inline'/'unsafe-eval' to script-src and this fails.
+func TestCSP_AllowsBlobWorkerForGateScanner(t *testing.T) {
+	h := newTestHarness(t)
+	rec := h.do(http.MethodGet, "/api/events", "", nil)
+
+	directives := parseCSP(t, rec.Header().Get("Content-Security-Policy"))
+
+	workerSrc, ok := directives["worker-src"]
+	if !ok {
+		t.Fatalf("CSP has no worker-src directive, so it falls back to script-src (%q) and the gate scanner's blob: Worker is blocked; policy = %q",
+			strings.Join(directives["script-src"], " "), rec.Header().Get("Content-Security-Policy"))
+	}
+	if !containsSource(workerSrc, "blob:") {
+		t.Fatalf("worker-src = %q, want it to allow blob: — qr-scanner builds its decode Worker from a Blob URL", strings.Join(workerSrc, " "))
+	}
+	if !containsSource(workerSrc, "'self'") {
+		t.Errorf("worker-src = %q, want 'self' kept alongside blob: so same-origin workers stay loadable", strings.Join(workerSrc, " "))
+	}
+
+	// The narrow fix must stay narrow: blob: belongs in worker-src only.
+	if containsSource(directives["script-src"], "blob:") {
+		t.Errorf("script-src = %q allows blob:; the scanner needs it in worker-src only, never for page-level script", strings.Join(directives["script-src"], " "))
+	}
+	for _, name := range []string{"script-src", "style-src", "default-src", "worker-src"} {
+		for _, unsafe := range []string{"'unsafe-eval'", "'unsafe-hashes'"} {
+			if containsSource(directives[name], unsafe) {
+				t.Errorf("%s = %q contains %s", name, strings.Join(directives[name], " "), unsafe)
+			}
+		}
+	}
+	if containsSource(directives["script-src"], "'unsafe-inline'") {
+		t.Errorf("script-src = %q contains 'unsafe-inline'; the build emits no inline script", strings.Join(directives["script-src"], " "))
+	}
+}
+
+// parseCSP splits a policy into directive name -> source list. Names are
+// ASCII case-insensitive per CSP3; source expressions are not.
+func parseCSP(t *testing.T, policy string) map[string][]string {
+	t.Helper()
+	if policy == "" {
+		t.Fatal("no Content-Security-Policy header on the response")
+	}
+	out := map[string][]string{}
+	for _, part := range strings.Split(policy, ";") {
+		fields := strings.Fields(part)
+		if len(fields) == 0 {
+			continue
+		}
+		out[strings.ToLower(fields[0])] = fields[1:]
+	}
+	return out
+}
+
+func containsSource(sources []string, want string) bool {
+	for _, s := range sources {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestHealthzIsPublicAndOutsideAPI(t *testing.T) {
