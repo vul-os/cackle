@@ -99,9 +99,19 @@ function PeerRow({ peer, onChanged }) {
         setBusy(true);
         try {
             const out = await request(`/sync/peers/${peer.id}/feed`, { method: 'POST' });
+            // A big programme arrives over several requests. The count is what an
+            // operator cares about, but "we did not get all of it" is the thing
+            // they must not have to infer from a number looking round — so it is
+            // said, in words, and the title changes with it.
+            const across = out.pages > 1 ? ` over ${out.pages} requests` : '';
+            const cut = out.complete
+                ? ''
+                : ' This organiser publishes more events than one fetch can hold, so this is not their whole programme.';
             toast({
-                title: 'Fetched',
-                description: `Showing ${out.stored} of ${out.fetched} event${out.fetched === 1 ? '' : 's'} from this organiser.`,
+                title: out.complete ? 'Fetched' : 'Fetched — but not all of it',
+                description:
+                    `Showing ${out.stored} of ${out.fetched} event${out.fetched === 1 ? '' : 's'}` +
+                    ` from this organiser${across}.${cut}`,
             });
             await onChanged();
             await loadListings();

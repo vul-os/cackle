@@ -637,11 +637,13 @@ func (s *server) recordFeedOutcome(ctx context.Context, p store.SyncPeer, out fe
 		status += fmt.Sprintf(", refused %d", n)
 	}
 	if !out.Complete {
-		// The bound is named with its number. "Truncated" on its own tells an
-		// operator nothing they can act on; this tells them the fetch stopped at a
-		// limit of this node's, that there is more on the other side, and that
-		// fetching again is what gets it.
-		status += fmt.Sprintf(" — stopped at this node's limit of %d pages of %d, and there are more; fetch again",
+		// The bound is named with its number, and it does NOT say "fetch again".
+		// A pull always restarts from the beginning of the peer's feed — it has to,
+		// because the cache is replaced wholesale so that an unpublished event
+		// disappears — so a second fetch would bring back the same listings, not
+		// the next ones. Telling an operator to retry would be telling them to do
+		// something that cannot work.
+		status += fmt.Sprintf(" — stopped at this node's limit of %d pages of %d; this organiser publishes more than one fetch holds",
 			maxFeedPages, maxFeedEvents)
 	}
 	if out.Error != "" {
