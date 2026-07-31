@@ -34,11 +34,22 @@
 // section renders ONLY when there is at least one borrowed listing to show:
 // no empty state, no "no other organisers yet", nothing at all. A visitor to a
 // box with no peers must not learn that peers are a thing that could appear.
+//
+// # And only when the operator asked for it publicly
+//
+// Enrolling an organiser and pulling their programme is one decision; putting
+// that programme on your own front page is a second one. The second is
+// `CACKLE_HOST_SCOPE=peers`, it is off by default, and it reaches this
+// component as `peers_included` on the host envelope. `renderablePeerRows`
+// holds it — so an operator who has enrolled a publisher and fetched its
+// events shows nothing here until they opt in. That is the intended
+// behaviour, not a missing feature, and docs/CONFIGURATION.md says so in the
+// same words.
 import React, { useEffect, useState } from 'react';
 import { Calendar, ExternalLink, MapPin } from 'lucide-react';
 import { request } from '@/lib/api';
 import { Separator } from '@/components/ui/separator';
-import { peerOrgId, usablePeerRows } from './peer-scope';
+import { peerOrgId, renderablePeerRows } from './peer-scope';
 
 function formatDate(iso) {
     if (!iso) return 'Date TBA';
@@ -69,21 +80,21 @@ function formatChecked(iso) {
  * the page — an error fetching one must never take out this host's own events.
  */
 function usePeerEvents(orgId) {
-    const [state, setState] = useState({ events: [], caveat: '' });
+    const [state, setState] = useState({ data: null, caveat: '' });
 
     useEffect(() => {
         if (!orgId) {
-            setState({ events: [], caveat: '' });
+            setState({ data: null, caveat: '' });
             return undefined;
         }
         let cancelled = false;
         request('/peer-events', { method: 'GET', query: { org: orgId } })
             .then((data) => {
                 if (cancelled) return;
-                setState({ events: usablePeerRows(data), caveat: data?.caveat || '' });
+                setState({ data, caveat: data?.caveat || '' });
             })
             .catch(() => {
-                if (!cancelled) setState({ events: [], caveat: '' });
+                if (!cancelled) setState({ data: null, caveat: '' });
             });
         return () => {
             cancelled = true;
@@ -157,11 +168,15 @@ function PeerEventCard({ event }) {
 
 /**
  * The whole section. Renders nothing — not a heading, not an empty state —
- * unless this host is actually carrying at least one borrowed listing.
+ * unless this host both displays borrowed listings (the operator's
+ * `peers` scope, read off the envelope) and is actually carrying at least
+ * one. `renderablePeerRows` answers both in one place; the component never
+ * reads the envelope itself.
  */
 export default function PeerEvents({ host }) {
     const orgId = peerOrgId(host);
-    const { events, caveat } = usePeerEvents(orgId);
+    const { data, caveat } = usePeerEvents(orgId);
+    const events = renderablePeerRows(host, data);
 
     if (events.length === 0) return null;
 

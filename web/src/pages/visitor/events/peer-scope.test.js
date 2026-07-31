@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { peerOrgId, usablePeerRows } from './peer-scope.js';
+import { peerOrgId, renderablePeerRows, usablePeerRows } from './peer-scope.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const componentSource = readFileSync(join(here, 'peer-events.jsx'), 'utf8');
@@ -44,43 +44,7 @@ function stripComments(src) {
 
 const component = stripComments(componentSource);
 
-// ── whose listings ──────────────────────────────────────────────────────────
-
-test('a single-organisation box shows that organisation\'s borrowed listings', () => {
-    assert.equal(peerOrgId({ organisations: [{ id: 'org-1', name: 'The Bijou', slug: 'the-bijou' }], multi_org: false }), 'org-1');
-});
-
-test('a narrowed listing shows the narrowed organisation\'s, not the box\'s first', () => {
-    const host = {
-        organisations: [
-            { id: 'org-1', name: 'The Bijou', slug: 'the-bijou' },
-            { id: 'org-2', name: 'Night Market', slug: 'night-market' },
-        ],
-        multi_org: true,
-        org: { id: 'org-2', name: 'Night Market', slug: 'night-market' },
-    };
-    assert.equal(peerOrgId(host), 'org-2');
-});
-
-test('a multi-organisation box with no narrowing shows none — one operator\'s enrolments are not another\'s', () => {
-    const host = {
-        organisations: [
-            { id: 'org-1', name: 'The Bijou', slug: 'the-bijou' },
-            { id: 'org-2', name: 'Night Market', slug: 'night-market' },
-        ],
-        multi_org: true,
-    };
-    assert.equal(peerOrgId(host), null);
-});
-
-test('a missing or malformed host envelope shows none rather than guessing', () => {
-    for (const host of [undefined, null, {}, { organisations: null }, { organisations: [] }, { organisations: [{}] }, { org: {} }]) {
-        assert.equal(peerOrgId(host), null, `expected null for ${JSON.stringify(host)}`);
-    }
-});
-
-// ── which rows may be rendered ──────────────────────────────────────────────
-
+/** One borrowed listing off the wire, in the shape internal/httpapi sends. */
 const row = (over = {}) => ({
     external: true,
     publisher: 'Neighbour Hall',
@@ -90,6 +54,98 @@ const row = (over = {}) => ({
     notice: 'Hosted by another organiser. Tickets are sold on their own site, not here.',
     ...over,
 });
+
+// ── whose listings ──────────────────────────────────────────────────────────
+
+// Every fixture below carries `peers_included: true`, because that is the
+// operator saying "show borrowed listings on my page" — see the section after
+// next. Without it the answer is null whatever the organisations are, and
+// these cases would all pass for the wrong reason.
+const shown = (over) => ({ peers_included: true, ...over });
+
+test('a single-organisation box shows that organisation\'s borrowed listings', () => {
+    assert.equal(peerOrgId(shown({ organisations: [{ id: 'org-1', name: 'The Bijou', slug: 'the-bijou' }], multi_org: false })), 'org-1');
+});
+
+test('a narrowed listing shows the narrowed organisation\'s, not the box\'s first', () => {
+    const host = shown({
+        organisations: [
+            { id: 'org-1', name: 'The Bijou', slug: 'the-bijou' },
+            { id: 'org-2', name: 'Night Market', slug: 'night-market' },
+        ],
+        multi_org: true,
+        org: { id: 'org-2', name: 'Night Market', slug: 'night-market' },
+    });
+    assert.equal(peerOrgId(host), 'org-2');
+});
+
+test('a multi-organisation box with no narrowing shows none — one operator\'s enrolments are not another\'s', () => {
+    const host = shown({
+        organisations: [
+            { id: 'org-1', name: 'The Bijou', slug: 'the-bijou' },
+            { id: 'org-2', name: 'Night Market', slug: 'night-market' },
+        ],
+        multi_org: true,
+    });
+    assert.equal(peerOrgId(host), null);
+});
+
+test('a missing or malformed host envelope shows none rather than guessing', () => {
+    const malformed = [{ organisations: null }, { organisations: [] }, { organisations: [{}] }, { org: {} }];
+    for (const host of [undefined, null, {}, ...malformed, ...malformed.map(shown)]) {
+        assert.equal(peerOrgId(host), null, `expected null for ${JSON.stringify(host)}`);
+    }
+});
+
+// ── whether this host shows borrowed listings at all ────────────────────────
+//
+// The second switch. `feed_subscribe` on the server decides whether this box
+// PULLS an organiser's programme; `CACKLE_HOST_SCOPE=peers` decides whether
+// what was pulled goes on the public page. Both are off by default, so an
+// operator who enrolled an organiser and fetched their events publishes
+// nothing until they ask for it.
+
+test('a host that has not opted in fetches nobody\'s listings, however many organisations it has', () => {
+    const org = { id: 'org-1', name: 'The Bijou', slug: 'the-bijou' };
+    assert.equal(peerOrgId({ scope: 'own', organisations: [org], peers_included: false }), null);
+    assert.equal(peerOrgId({ scope: 'own', organisations: [org], multi_org: false, org, peers_included: false }), null);
+});
+
+// THE test for the join. Rows are present — a real pull happened, the cache is
+// full, `usablePeerRows` keeps every one of them — and the operator has not
+// opted in. Nothing renders. Without rows in this fixture the assertion would
+// pass on an empty cache and prove nothing about the guard.
+test('rows in hand and the scope off renders nothing — the case that isolates the guard', () => {
+    const data = { events: [row(), row({ title: 'Autumn Fair', url: 'https://their-box.example/h/autumn-fair' })] };
+    assert.equal(usablePeerRows(data).length, 2, 'the fixture must carry rows, or this test proves nothing');
+
+    for (const host of [{ scope: 'own', peers_included: false }, { scope: 'single', peers_included: false }]) {
+        assert.deepEqual(renderablePeerRows(host, data), [], `expected nothing rendered for ${JSON.stringify(host)}`);
+    }
+});
+
+test('the same rows with the scope on are rendered', () => {
+    const data = { events: [row(), row({ title: 'Autumn Fair', url: 'https://their-box.example/h/autumn-fair' })] };
+    const out = renderablePeerRows({ scope: 'peers', peers_included: true }, data);
+    assert.equal(out.length, 2);
+    assert.deepEqual(out.map((e) => e.title), ['Spring Fair', 'Autumn Fair']);
+});
+
+test('an absent or malformed envelope renders nothing, never everything', () => {
+    const data = { events: [row()] };
+    for (const host of [undefined, null, {}, { scope: 'peers' }, { peers_included: 'true' }, { peers_included: 1 }]) {
+        assert.deepEqual(renderablePeerRows(host, data), [], `expected nothing rendered for ${JSON.stringify(host)}`);
+    }
+});
+
+test('opting in does not lower the bar on which rows may be rendered', () => {
+    // The scope says "show borrowed listings"; it does not say "show anything
+    // that arrives". A row that fails usablePeerRows is still dropped.
+    const data = { events: [row({ external: false }), row({ url: '' }), row()] };
+    assert.equal(renderablePeerRows({ peers_included: true }, data).length, 1);
+});
+
+// ── which rows may be rendered ──────────────────────────────────────────────
 
 test('a row that does not declare itself external is DROPPED, not rendered', () => {
     const kept = usablePeerRows({ events: [row(), row({ external: false }), row({ external: undefined }), row({ external: 'true' })] });
@@ -183,6 +239,21 @@ test('the source guard would catch the defects it exists to catch', () => {
 test('the section renders nothing at all when this host carries no borrowed listing', () => {
     // Not an empty state, not a heading, not "no other organisers yet". A
     // visitor to a box with no peers must not learn that peers are a thing
-    // that could appear — peers_included is false on the wire today.
+    // that could appear.
     assert.match(component, /if \(events\.length === 0\) return null;/);
+});
+
+test('the section is rendered from the GATED rows, never from the raw ones', () => {
+    // The guard the component cannot be allowed to walk around. `events` must
+    // come from renderablePeerRows, which consults the host envelope; a
+    // component that called usablePeerRows directly would render another
+    // organiser's programme on a host whose operator never opted in, and every
+    // behavioural assertion above would still pass, because the rows
+    // themselves are perfectly good rows.
+    assert.match(component, /const events = renderablePeerRows\(host, data\);/);
+    assert.equal(/\busablePeerRows\b/.test(component), false,
+        'peer-events.jsx must not reach past the gate to the ungated rows');
+    // And the envelope is read in @/lib/host, not picked apart here.
+    assert.equal(/\bpeers_included\b/.test(component), false,
+        'peer-events.jsx must not parse the host envelope itself; lib/host.js is the one reader');
 });

@@ -41,6 +41,35 @@ export function showsOrgLabels(host) {
     return Boolean(host?.multi_org);
 }
 
+/**
+ * True when this host displays BORROWED LISTINGS — events belonging to
+ * another organiser, which this box pulled from a publisher its operator
+ * enrolled by hand.
+ *
+ * Two switches stand between an operator and a borrowed listing on their
+ * front page, and they answer two different questions:
+ *
+ *  1. Per publisher, on the server: does this box PULL that organiser's
+ *     programme at all? (`feed_subscribe`, off until the operator says so.)
+ *  2. This one: is what was pulled shown to the PUBLIC? That is
+ *     `CACKLE_HOST_SCOPE=peers`, and the envelope carries the answer as
+ *     `peers_included`.
+ *
+ * Both are off by default, so an operator who has enrolled an organiser and
+ * fetched their events still shows nobody else's programme on their own front
+ * page until they ask for it. Reading someone's feed and publishing it are
+ * separate decisions; this is the second one.
+ *
+ * Strictly `=== true`. A missing envelope, an older server that never sends
+ * the field, a failed request, a truthy-but-not-true value — every one of them
+ * resolves to NOT showing another organiser's events on this operator's page.
+ * The unsafe direction here is showing something the operator did not publish,
+ * so absence of an answer is never taken as yes.
+ */
+export function showsPeerEvents(host) {
+    return host?.peers_included === true;
+}
+
 /** Every organisation this listing can contain. Always an array. */
 export function hostOrgs(host) {
     return Array.isArray(host?.organisations) ? host.organisations : [];

@@ -96,16 +96,16 @@ const (
 	// HostOrg. Events belonging to any other organisation on the same box
 	// are not listed publicly. This is the common case for a single venue.
 	HostScopeSingle HostScope = "single"
-	// HostScopePeers is reserved for opt-in peer feeds — listing events from
-	// other Cackle boxes an operator has explicitly chosen to federate with.
+	// HostScopePeers is HostScopeOwn PLUS the borrowed listings this box is
+	// carrying: events published by another operator's box, pulled here
+	// because this operator enrolled that publisher by hand and by key
+	// (feed_subscribe, migration 0007). They are shown below this host's own
+	// events, never mixed into them, and never sold here.
 	//
-	// NO PEER DATA EXISTS TODAY. There is no peer event source in this
-	// binary, so this scope behaves EXACTLY as HostScopeOwn: it lists this
-	// box's own organisations' events and nothing else. It is accepted as a
-	// value so that the setting an operator writes now keeps its meaning
-	// when peer feeds land, and so the seam has one named place rather than
-	// being invented twice. The listing response reports
-	// "peers_included": false so a client can never assume otherwise.
+	// This scope does not find anybody. Nothing in Cackle discovers a peer —
+	// there is no directory, no index, no rendezvous and no proximity lookup
+	// anywhere in the stack. It only decides whether what an operator
+	// already chose to pull is put in front of the public.
 	HostScopePeers HostScope = "peers"
 )
 
@@ -118,13 +118,29 @@ func (s HostScope) Valid() bool {
 	return false
 }
 
-// IncludesPeerEvents reports whether the listing may contain events from
-// another box. It is FALSE for every scope, including HostScopePeers,
-// because no peer event source exists in this binary. It is a method rather
-// than a literal so that the day one does exist, there is exactly one place
-// that has to start saying true — and every caller (API response, docs
-// assertions, tests) follows.
-func (s HostScope) IncludesPeerEvents() bool { return false }
+// IncludesPeerEvents reports whether this host DISPLAYS borrowed listings —
+// events belonging to another operator, which this box pulled from a
+// publisher its operator enrolled. It is true for HostScopePeers and for
+// nothing else.
+//
+// Two switches govern a borrowed listing, and they are deliberately not the
+// same switch:
+//
+//   - feed_subscribe, per peer (migration 0007), decides whether this box
+//     PULLS a given publisher's programme at all. Off by default.
+//   - this scope decides whether what was pulled is shown to the PUBLIC on
+//     the front page. Off by default — "own" is the default scope.
+//
+// So an operator who has enrolled a publisher and fetched its events still
+// shows nothing publicly until they set CACKLE_HOST_SCOPE=peers. That is the
+// intended behaviour, not a gap: deciding to read another organiser's
+// programme is not the same decision as putting it on your own front page,
+// and both being off by default is what keeps the posture fail-closed.
+//
+// It stays a method rather than a comparison spelled out at each call site
+// so that the rule has one home and every caller — the API envelope, the
+// docs, the tests — reads the same answer.
+func (s HostScope) IncludesPeerEvents() bool { return s == HostScopePeers }
 
 // Key-material environment variables. Exactly one may be set; see
 // resolveKeySource.

@@ -1,16 +1,31 @@
-// The two decisions behind a borrowed listing, kept out of the component so
-// they can be tested directly rather than inferred from a rendered tree.
+// The decisions behind a borrowed listing, kept out of the component so they
+// can be tested directly rather than inferred from a rendered tree.
 //
 // See ./peer-events.jsx for what a borrowed listing IS and the rule it holds.
-// This file answers only: whose borrowed listings does a page show, and which
-// rows off the wire are safe to put on a screen.
+// This file answers three questions: does this host display borrowed listings
+// at all, whose does it display, and which rows off the wire are safe to put
+// on a screen. All three must say yes before anything reaches a screen.
+
+// Relative, with its extension, rather than the `@/` alias every component
+// uses: this module is loaded directly by `node --test` as well as by Vite,
+// and only a real specifier resolves under both. `lib/host.js` is the app's
+// one reader of the host envelope and stays that way — the envelope is not
+// parsed here or in the component.
+import { showsPeerEvents } from '../../../lib/host.js';
 
 /**
  * The organisation whose borrowed listings this page shows, or null for
  * "show none".
  *
- * GET /api/peer-events takes ONE org id, so a page has to answer "whose". The
- * three cases:
+ * The first question is not "whose" but "any at all": borrowed listings are
+ * shown publicly only when the operator set `CACKLE_HOST_SCOPE=peers`, which
+ * arrives as `peers_included` on the host envelope and is read in exactly one
+ * place (`@/lib/host`). Without it this answers null and nothing is even
+ * fetched — a host that does not publish another organiser's programme does
+ * not ask for it either.
+ *
+ * Then, because GET /api/peer-events takes ONE org id, a page has to answer
+ * "whose". The three cases:
  *
  *  - `?host=` narrowed the listing to one organisation — that one.
  *  - exactly one organisation on this box — trivially that one.
@@ -25,6 +40,7 @@
  * envelope, no borrowed listings, rather than a guess.
  */
 export function peerOrgId(host) {
+    if (!showsPeerEvents(host)) return null;
     if (typeof host?.org?.id === 'string' && host.org.id) return host.org.id;
     const orgs = Array.isArray(host?.organisations) ? host.organisations : [];
     if (orgs.length !== 1) return null;
@@ -50,4 +66,25 @@ export function peerOrgId(host) {
 export function usablePeerRows(data) {
     const rows = Array.isArray(data?.events) ? data.events : [];
     return rows.filter((e) => e?.external === true && typeof e?.url === 'string' && e.url !== '');
+}
+
+/**
+ * The rows this page may actually RENDER: the usable ones, but only if this
+ * host displays borrowed listings at all.
+ *
+ * This is the gate, and it is a separate function from `usablePeerRows` on
+ * purpose. `peerOrgId` already refuses to fetch when the scope is off, but a
+ * gate that only guards the fetch is a gate that a cached response, a
+ * refactor, or a second caller walks straight around. This one sits at the
+ * point where rows become pixels, and it takes the rows as an argument so the
+ * case that matters can be tested head-on: rows present AND the scope off,
+ * which is the only case that isolates the guard from "there was nothing to
+ * show anyway".
+ *
+ * The component calls this and nothing else, so there is no path from a
+ * fetched row to a screen that skips the operator's decision.
+ */
+export function renderablePeerRows(host, data) {
+    if (!showsPeerEvents(host)) return [];
+    return usablePeerRows(data);
 }

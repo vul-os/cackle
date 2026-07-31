@@ -253,11 +253,22 @@ func TestHostScope_HostParamOutOfScopeIs404(t *testing.T) {
 	}
 }
 
-// The peers scope is a NAME today, not a feature. It must behave exactly as
-// own and must say, on the wire, that no peer event is in the list. If this
-// test starts failing because peer events became real, docs/CONFIGURATION.md's
-// claim that they are not has to change in the same commit.
-func TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo(t *testing.T) {
+// The peers scope is the operator's permission to DISPLAY borrowed listings,
+// and peers_included is how that permission reaches a client. Two halves,
+// pinned together here because they were built apart:
+//
+//   - own must say false and peers must say true — a wire claim that never
+//     changed was the defect this replaced, and it was a false one from the
+//     moment the peer feed landed.
+//   - the events array itself must be IDENTICAL under both. Borrowed
+//     listings are not this box's events: they carry no price, cannot be
+//     bought here, and are read from GET /api/peer-events. A peers-scoped
+//     listing that grew extra rows would be selling somebody else's show.
+//
+// This test previously pinned peers_included:false in every scope, which was
+// true when the scope was a name with nothing behind it and became a false
+// claim on the wire once peer feeds existed.
+func TestHostScope_PeersDisplaysBorrowedListingsAndSaysSo(t *testing.T) {
 	h := newTestHarness(t)
 	h.newPublishedEvent(t, "local-a")
 	h.newPublishedEvent(t, "local-b")
@@ -270,25 +281,42 @@ func TestHostScope_PeersBehavesExactlyAsOwnAndSaysSo(t *testing.T) {
 	if peers.Host.Scope != string(config.HostScopePeers) {
 		t.Errorf("scope = %q, want %q", peers.Host.Scope, config.HostScopePeers)
 	}
-	if peers.Host.PeersIncluded {
-		t.Error("peers_included = true, but this binary has no peer event source")
+	if !peers.Host.PeersIncluded {
+		t.Error("peers_included = false under the peers scope; the setting would do nothing and the wire would understate what the page shows")
 	}
 	if own.Host.PeersIncluded {
-		t.Error("peers_included = true in own scope")
+		t.Error("peers_included = true in own scope; the default must not publish another operator's listings")
 	}
 	if len(peers.Events) != len(own.Events) {
-		t.Fatalf("peers scope returned %d events, own returned %d; they must be identical today",
+		t.Fatalf("peers scope returned %d events, own returned %d; borrowed listings must not join the events array",
 			len(peers.Events), len(own.Events))
 	}
 	for i := range peers.Events {
 		if peers.Events[i].ID != own.Events[i].ID {
-			t.Fatalf("peers scope event %d = %q, own = %q; they must be identical today",
+			t.Fatalf("peers scope event %d = %q, own = %q; the events array is this box's own events under either scope",
 				i, peers.Events[i].Slug, own.Events[i].Slug)
 		}
 	}
 	if len(peers.Host.Organisations) != len(own.Host.Organisations) {
 		t.Errorf("peers scope names %d organisations, own names %d",
 			len(peers.Host.Organisations), len(own.Host.Organisations))
+	}
+}
+
+// The single scope is a narrowing, and it must not be widened by the peer
+// display switch it does not carry: a box presenting as ONE organisation says
+// peers_included:false, because it is not the scope that displays borrowed
+// listings.
+func TestHostScope_SingleDoesNotDisplayBorrowedListings(t *testing.T) {
+	h := newTestHarness(t)
+	h.newPublishedEvent(t, "here")
+
+	h.cfg.HostScope = config.HostScopeSingle
+	h.cfg.HostOrg = "test-org-here"
+
+	got := h.listing(t, "/api/events")
+	if got.Host.PeersIncluded {
+		t.Error("peers_included = true under the single scope; only peers displays borrowed listings")
 	}
 }
 

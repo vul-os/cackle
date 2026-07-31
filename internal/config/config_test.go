@@ -497,10 +497,15 @@ func TestLoad_HostOrgWithoutSingleScopeIsRefused(t *testing.T) {
 	}
 }
 
-// The peers scope is accepted as a NAME today and carries no peer data. If
-// this test ever has to change, peer events have become real and every claim
-// in docs/CONFIGURATION.md about them has to be re-read.
-func TestHostScopePeersCarriesNoPeerData(t *testing.T) {
+// Borrowed listings are displayed under the peers scope and under no other.
+//
+// This test used to assert IncludesPeerEvents() was false for EVERY scope,
+// which was accurate while the scope was a name with nothing behind it. Once
+// peer event feeds landed it stopped being accurate and started pinning a
+// defect: CACKLE_HOST_SCOPE=peers did nothing at all, and the listing API
+// told every client that borrowed listings were not included while the browse
+// page was able to display them.
+func TestHostScopePeersDisplaysBorrowedListings(t *testing.T) {
 	isolateEnv(t)
 	clearKeyEnv(t)
 	t.Setenv(envHostScope, "peers")
@@ -512,9 +517,16 @@ func TestHostScopePeersCarriesNoPeerData(t *testing.T) {
 	if cfg.HostScope != HostScopePeers {
 		t.Fatalf("HostScope = %q, want %q", cfg.HostScope, HostScopePeers)
 	}
-	for _, s := range []HostScope{HostScopeOwn, HostScopeSingle, HostScopePeers} {
+	if !cfg.HostScope.IncludesPeerEvents() {
+		t.Error("peers.IncludesPeerEvents() = false; the setting an operator wrote would do nothing")
+	}
+	// Every other scope, including the default, shows none. Enrolling a
+	// publisher and pulling its programme is a decision about what this box
+	// reads; putting it on the public front page is a second decision, and
+	// this is the switch for it.
+	for _, s := range []HostScope{HostScopeOwn, HostScopeSingle, "", "nonsense"} {
 		if s.IncludesPeerEvents() {
-			t.Errorf("%q.IncludesPeerEvents() = true; no peer event source exists in this binary", s)
+			t.Errorf("%q.IncludesPeerEvents() = true; only %q displays borrowed listings", s, HostScopePeers)
 		}
 	}
 }

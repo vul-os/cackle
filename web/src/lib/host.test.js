@@ -11,6 +11,7 @@ import {
     orgForEvent,
     orgHref,
     showsOrgLabels,
+    showsPeerEvents,
 } from './host.js';
 
 const bijou = { id: 'org_1', name: 'The Bijou', slug: 'the-bijou' };
@@ -76,4 +77,36 @@ test('a missing or malformed envelope degrades to the single-tenant presentation
     assert.equal(hostHeading(undefined), "What's on");
     assert.equal(emptyDescription(undefined), 'There are no tickets on sale at the moment.');
     assert.equal(EMPTY_HEADING, 'Nothing on sale right now');
+});
+
+// ── borrowed listings: does this host display another organiser's events ────
+
+test('a host says so before another organiser\'s events are shown on its page', () => {
+    assert.equal(showsPeerEvents({ scope: 'peers', organisations: [bijou], peers_included: true }), true);
+});
+
+test('the default scope does not put another organiser\'s events on this page', () => {
+    assert.equal(showsPeerEvents({ scope: 'own', organisations: [bijou], peers_included: false }), false);
+    assert.equal(showsPeerEvents({ scope: 'single', name: 'The Bijou', organisations: [bijou], peers_included: false }), false);
+});
+
+// The unsafe direction is publishing somebody else's programme on an
+// operator's page without being told to. So anything that is not an explicit
+// true — a missing envelope, an older server that never sends the field, a
+// failed request, a truthy string — resolves to showing nothing.
+test('a missing, malformed or merely truthy envelope shows no borrowed listings', () => {
+    const notTrue = [
+        undefined,
+        null,
+        {},
+        { scope: 'peers' },
+        { peers_included: false },
+        { peers_included: 'true' },
+        { peers_included: 1 },
+        { peers_included: null },
+        { peers_included: [] },
+    ];
+    for (const host of notTrue) {
+        assert.equal(showsPeerEvents(host), false, `expected false for ${JSON.stringify(host)}`);
+    }
 });

@@ -53,10 +53,18 @@ type hostView struct {
 	// must not make a multi-organisation box present as a single venue,
 	// and a single venue must never be dressed up as a directory.
 	MultiOrg bool `json:"multi_org"`
-	// PeersIncluded reports whether any event in this listing came from
-	// another box. It is false in every scope, including "peers", because
-	// no peer event source exists in this binary yet. See
-	// config.HostScope.IncludesPeerEvents.
+	// PeersIncluded reports whether this host displays BORROWED LISTINGS:
+	// events published by another operator's box, which this box pulled from
+	// a publisher its operator enrolled by hand. True under the "peers"
+	// scope and no other. See config.HostScope.IncludesPeerEvents.
+	//
+	// It does NOT mean the events array beside it contains any. That array
+	// is always and only this box's own events — a borrowed listing has no
+	// price and is not sold here, so it is never merged into a list of
+	// things that are. Borrowed listings are read separately from GET
+	// /api/peer-events, and this flag is the client's permission to show
+	// them at all: false means do not display them, whatever that route
+	// returns.
 	PeersIncluded bool `json:"peers_included"`
 	// Org, when set, is the single organisation this listing was narrowed
 	// to by ?host=. Absent otherwise.
@@ -104,13 +112,14 @@ func (s *server) hostScope(ctx context.Context) (scope config.HostScope, orgs []
 		return scope, []hostOrgView{{ID: org.ID, Name: org.Name, Slug: org.Slug}}, []string{org.ID}, nil
 
 	default:
-		// "own" and "peers" are the same set today. "peers" is the seam: when
-		// an opt-in peer feed exists, THIS is where its organisations join the
-		// list and where its events would be merged into the result — and
-		// config.HostScope.IncludesPeerEvents is the one predicate that has to
-		// start returning true. Until then the two scopes are identical, and
-		// the response says so via peers_included:false rather than leaving a
-		// client to assume.
+		// "own" and "peers" draw the same set HERE, and that is correct
+		// rather than unfinished. Both list the published events of every
+		// organisation on this box; what "peers" adds is borrowed listings,
+		// which are not events of this box, carry no price, and are read from
+		// GET /api/peer-events instead. Merging them into this array would
+		// put an event nobody here can sell into the list of things on sale.
+		// The difference between the two scopes travels on the envelope, as
+		// peers_included, and that is the whole of it.
 		rows, err := s.deps.Store.ListPublicHostOrgs(ctx)
 		if err != nil {
 			return scope, nil, nil, err
