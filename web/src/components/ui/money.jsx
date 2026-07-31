@@ -27,12 +27,15 @@ import { formatMoney } from '@/lib/money';
 //      symbol width, so "R " and "¥" still shift the start of the string. In a
 //      column what must line up is the last digit, not the first character.
 //
-// `<MoneyCell>` applies both plus `whitespace-nowrap`, because a currency
-// string wrapping mid-amount is its own kind of wrong.
+// `Money` itself carries `whitespace-nowrap`, because a currency string
+// wrapping mid-amount is its own kind of wrong — no page should have to
+// remember that. `<MoneyCell>` layers on the column-specific half:
+// right alignment, so a table of mixed currencies keeps its last digits on
+// one axis.
 
 /**
  * Money renders an integer minor-unit amount in its own currency, with
- * tabular figures.
+ * tabular figures. Never wraps mid-amount.
  *
  * @param {object} props
  * @param {number} props.minor integer minor units (price_minor, total_minor…)
@@ -44,16 +47,16 @@ import { formatMoney } from '@/lib/money';
 export function Money({ minor, currency, locale, className, as: Tag = 'span', ...rest }) {
     const formatted = formatMoney(minor, currency, locale ? { locale } : undefined);
     return (
-        <Tag className={cn('tnum', className)} {...rest}>
+        <Tag className={cn('tnum whitespace-nowrap', className)} {...rest}>
             {formatted}
         </Tag>
     );
 }
 
 /**
- * MoneyCell is Money for a table column: right-aligned and non-wrapping, so a
- * column of mixed currencies keeps its last digits on one axis and no row
- * changes width when a value does.
+ * MoneyCell is Money for a table column: right-aligned, so a column of mixed
+ * currencies keeps its last digits on one axis and no row changes width when
+ * a value does. Non-wrapping comes from `Money` itself.
  *
  * Renders a `<td>` by default; pass `as="div"` inside a non-table layout.
  */
@@ -64,7 +67,7 @@ export function MoneyCell({ minor, currency, locale, className, as: Tag = 'td', 
             minor={minor}
             currency={currency}
             locale={locale}
-            className={cn('whitespace-nowrap text-right', className)}
+            className={cn('text-right', className)}
             {...rest}
         />
     );
