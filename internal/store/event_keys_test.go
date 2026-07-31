@@ -983,3 +983,128 @@ func TestKeyVaultStatusLeaksNothing(t *testing.T) {
 		t.Fatalf("fingerprint %q has length %d, want 8", fp, len(fp))
 	}
 }
+
+// rotateKeyAt adds a second active issuer key to an event with an explicit
+// CreatedAt, and returns it. It exists so a test can put two keys on the SAME
+// STORED SECOND on purpose rather than racing for one.
+func rotateKeyAt(t *testing.T, st *Store, eventID string, at time.Time) *EventKey {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate rotated key: %v", err)
+	}
+	k := &EventKey{EventID: eventID, PublicKey: pub, PrivateKey: priv, CreatedAt: at}
+	if err := st.CreateEventKey(context.Background(), k); err != nil {
+		t.Fatalf("CreateEventKey: %v", err)
+	}
+	return k
+}
+
+// TestLatestActiveEventKeyBreaksSameSecondTies pins which key signs when two
+// active keys were created inside the same second.
+//
+// HOW THE TIE IS FORCED, since a test that merely hopes for one proves
+// nothing: timeToText (store.go:207) formats with time.RFC3339, which has
+// whole-second resolution. The two keys below are created 400ms apart in real
+// time and land on BYTE-IDENTICAL created_at text. `ORDER BY created_at DESC
+// LIMIT 1` therefore has nothing left to order by, and which of the two signs
+// the next ticket is whatever SQLite happens to hand back.
+//
+// The assertion is that the LATER key wins, which is what the method's name
+// and doc comment promise. `, id DESC` delivers it because ids are ULIDs from
+// a monotonic entropy source, so a key made later in the same process has the
+// strictly greater id. The test asserts that ordering as a PRECONDITION rather
+// than assuming it.
+//
+// MUTATION: drop `, id DESC` from LatestActiveEventKey and this fails, naming
+// the older key.
+func TestLatestActiveEventKeyBreaksSameSecondTies(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	ev, first := mustEventWithKey(t, st)
+
+	// Move the event's original key onto a known second, then add the rotated
+	// key 400ms later — the same second once written.
+	base := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+	if _, err := st.db.Exec(`UPDATE event_keys SET created_at = ? WHERE id = ?`,
+		timeToText(base), first.ID); err != nil {
+		t.Fatalf("backdate first key: %v", err)
+	}
+	second := rotateKeyAt(t, st, ev.ID, base.Add(400*time.Millisecond))
+
+	var firstText, secondText string
+	if err := st.db.QueryRow(`SELECT created_at FROM event_keys WHERE id = ?`, first.ID).Scan(&firstText); err != nil {
+		t.Fatalf("read first created_at: %v", err)
+	}
+	if err := st.db.QueryRow(`SELECT created_at FROM event_keys WHERE id = ?`, second.ID).Scan(&secondText); err != nil {
+		t.Fatalf("read second created_at: %v", err)
+	}
+	if firstText != secondText {
+		t.Fatalf("the tie was not forced: created_at %q vs %q — this test proves nothing unless they are equal", firstText, secondText)
+	}
+	if !(second.ID > first.ID) {
+		t.Fatalf("precondition: rotated key id %q should sort after original %q", second.ID, first.ID)
+	}
+
+	// Both keys are active, so LIMIT 1 has two candidates and the ORDER BY is
+	// the only thing choosing between them — no filter backstops this.
+	active, err := st.ActiveEventKeys(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("ActiveEventKeys: %v", err)
+	}
+	if len(active) != 2 {
+		t.Fatalf("expected 2 active keys for the tie to matter, got %d", len(active))
+	}
+
+	got, err := st.LatestActiveEventKey(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("LatestActiveEventKey: %v", err)
+	}
+	if got.ID != second.ID {
+		t.Fatalf("LatestActiveEventKey chose %q (the older key), want the rotated key %q — rotation silently did not take effect", got.ID, second.ID)
+	}
+}
+
+// TestLatestActiveEventKeyDoesNotDependOnTheQueryPlan shows the tie is not
+// merely "unspecified in theory". With today's schema the tied query is served
+// by idx_event_keys_event_id plus a temp b-tree for the ORDER BY, and the
+// sorter hands back the first row it scanned — the OLDEST key. Create an index
+// SQLite can walk backwards to satisfy the ORDER BY instead and the very same
+// query returns the OTHER key.
+//
+// So which key signs is decided by which indexes happen to exist, i.e. by a
+// future performance change nobody would think to connect to signing. This
+// test makes the two plans agree; the tiebreaker is the only thing that can.
+//
+// MUTATION: drop `, id DESC` from LatestActiveEventKey and the two plans
+// disagree again.
+func TestLatestActiveEventKeyDoesNotDependOnTheQueryPlan(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	ev, first := mustEventWithKey(t, st)
+
+	base := time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
+	if _, err := st.db.Exec(`UPDATE event_keys SET created_at = ? WHERE id = ?`,
+		timeToText(base), first.ID); err != nil {
+		t.Fatalf("backdate first key: %v", err)
+	}
+	rotateKeyAt(t, st, ev.ID, base.Add(400*time.Millisecond))
+
+	viaTempBTree, err := st.LatestActiveEventKey(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("LatestActiveEventKey (temp b-tree plan): %v", err)
+	}
+
+	if _, err := st.db.Exec(`CREATE INDEX tmp_event_keys_created ON event_keys(event_id, created_at)`); err != nil {
+		t.Fatalf("create probe index: %v", err)
+	}
+	viaIndexScan, err := st.LatestActiveEventKey(ctx, ev.ID)
+	if err != nil {
+		t.Fatalf("LatestActiveEventKey (index-ordered plan): %v", err)
+	}
+
+	if viaTempBTree.ID != viaIndexScan.ID {
+		t.Fatalf("the signing key changed with the query plan: %q without an ordering index, %q with one",
+			viaTempBTree.ID, viaIndexScan.ID)
+	}
+}

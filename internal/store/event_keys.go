@@ -143,11 +143,28 @@ func (s *Store) ActiveEventKeys(ctx context.Context, eventID string) ([]EventKey
 // returns ErrKeyVaultLocked and no ticket can be signed. A row still holding
 // pre-0004 plaintext returns ErrEventKeyNotSealed rather than serving the
 // plaintext — the boot-time migration is not optional.
+//
+// `, id DESC` IS LOAD-BEARING, not tidiness. created_at is written by
+// timeToText (store.go:207) in RFC3339, which has whole-second resolution, so
+// a key rotated in the same second as the one it replaces stores a
+// BYTE-IDENTICAL created_at and `ORDER BY created_at DESC` alone has nothing
+// left to choose with. What it returned then was an artifact of the query
+// plan — today's temp-b-tree sort hands back the OLDER key, and adding an
+// index SQLite can walk in order flips it to the newer one.
+//
+// Ordering by id recovers the real answer because ids come from NewID() =
+// ulid.Make(), whose entropy source is a LockedMonotonicReader: a
+// millisecond-resolution timestamp, plus entropy that strictly increases
+// within a millisecond. Two keys made by one process therefore always sort by
+// id in true creation order, however close together. Two keys made by
+// DIFFERENT processes inside the same millisecond sort by entropy rather than
+// by time — still a stable total order every plan agrees on, which is what
+// LIMIT 1 needs. See TestLatestActiveEventKeyBreaksSameSecondTies.
 func (s *Store) LatestActiveEventKey(ctx context.Context, eventID string) (*EventKey, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, event_id, public_key, sealed_private_key, sealed_nonce, created_at, revoked_at
 		FROM event_keys WHERE event_id = ? AND revoked_at IS NULL
-		ORDER BY created_at DESC LIMIT 1`, eventID)
+		ORDER BY created_at DESC, id DESC LIMIT 1`, eventID)
 	return s.scanEventKeyWithPrivate(row)
 }
 
