@@ -28,7 +28,16 @@ function Hero({ query, onSearch }) {
         // same ink and the type on it stays the mark's own white regardless
         // of which theme the rest of the page is in, which is exactly what a
         // fixed brand surface means. See index.css's note on `--brand-ink`.
-        <div className="relative overflow-hidden bg-brand-2 pb-16 pt-28 sm:pb-24 sm:pt-40">
+        //
+        // This is a deliberate, committed brand surface, not a default: full
+        // bleed, no cap on how tall it's allowed to be, and all of its
+        // bottom padding lives on the CONTENT wrapper below rather than on
+        // this outer element. That matters because the outer element ends
+        // the moment the tear line does — put padding out here as well and
+        // the ink keeps going a whole extra section-height past the visible
+        // "tear", which is exactly the dead ink strip this used to leave
+        // sitting above the category row.
+        <div className="relative overflow-hidden bg-brand-2 pt-24 sm:pt-32 lg:pt-40">
             {/* Atmosphere: brand glow + dot-grid texture + an oversized
                 watermark of the ticket mark itself, bled off the right edge
                 for asymmetry — identity, not decoration invented alongside
@@ -39,17 +48,17 @@ function Hero({ query, onSearch }) {
                 <div className="dot-grid absolute inset-0 opacity-40" />
                 <LogoTile
                     aria-hidden="true"
-                    className="absolute -right-24 -top-16 hidden h-[34rem] w-[34rem] rotate-[14deg] opacity-[0.07] mix-blend-screen lg:block"
+                    className="absolute -right-28 -top-20 hidden h-[38rem] w-[38rem] rotate-[14deg] opacity-[0.08] mix-blend-screen lg:block"
                 />
             </div>
 
-            <div className="container relative mx-auto px-4">
+            <div className="container relative mx-auto px-4 pb-24 sm:pb-32 lg:pb-40">
                 <div className="mx-auto max-w-3xl text-center">
                     <motion.div
                         initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
-                        className="mb-5 flex flex-wrap items-center justify-center gap-2"
+                        className="mb-6 flex flex-wrap items-center justify-center gap-2"
                     >
                         {SIGNALS.map(({ icon: Icon, label }) => (
                             <span
@@ -78,7 +87,7 @@ function Hero({ query, onSearch }) {
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.1 }}
-                        className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-brand-ink/75 sm:text-lg"
+                        className="mx-auto mt-7 max-w-xl text-base leading-relaxed text-brand-ink/75 sm:text-lg"
                     >
                         Sell tickets online. Then check them at the door on an ordinary phone — no wifi, no signal, no
                         server in the building. It remembers who came in and catches up when the internet comes back.
@@ -90,7 +99,7 @@ function Hero({ query, onSearch }) {
                         transition={{ duration: 0.5, delay: 0.15 }}
                         onSubmit={handleSubmit}
                         role="search"
-                        className="mx-auto mt-10 flex max-w-xl gap-2 rounded-2xl border border-brand-ink/10 bg-brand-ink/10 p-2 shadow-floating backdrop-blur"
+                        className="mx-auto mt-12 flex max-w-xl gap-2 rounded-2xl border border-brand-ink/10 bg-brand-ink/10 p-2 shadow-floating backdrop-blur"
                     >
                         <div className="relative flex-1">
                             <Search
@@ -117,11 +126,11 @@ function Hero({ query, onSearch }) {
                 </div>
             </div>
 
-            {/* Tear seam into the category strip below — .ticket-tear defaults
-                to var(--background), which is exactly what sits underneath. */}
-            <div className="relative mt-16 sm:mt-20">
-                <div className="ticket-tear" aria-hidden="true" />
-            </div>
+            {/* Tear seam into the category strip below, flush against this
+                band's own bottom edge — .ticket-tear defaults to
+                var(--background), which is exactly what sits underneath. No
+                padding follows it: this element ending IS the hero ending. */}
+            <div className="ticket-tear" aria-hidden="true" />
         </div>
     );
 }

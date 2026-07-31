@@ -18,7 +18,6 @@ import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 import { EMPTY_HEADING, emptyDescription, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
 
-const FEATURED_COUNT = 3;
 // The homepage is a preview, but the preview has to actually be wide enough
 // to show what's on — a handful of events isn't a preview, it's the whole
 // catalogue looking sparse. 12 comfortably covers a new/small deployment
@@ -91,9 +90,6 @@ const LandingPage = () => {
         navigate(`/events${params.toString() ? `?${params}` : ''}`);
     };
 
-    const featured = state.events.slice(0, FEATURED_COUNT);
-    const upcoming = state.events.slice(FEATURED_COUNT);
-
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <Header />
@@ -137,40 +133,22 @@ const LandingPage = () => {
                         />
                     )}
 
-                    {!state.error && !state.loading && featured.length > 0 && (
-                        <div className="mb-16">
-                            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-                                <div>
-                                    {/* Neither "Featured" nor "hand-picked" —
-                                        both claim an editorial process. This
-                                        section is `state.events.slice(0, 3)`,
-                                        the first three by start date. Nobody
-                                        picked them, so the heading says what
-                                        the slice actually is. */}
-                                    <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Next up</h2>
-                                    <p className="mt-1 text-muted-foreground">Happening soon.</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                                {featured.map((event, i) => (
-                                    <EventCard
-                                        key={event.id}
-                                        event={event}
-                                        org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
-                                        pricing={pricing[event.slug || event.id]}
-                                        index={i}
-                                        featured
-                                    />
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {!state.error && !state.loading && upcoming.length > 0 && (
+                    {/* One listing, not two stacked grids. It used to split
+                        into "Next up" (the soonest three) and "Upcoming
+                        events" (the rest) with matching card treatment for
+                        both — which read as one undifferentiated wall of
+                        cards, not two meaningful groups. The soonest event
+                        still gets a genuinely different, wider treatment
+                        below (`sm:col-span-2`, `featured`) so a visitor's eye
+                        lands somewhere before it hits the grid; it does not
+                        get its own heading, because "the soonest one" isn't
+                        a claim worth a second section, just a claim worth a
+                        bigger card. */}
+                    {!state.error && !state.loading && state.events.length > 0 && (
                         <div>
                             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                                 <div>
-                                    <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">Upcoming events</h2>
+                                    <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">What&apos;s on</h2>
                                     {/* Not "happening near you" — there is no
                                         geolocation and no discovery anywhere in
                                         this product. The honest line is who is
@@ -186,27 +164,18 @@ const LandingPage = () => {
                                 </Button>
                             </div>
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                                {upcoming.map((event, i) => (
-                                    <EventCard
-                                        key={event.id}
-                                        event={event}
-                                        org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
-                                        pricing={pricing[event.slug || event.id]}
-                                        index={i}
-                                    />
+                                {state.events.map((event, i) => (
+                                    <div key={event.id} className={i === 0 ? 'sm:col-span-2' : undefined}>
+                                        <EventCard
+                                            event={event}
+                                            org={showsOrgLabels(state.host) ? orgForEvent(state.host, event) : null}
+                                            pricing={pricing[event.slug || event.id]}
+                                            index={i}
+                                            featured={i === 0}
+                                        />
+                                    </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
-
-                    {!state.error && !state.loading && state.events.length > 0 && upcoming.length === 0 && (
-                        <div className="mt-4 flex justify-center">
-                            <Button variant="outline" className={TAP_BUTTON} asChild>
-                                <Link to="/events">
-                                    See what else is on
-                                    <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-                                </Link>
-                            </Button>
                         </div>
                     )}
                 </section>
