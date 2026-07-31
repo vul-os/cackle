@@ -1,10 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { QrCode, Download, RefreshCw, Wifi, WifiOff, CheckCircle2, AlertCircle, Radio } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { SkeletonList } from '@/components/ui/skeleton';
+import { QrCode, Download, RefreshCw, Wifi, WifiOff, CheckCircle2, Radio } from 'lucide-react';
 import { events as eventsApi, scan as scanApi } from '@/lib/api';
 import { saveBundle, getBundle, listCachedBundles } from '@/lib/scan-store';
 import { publicKeyToBytes } from '@/lib/capability';
@@ -44,6 +48,7 @@ function normaliseSessionEvent(bundleEvent, fallbackEvent) {
 
 const ScannerPage = () => {
     const online = useOnline();
+    const navigate = useNavigate();
     const [state, setState] = useState({ events: [], loading: true, error: null });
     const [cachedIds, setCachedIds] = useState(new Set());
     const [downloadingId, setDownloadingId] = useState(null);
@@ -60,24 +65,29 @@ const ScannerPage = () => {
         return bundles;
     };
 
-    useEffect(() => {
-        let cancelled = false;
-
+    // Factored out (rather than inlined in the mount effect) so the error
+    // state's "Try again" button runs exactly the same offline-first
+    // fallback as the initial load — a gate that fails once should get the
+    // same behaviour on retry, not a second code path that might disagree.
+    // `cancelledRef` lets a retry started before an earlier call resolves
+    // (or an unmount) avoid clobbering newer state.
+    const loadEvents = useCallback((cancelledRef) => {
+        setState((s) => ({ ...s, loading: true, error: null }));
         refreshCached();
-
         eventsApi
             .list()
             .then((data) => {
-                if (cancelled) return;
+                if (cancelledRef?.current) return;
                 const list = Array.isArray(data) ? data : (data?.events ?? []);
                 setState({ events: list, loading: false, error: null });
             })
             .catch(async (err) => {
-                if (cancelled) return;
+                if (cancelledRef?.current) return;
                 // Offline (or the network call otherwise failed) — fall back
                 // entirely to whatever bundles are already cached locally, so
                 // a gate device that's never coming back online can still work.
                 const bundles = await refreshCached();
+                if (cancelledRef?.current) return;
                 setState({
                     events: bundles
                         .map((b) => (b.event ? { ...b.event, id: b.event.event_id } : null))
@@ -86,10 +96,15 @@ const ScannerPage = () => {
                     error: bundles.length === 0 ? err.message || 'Could not load events.' : null,
                 });
             });
+    }, []);
 
+    useEffect(() => {
+        const cancelledRef = { current: false };
+        loadEvents(cancelledRef);
         return () => {
-            cancelled = true;
+            cancelledRef.current = true;
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleDownload = async (event) => {
@@ -182,8 +197,17 @@ const ScannerPage = () => {
                 <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                         <div
-                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${
-                                online ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning-foreground'
+                            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                                // Badge wash + on-wash ink, same idiom as
+                                // ConnectionState's `positive` class: the
+                                // *-foreground tokens are tuned for text ON a
+                                // solid fill, not on a low-alpha wash, so
+                                // pairing warning/15 with warning-foreground
+                                // (near-white or near-black by theme) would
+                                // wash out to near-invisible here. The base
+                                // success/warning tokens are themselves
+                                // legible ink at this alpha.
+                                online ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
                             }`}
                         >
                             {online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
@@ -195,32 +219,35 @@ const ScannerPage = () => {
                             <Radio className="mr-1 inline h-3.5 w-3.5" />
                             Gate name
                         </Label>
-                        <Input id="gate-id" value={gateId} onChange={(e) => setGateId(e.target.value)} className="h-8 w-32" />
+                        {/* h-11 (44px): a gate operator is naming their own
+                            door, on a phone, possibly wearing gloves. */}
+                        <Input
+                            id="gate-id"
+                            value={gateId}
+                            onChange={(e) => setGateId(e.target.value)}
+                            className="h-11 w-32 sm:h-11"
+                        />
                     </div>
                 </CardContent>
             </Card>
 
-            {state.loading && (
-                <div className="space-y-3">
-                    {[0, 1].map((i) => (
-                        <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
-                    ))}
-                </div>
-            )}
+            {state.loading && <SkeletonList rows={2} />}
 
             {!state.loading && state.error && !cachedAsFallback && (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="font-medium">{state.error}</p>
-                </div>
+                <ErrorState description={state.error} onRetry={() => loadEvents()} />
             )}
 
             {!state.loading && state.events.length === 0 && !state.error && (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-                    <QrCode className="h-8 w-8 text-muted-foreground" />
-                    <p className="font-medium">No events to scan yet</p>
-                    <p className="text-sm text-muted-foreground">Publish an event first, then come back here to prep the gate.</p>
-                </div>
+                <EmptyState
+                    icon={QrCode}
+                    title="No events to scan yet"
+                    description="Publish an event first, then come back here to prep the gate."
+                    action={
+                        <Button size="lg" onClick={() => navigate('/admin/events/new')}>
+                            Create an event
+                        </Button>
+                    }
+                />
             )}
 
             {!state.loading && state.events.length > 0 && (
@@ -242,10 +269,13 @@ const ScannerPage = () => {
                                         </div>
                                         {event.venue_name && <p className="text-sm text-muted-foreground">{event.venue_name}</p>}
                                     </div>
+                                    {/* h-11 (44px): these are the buttons a
+                                        gate operator taps at the door, fast
+                                        and often gloved — not a desk control. */}
                                     <div className="flex gap-2">
                                         <Button
                                             variant="outline"
-                                            size="sm"
+                                            className="h-11 px-4"
                                             onClick={() => handleDownload(event)}
                                             disabled={!online || downloadingId === event.id}
                                         >
@@ -256,7 +286,11 @@ const ScannerPage = () => {
                                             )}
                                             {isCached ? 'Refresh' : 'Download'}
                                         </Button>
-                                        <Button size="sm" onClick={() => handleEnterScanMode(event)} disabled={!isCached && !online}>
+                                        <Button
+                                            className="h-11 px-4"
+                                            onClick={() => handleEnterScanMode(event)}
+                                            disabled={!isCached && !online}
+                                        >
                                             <QrCode className="mr-2 h-4 w-4" />
                                             Scan
                                         </Button>
