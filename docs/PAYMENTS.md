@@ -225,21 +225,51 @@ This is opt-in and requires more than `go build`:
 
 > **This path is not built by CI, and cannot be built from a clean clone.**
 > `grep -rn patala .github/workflows/` returns nothing — no workflow passes
-> `-tags patala`, so no commit here has ever been proved to compile
-> `internal/payments/patala.go`. All three prerequisites live outside this
-> repo and none of them is fetchable: the sibling checkout is wired by a
+> `-tags patala`, so **no commit here has ever been proved by CI to compile
+> `internal/payments/patala.go`**, and a later commit can break it with
+> nothing automated noticing. All three prerequisites live outside this repo
+> and none of them is fetchable: the sibling checkout is wired by a
 > **gitignored `go.work`**, the Go bindings under
 > `../patala/patala-go/bindings/patala/` are generated build output patala
 > does not commit, and `make build-patala` links `-lpatala_py` against a
 > cdylib you build locally with `cargo`. Steps 1–4 above are the real recipe,
 > and it is a recipe a human runs by hand on a machine that already has
-> patala cloned — not a supported build. The parts that *are* covered by the
-> default suite are the ones that need no binding
-> (`internal/payments/patala_webhook_status_test.go`,
-> `PatalaConfigFromEnv`); everything inside `patala.go` is unverified by any
-> automated run. This is a status statement, not a plan — see
+> patala cloned — not a supported build. **Unbuildable from a clean clone
+> stays true.** This is a status statement, not a plan — see
 > [Known limitations](#known-limitations) and
 > [ROADMAP.md](../ROADMAP.md).
+
+> **It has been compiled once, by hand, and that is the whole claim.** On
+> 2026-07-31, on one developer machine, `go build -tags patala`,
+> `go vet -tags patala` and `go test -tags patala` over
+> `./cmd/... ./internal/...` each exited 0 — 17 packages ok, including all
+> **34 tests that exist only under the tag** (16 in `patala_test.go`, 18 in
+> `compensating_test.go`), which make real FFI calls into the Rust cdylib
+> rather than exercising Go-side mapping alone. The untagged build and suite
+> stayed green in the same tree, so the tag is genuinely additive. That was
+> against patala commit `4396c6be36e33267ca9a91ba4b0ac28c2b07d570` with
+> bindings generated that day, on darwin/arm64; a different patala commit,
+> feature set or platform is a different experiment.
+>
+> What that does **not** buy, stated so it is not read as more: it is **not
+> CI coverage**, it is **not sandbox verification**, and **no network call
+> was made** by that run or any other. It is a compile-and-unit-test result.
+> **Every adapter reachable through this path remains unit-tested, not
+> sandbox-verified.** Do not take real money through one on the strength of
+> it. `internal/payments/patala.go`'s own file comment records the same run
+> at full detail.
+
+**What the default (untagged) suite actually covers here** is
+`internal/payments/patala_webhook_status_test.go`'s **five** mapping tests,
+and nothing else — that file carries no `//go:build patala` tag because the
+status mapping it pins needs no binding. It does **not** cover
+`PatalaConfigFromEnv`: an earlier version of this document listed it here,
+but `PatalaConfigFromEnv` is declared in `patala.go`, which is a
+`//go:build patala` file, and both of its tests
+(`TestPatalaConfigFromEnv` and `TestPatalaConfigFromEnv_KeyOverrides`) live
+in the tagged `patala_test.go`. Everything inside `patala.go` — that
+function included — is covered by no automated run at all, only by the
+one-off above.
 
 **The DEFAULT `make build`/`make test` (no `-tags patala`) are completely
 unaffected** — they never import patala-go, never need cgo, and produce
@@ -469,6 +499,15 @@ go test ./internal/payments/...
 ```bash
 make test-patala
 ```
+
+The command above is the *only* way anything in `patala.go` gets run,
+`PatalaConfigFromEnv` included. The one patala-related file the plain
+`go test ./internal/payments/...` above does execute is
+`patala_webhook_status_test.go` — five tests pinning the webhook-status
+mapping, deliberately untagged because that mapping needs no binding.
+`make test-patala` has been run successfully exactly once, by hand; it is
+not run by CI and cannot run from a clean clone. See
+[Building it in](#building-it-in).
 
 Every processor patala-fiat ports from Cackle's original adapters keeps
 its own `httptest`/`wiremock`-based coverage — now in the patala repo
