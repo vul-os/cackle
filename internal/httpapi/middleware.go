@@ -11,10 +11,18 @@ import (
 )
 
 // securityHeaders sets a fixed, conservative header set on every response.
-// CSP allows only same-origin script/style/connect (Tailwind/shadcn need
-// 'unsafe-inline' for style-src; there is no inline script anywhere in the
-// build so script-src stays strict). camera is allowed same-origin only,
-// for the scanner view's QR camera access.
+// CSP allows only same-origin script/style/connect, and names no remote
+// origin anywhere: a Cackle page contacts nobody else.
+//
+// style-src carries 'unsafe-inline' — not, as this comment used to say,
+// because "Tailwind/shadcn need it". Tailwind compiles to a linked
+// stylesheet. The two things that actually need it, both measured in a
+// browser against the built app, are web/index.html's inline <style> (the
+// anti-FOUC background, which must apply before the stylesheet loads) and
+// inline style="" attributes — 25 in web/src plus qr-scanner's scan-region
+// overlay. script-src needs no such thing: the build emits no inline script.
+//
+// camera is allowed same-origin only, for the scanner view's QR camera.
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
