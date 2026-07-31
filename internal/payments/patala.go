@@ -46,25 +46,68 @@
 //     Makefile's `build-patala`/`test-patala` targets in this repo for the
 //     whole recipe as one command.
 //
-// # This path has never been built by CI, and cannot be built from a clean clone
+// # This path is not built by CI, and cannot be built from a clean clone
 //
 // Stated plainly because every line above reads like a supported build and
 // it is not one. `grep -rn patala .github/workflows/` returns nothing:
-// no workflow passes `-tags patala`, so no commit in this repo's history
-// has ever been proved to compile this file. Its three prerequisites are
-// all outside the repo and none is fetchable — the sibling checkout is
-// wired by a gitignored `go.work`, the Go bindings under
-// `../patala/patala-go/bindings/patala/` are generated build output that
-// patala itself does not commit, and `build-patala` links `-lpatala_py`
-// against a cdylib built locally by `cargo`. A fresh `git clone` of this
-// repo therefore cannot build `-tags patala` by any sequence of commands
-// that does not also involve cloning and building patala by hand.
+// no workflow passes `-tags patala`, so NO COMMIT IN THIS REPO'S HISTORY
+// HAS EVER BEEN PROVED TO COMPILE THIS FILE BY AN AUTOMATED RUN. Its three
+// prerequisites are all outside the repo and none is fetchable — the
+// sibling checkout is wired by a gitignored `go.work`, the Go bindings
+// under `../patala/patala-go/bindings/patala/` are generated build output
+// that patala itself does not commit, and `build-patala` links
+// `-lpatala_py` against a cdylib built locally by `cargo`. A fresh `git
+// clone` of this repo therefore cannot build `-tags patala` by any
+// sequence of commands that does not also involve cloning and building
+// patala by hand. Both of those remain true; nothing below changes them.
 //
-// What IS covered by the default, untagged suite: the mapping tests that
-// do not need the binding — see `patala_webhook_status_test.go` and
-// `PatalaConfigFromEnv`. Everything in THIS file is unverified by any
-// automated run. Treat it as an unbuilt integration, and do not take real
-// money through it on the strength of this comment.
+// # What HAS been proved, once, by hand
+//
+// On 2026-07-31 this file was compiled and its tagged tests were run on one
+// developer machine, which is the first time that has been demonstrated at
+// all. The exact, bounded result:
+//
+//   - `go build -tags patala ./cmd/... ./internal/...` exited 0.
+//   - `go vet -tags patala ./cmd/... ./internal/...` exited 0.
+//   - `go test -tags patala ./cmd/... ./internal/...` exited 0 — all 17
+//     packages ok, including all 34 tests that ONLY exist under the tag
+//     (16 in `patala_test.go`, 18 in `compensating_test.go`; every one
+//     passed). Those make real FFI calls into the Rust cdylib — rail
+//     construction via PatalaRailNewFiat, webhook signature verification —
+//     rather than exercising Go-side mapping alone. The other two tagged
+//     files, `compensating.go` and `cmd/cackle/patala_register.go`, were
+//     compiled by the same run for the first time too.
+//   - The untagged build and test suite stayed green in the same tree, so
+//     the tag genuinely is additive.
+//
+// Against exactly this, and claiming nothing outside it: patala commit
+// 4396c6be36e33267ca9a91ba4b0ac28c2b07d570, bindings regenerated that day
+// via `make -C ../patala/patala-go FEATURES=fiat-all generate` with
+// uniffi-bindgen 0.5.0+v0.29.5, cargo/rustc 1.94.0, Go 1.25.6,
+// darwin/arm64. A different patala commit, a different feature set, or a
+// different platform is a different experiment — patala's UniFFI surface
+// is generated build output that can and does move underneath this file,
+// which is what `scripts/check-patala-bindings.sh` exists to catch.
+//
+// What this does NOT establish, and must not be read as establishing:
+// it is one manual run on one machine, not CI coverage — a later commit
+// can break this file again and nothing automated will notice. It is a
+// COMPILE-AND-UNIT-TEST result only. No payment rail reached here has been
+// exercised against a real processor, a sandbox, or any network, by that
+// run or any other. Every adapter behind this file remains unit-tested and
+// NOT sandbox-verified. Do not take real money through it on the strength
+// of this comment.
+//
+// What IS covered by the default, untagged suite: only
+// `patala_webhook_status_test.go`'s five mapping tests, which need no
+// binding. NOT `PatalaConfigFromEnv` — an earlier version of this comment
+// (and docs/PAYMENTS.md) listed it here, but it is declared in THIS file,
+// so it is tagged, and both `TestPatalaConfigFromEnv` and
+// `TestPatalaConfigFromEnv_KeyOverrides` live in the tagged
+// `patala_test.go`. `go test -list` under and without the tag differ by
+// exactly the 34 tests named above, and those two are among them.
+// Everything else in this file is covered by no automated run at all, only
+// by the one-off above.
 //
 // If a self-hoster does not want cgo at all but still wants real
 // processors, patala-sidecar (a loopback-only HTTP server over the same
