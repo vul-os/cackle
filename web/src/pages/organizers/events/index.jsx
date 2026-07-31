@@ -11,11 +11,12 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Calendar, Ticket, Edit, MoreVertical, Image as ImageIcon, Copy, Trash2 } from 'lucide-react';
+import { Plus, Search, Calendar, Ticket, Edit, Eye, MoreVertical, Image as ImageIcon, Copy, Trash2, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { SkeletonCardGrid } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { Money } from '@/components/ui/money';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { toast } from '@/components/ui/use-toast';
@@ -32,7 +33,17 @@ const statusVariant = {
 const EventsPage = () => {
     const navigate = useNavigate();
     const { activeOrg } = useAuth();
+    // Owner/admin can create, edit, duplicate and delete events; a scanner
+    // can list and read every one of them (server RBAC is scanner+ for the
+    // listing itself) but is 403'd on every write. Ticket-type management
+    // in particular requires admin+ even to READ, so a scanner following a
+    // "Tickets" link into that page would hit a wall on load, not just on
+    // save — every admin-only action below is gated out for them instead
+    // of being shown and left to fail.
+    const canManage = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
+
     const [state, setState] = useState({ events: [], loading: true, error: null });
+    const [statsById, setStatsById] = useState({});
     const [searchQuery, setSearchQuery] = useState('');
     const [duplicatingId, setDuplicatingId] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null); // the event being confirmed for delete
@@ -46,9 +57,20 @@ const EventsPage = () => {
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
             .listForOrg(activeOrg.id)
-            .then((data) => {
+            .then(async (data) => {
                 const list = Array.isArray(data) ? data : (data?.events ?? []);
                 setState({ events: list, loading: false, error: null });
+
+                // Best-effort per-event stats so the list can show sold/
+                // admitted counts. One event's stats failing to load just
+                // leaves that card without a count rather than blanking the
+                // whole list.
+                const results = await Promise.allSettled(list.map((ev) => eventsApi.stats(ev.id)));
+                const next = {};
+                results.forEach((r, i) => {
+                    if (r.status === 'fulfilled') next[list[i].id] = r.value?.stats ?? r.value;
+                });
+                setStatsById(next);
             })
             .catch((err) => setState({ events: [], loading: false, error: err.message || 'Could not load events.' }));
     }, [activeOrg?.id]);
@@ -145,10 +167,12 @@ const EventsPage = () => {
                         {activeOrg && <p className="text-sm text-muted-foreground">{activeOrg.name}</p>}
                     </div>
                 </div>
-                <Button onClick={() => navigate('/admin/events/new')}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Event
-                </Button>
+                {canManage && (
+                    <Button className="min-h-11" onClick={() => navigate('/admin/events/new')}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Event
+                    </Button>
+                )}
             </div>
 
             <div className="relative mb-6">
@@ -157,7 +181,7 @@ const EventsPage = () => {
                     placeholder="Search events..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="min-h-11 pl-10"
                     aria-label="Search your events"
                 />
             </div>
@@ -170,10 +194,17 @@ const EventsPage = () => {
                 <EmptyState
                     icon={Calendar}
                     title={searchQuery ? 'No events match your search.' : 'No events yet'}
-                    description={searchQuery ? 'Try a different search term.' : 'Create your first event to start selling tickets.'}
+                    description={
+                        searchQuery
+                            ? 'Try a different search term.'
+                            : canManage
+                              ? 'Create your first event to start selling tickets.'
+                              : 'Ask an owner or admin to create one to get started.'
+                    }
                     action={
-                        !searchQuery && (
-                            <Button size="sm" onClick={() => navigate('/admin/events/new')}>
+                        !searchQuery &&
+                        canManage && (
+                            <Button size="sm" className="min-h-11" onClick={() => navigate('/admin/events/new')}>
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create Event
                             </Button>
@@ -184,95 +215,146 @@ const EventsPage = () => {
 
             {!state.loading && !state.error && filtered.length > 0 && (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {filtered.map((event) => (
-                        <Card
-                            key={event.id}
-                            className="flex cursor-pointer flex-col transition-shadow hover:shadow-lg"
-                            onClick={() => navigate(`/admin/events/${event.id}`)}
-                        >
-                            <CardHeader>
-                                <div className="flex items-start justify-between gap-2">
-                                    <CardTitle className="truncate">{event.title}</CardTitle>
-                                    <div className="flex shrink-0 items-center gap-1">
-                                        <Badge variant={statusVariant[event.status] ?? 'secondary'}>{event.status ?? 'draft'}</Badge>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="h-7 w-7"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    aria-label={`More actions for ${event.title}`}
-                                                >
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                                <DropdownMenuItem onClick={() => navigate(`/admin/events/${event.id}`)}>
-                                                    <Edit className="mr-2 h-4 w-4" />
-                                                    Edit
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => navigate(`/admin/events/${event.id}/images`)}>
-                                                    <ImageIcon className="mr-2 h-4 w-4" />
-                                                    Images
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem disabled={duplicatingId === event.id} onClick={() => handleDuplicate(event)}>
-                                                    <Copy className="mr-2 h-4 w-4" />
-                                                    {duplicatingId === event.id ? 'Duplicating…' : 'Duplicate'}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => setDeleteTarget(event)}
-                                                    className="text-destructive focus:text-destructive"
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                    {filtered.map((event) => {
+                        const s = statsById[event.id];
+                        return (
+                            <Card
+                                key={event.id}
+                                className="flex cursor-pointer flex-col transition-shadow hover:shadow-lg"
+                                onClick={() => navigate(`/admin/events/${event.id}`)}
+                            >
+                                <CardHeader>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <CardTitle className="truncate">{event.title}</CardTitle>
+                                        <div className="flex shrink-0 items-center gap-1">
+                                            <Badge variant={statusVariant[event.status] ?? 'secondary'}>{event.status ?? 'draft'}</Badge>
+                                            {canManage && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        {/* Was h-7 w-7 (28×28) — under the 44×44 floor at 390px, and this
+                                                            is the ONLY route to Duplicate/Delete on a card. The negative
+                                                            margin keeps the glyph's optical position roughly where it
+                                                            was rather than pushing the card title further left. */}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="-my-2.5 -mr-2 h-11 w-11"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            aria-label={`More actions for ${event.title}`}
+                                                        >
+                                                            <MoreVertical className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                                        <DropdownMenuItem onClick={() => navigate(`/admin/events/${event.id}`)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => navigate(`/admin/events/${event.id}/images`)}>
+                                                            <ImageIcon className="mr-2 h-4 w-4" />
+                                                            Images
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem disabled={duplicatingId === event.id} onClick={() => handleDuplicate(event)}>
+                                                            <Copy className="mr-2 h-4 w-4" />
+                                                            {duplicatingId === event.id ? 'Duplicating…' : 'Duplicate'}
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onClick={() => setDeleteTarget(event)}
+                                                            className="text-destructive focus:text-destructive"
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                {event.starts_at && (
-                                    <CardDescription className="flex items-center gap-1.5">
-                                        <Calendar className="h-3.5 w-3.5" />
-                                        {format(new Date(event.starts_at), 'PPP')}
-                                    </CardDescription>
+                                    {event.starts_at && (
+                                        <CardDescription className="flex items-center gap-1.5">
+                                            <Calendar className="h-3.5 w-3.5" />
+                                            {format(new Date(event.starts_at), 'PPP')}
+                                        </CardDescription>
+                                    )}
+                                </CardHeader>
+                                <CardContent className="flex-1">
+                                    {event.venue_name && <p className="text-sm text-muted-foreground">{event.venue_name}</p>}
+                                    {event.category && (
+                                        <Badge variant="outline" className="mt-2">
+                                            {categoryLabel(event.category)}
+                                        </Badge>
+                                    )}
+                                    {event.summary && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{event.summary}</p>}
+                                    {/* Status is on the badge above; sold/admitted is the
+                                        other thing an organiser scans this list for. */}
+                                    <p className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
+                                        {s ? (
+                                            <>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Ticket className="h-3.5 w-3.5" />
+                                                    {s.sold ?? 0} sold
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                                    {s.admitted ?? 0} admitted
+                                                </span>
+                                            </>
+                                        ) : (
+                                            '—'
+                                        )}
+                                    </p>
+                                    {s && s.revenue_minor > 0 && (
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            <Money minor={s.revenue_minor} currency={event.currency} /> revenue
+                                        </p>
+                                    )}
+                                </CardContent>
+                                {canManage ? (
+                                    <div className="mt-auto flex justify-end gap-2 border-t border-border p-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="min-h-11"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/admin/events/${event.id}/tickets`);
+                                            }}
+                                        >
+                                            <Ticket className="mr-2 h-4 w-4" />
+                                            Tickets
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="min-h-11"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/admin/events/${event.id}`);
+                                            }}
+                                        >
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <div className="mt-auto flex justify-end border-t border-border p-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="min-h-11"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/admin/events/${event.id}`);
+                                            }}
+                                        >
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            View
+                                        </Button>
+                                    </div>
                                 )}
-                            </CardHeader>
-                            <CardContent className="flex-1">
-                                {event.venue_name && <p className="text-sm text-muted-foreground">{event.venue_name}</p>}
-                                {event.category && (
-                                    <Badge variant="outline" className="mt-2">
-                                        {categoryLabel(event.category)}
-                                    </Badge>
-                                )}
-                                {event.summary && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{event.summary}</p>}
-                            </CardContent>
-                            <div className="mt-auto flex justify-end gap-2 border-t border-border p-4">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/admin/events/${event.id}/tickets`);
-                                    }}
-                                >
-                                    <Ticket className="mr-2 h-4 w-4" />
-                                    Tickets
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        navigate(`/admin/events/${event.id}`);
-                                    }}
-                                >
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                </Button>
-                            </div>
-                        </Card>
-                    ))}
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { Skeleton, SkeletonCardGrid } from '@/components/ui/skeleton';
+import { Money } from '@/components/ui/money';
 import { Calendar, Plus, QrCode, Ticket, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi } from '@/lib/api';
-import { formatMoney } from '@/lib/money';
 
 const statusVariant = {
     draft: 'secondary',
@@ -17,23 +18,52 @@ const statusVariant = {
     cancelled: 'destructive',
 };
 
-const StatTile = ({ icon: Icon, label, value }) => (
+const StatTile = ({ icon: Icon, label, value, loading }) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-5">
             <div className="rounded-xl bg-primary/10 p-3 text-primary-emphasis">
                 <Icon className="h-5 w-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                {/* break-words (not truncate): revenue can be a per-currency
-                    breakdown ("R 3,894.00 · ¥13,500 · KWD 98.250 · ...") when
-                    an org's events span multiple currencies — wrapping beats
-                    silently cutting a real figure off with an ellipsis. */}
-                <p className="break-words text-2xl font-bold leading-tight tabular-nums">{value}</p>
+                {loading ? (
+                    <Skeleton className="mt-1.5 h-7 w-20" />
+                ) : (
+                    // break-words (not truncate): revenue can be a per-currency
+                    // breakdown ("R 3,894.00 · ¥13,500 · KWD 98.250 · ...") when
+                    // an org's events span multiple currencies — wrapping beats
+                    // silently cutting a real figure off with an ellipsis.
+                    <p className="break-words text-2xl font-bold leading-tight tabular-nums">{value}</p>
+                )}
             </div>
         </CardContent>
     </Card>
 );
+
+// Renders a per-currency revenue rollup as real <Money> primitives rather
+// than a hand-formatted string, so every figure gets the shared tabular
+// treatment. Cackle has no privileged currency, so an org's events can span
+// several — there is no single meaningful "total" to blend them into.
+const RevenueValue = ({ revenueByCurrency }) => {
+    const entries = Object.entries(revenueByCurrency);
+    if (entries.length === 0) return <>—</>;
+    // Only surface currencies that actually earned something. An org whose
+    // events span currencies it has made no sales in would otherwise pad the
+    // figure with "€0.00 · $0.00" noise. If every currency is genuinely at
+    // zero, show a single zero in one real currency rather than a dash.
+    const earning = entries.filter(([, minor]) => minor > 0);
+    const shown = earning.length > 0 ? earning : [entries[0]];
+    return (
+        <>
+            {shown.map(([currency, minor], i) => (
+                <React.Fragment key={currency || i}>
+                    {i > 0 && ' · '}
+                    <Money minor={minor} currency={currency} />
+                </React.Fragment>
+            ))}
+        </>
+    );
+};
 
 const HomePage = () => {
     const navigate = useNavigate();
@@ -41,7 +71,14 @@ const HomePage = () => {
     const [state, setState] = useState({ events: [], loading: true, error: null });
     const [statsById, setStatsById] = useState({});
 
-    useEffect(() => {
+    // Owner/admin can create, edit, duplicate and delete events; a scanner
+    // can see everything on this page (it's the same read bar as stats/
+    // attendees) but the server 403s them on every write. Gating the
+    // affordance here means a scanner never sees a button that only exists
+    // to fail for them.
+    const canManage = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
+
+    const loadDashboard = useCallback(() => {
         if (!activeOrg?.id) return;
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
@@ -76,6 +113,8 @@ const HomePage = () => {
         };
     }, [activeOrg?.id]);
 
+    useEffect(() => loadDashboard(), [loadDashboard]);
+
     const eventsById = useMemo(() => Object.fromEntries(state.events.map((e) => [e.id, e])), [state.events]);
 
     const totals = useMemo(() => {
@@ -93,23 +132,6 @@ const HomePage = () => {
             };
         }, base);
     }, [statsById, eventsById]);
-
-    // An organiser's events can span multiple currencies (Cackle has no
-    // privileged currency) — there is no single meaningful "total revenue"
-    // number to blend them into, so render one figure per currency
-    // instead of silently adding a JPY total to a ZAR total.
-    const revenueDisplay = useMemo(() => {
-        const entries = Object.entries(totals.revenueByCurrency);
-        if (entries.length === 0) return '—';
-        // Only surface currencies that actually earned something. An org whose
-        // events span currencies it has made no sales in would otherwise pad the
-        // figure with "€0.00 · $0.00" noise that overflows the tile and reads as
-        // broken. If every currency is genuinely at zero, show a single zero in
-        // one real currency rather than a misleading dash.
-        const earning = entries.filter(([, minor]) => minor > 0);
-        if (earning.length === 0) return formatMoney(0, entries[0][0]);
-        return earning.map(([currency, minor]) => formatMoney(minor, currency)).join(' · ');
-    }, [totals]);
 
     const nextEvent = useMemo(() => {
         const now = Date.now();
@@ -148,17 +170,22 @@ const HomePage = () => {
             </div>
 
             {state.error && (
-                <ErrorState className="mb-8" description={state.error} onRetry={() => window.location.reload()} />
+                <ErrorState className="mb-8" description={state.error} onRetry={loadDashboard} />
             )}
 
             {!state.error && (
                 <>
                     {/* Stats at a glance */}
                     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                        <StatTile icon={Calendar} label="Published events" value={state.loading ? '—' : published} />
-                        <StatTile icon={Ticket} label="Tickets sold" value={state.loading ? '—' : totals.sold} />
-                        <StatTile icon={Coins} label="Revenue" value={state.loading ? '—' : revenueDisplay} />
-                        <StatTile icon={ShieldCheck} label="Admitted" value={state.loading ? '—' : totals.admitted} />
+                        <StatTile icon={Calendar} label="Published events" value={published} loading={state.loading} />
+                        <StatTile icon={Ticket} label="Tickets sold" value={totals.sold} loading={state.loading} />
+                        <StatTile
+                            icon={Coins}
+                            label="Revenue"
+                            value={<RevenueValue revenueByCurrency={totals.revenueByCurrency} />}
+                            loading={state.loading}
+                        />
+                        <StatTile icon={ShieldCheck} label="Admitted" value={totals.admitted} loading={state.loading} />
                     </div>
 
                     <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -170,7 +197,13 @@ const HomePage = () => {
                             </CardHeader>
                             <CardContent>
                                 {state.loading ? (
-                                    <div className="h-24 animate-pulse rounded-xl bg-muted" />
+                                    <div role="status" aria-label="Loading" className="flex items-center justify-between gap-4">
+                                        <div className="min-w-0 flex-1 space-y-2">
+                                            <Skeleton className="h-5 w-1/2" />
+                                            <Skeleton className="h-4 w-2/3" />
+                                        </div>
+                                        <Skeleton className="h-11 w-24 shrink-0" />
+                                    </div>
                                 ) : nextEvent ? (
                                     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                                         <div className="min-w-0">
@@ -194,16 +227,21 @@ const HomePage = () => {
                                             {statsById[nextEvent.id] && (
                                                 <p className="mt-2 text-sm text-muted-foreground">
                                                     {statsById[nextEvent.id].sold ?? 0} sold ·{' '}
-                                                    {formatMoney(statsById[nextEvent.id].revenue_minor, nextEvent.currency)} revenue
+                                                    <Money minor={statsById[nextEvent.id].revenue_minor} currency={nextEvent.currency} /> revenue
                                                 </p>
                                             )}
                                         </div>
                                         <div className="flex shrink-0 gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/events/${nextEvent.id}/stats`)}>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="min-h-11"
+                                                onClick={() => navigate(`/admin/events/${nextEvent.id}/stats`)}
+                                            >
                                                 Stats
                                             </Button>
-                                            <Button size="sm" onClick={() => navigate(`/admin/events/${nextEvent.id}`)}>
-                                                Manage
+                                            <Button size="sm" className="min-h-11" onClick={() => navigate(`/admin/events/${nextEvent.id}`)}>
+                                                {canManage ? 'Manage' : 'View'}
                                                 <ArrowRight className="ml-2 h-4 w-4" />
                                             </Button>
                                         </div>
@@ -212,12 +250,18 @@ const HomePage = () => {
                                     <EmptyState
                                         icon={Calendar}
                                         title="Nothing on the calendar"
-                                        description="Publish an event to see it here."
+                                        description={
+                                            canManage
+                                                ? 'Publish an event to see it here.'
+                                                : 'Nothing published yet. Ask an owner or admin to publish one.'
+                                        }
                                         action={
-                                            <Button size="sm" onClick={() => navigate('/admin/events')}>
-                                                <Plus className="mr-2 h-4 w-4" />
-                                                Go to Events
-                                            </Button>
+                                            canManage && (
+                                                <Button size="sm" className="min-h-11" onClick={() => navigate('/admin/events/new')}>
+                                                    <Plus className="mr-2 h-4 w-4" />
+                                                    Create event
+                                                </Button>
+                                            )
                                         }
                                     />
                                 )}
@@ -239,11 +283,13 @@ const HomePage = () => {
                                 </p>
                             </CardContent>
                             <CardFooter className="gap-2">
-                                <Button variant="outline" className="w-full" onClick={() => navigate('/admin/events')}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    New event
-                                </Button>
-                                <Button className="w-full" onClick={() => navigate('/admin/scanner')}>
+                                {canManage && (
+                                    <Button variant="outline" className="min-h-11 w-full" onClick={() => navigate('/admin/events/new')}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        New event
+                                    </Button>
+                                )}
+                                <Button className="min-h-11 w-full" onClick={() => navigate('/admin/scanner')}>
                                     <QrCode className="mr-2 h-4 w-4" />
                                     Scanner
                                 </Button>
@@ -262,21 +308,23 @@ const HomePage = () => {
                             )}
                         </div>
                         {state.loading ? (
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                {[0, 1, 2].map((i) => (
-                                    <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
-                                ))}
-                            </div>
+                            <SkeletonCardGrid count={3} />
                         ) : state.events.length === 0 ? (
                             <EmptyState
                                 icon={Calendar}
                                 title="No events yet"
-                                description="Create your first event to start selling tickets."
+                                description={
+                                    canManage
+                                        ? 'Create your first event to start selling tickets.'
+                                        : 'Ask an owner or admin to create one to get started.'
+                                }
                                 action={
-                                    <Button size="sm" onClick={() => navigate('/admin/events')}>
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Create Event
-                                    </Button>
+                                    canManage && (
+                                        <Button size="sm" className="min-h-11" onClick={() => navigate('/admin/events/new')}>
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Create Event
+                                        </Button>
+                                    )
                                 }
                             />
                         ) : (
@@ -294,7 +342,13 @@ const HomePage = () => {
                                                 </div>
                                                 {event.venue_name && <p className="mt-1 text-sm text-muted-foreground">{event.venue_name}</p>}
                                                 <p className="mt-2 text-sm text-muted-foreground">
-                                                    {s ? `${s.sold ?? 0} sold · ${formatMoney(s.revenue_minor, event.currency)}` : '—'}
+                                                    {s ? (
+                                                        <>
+                                                            {s.sold ?? 0} sold · <Money minor={s.revenue_minor} currency={event.currency} />
+                                                        </>
+                                                    ) : (
+                                                        '—'
+                                                    )}
                                                 </p>
                                             </CardContent>
                                         </Card>
