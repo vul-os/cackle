@@ -509,11 +509,24 @@ async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues 
     await page.waitForTimeout(surface.settleMs || 800);
     await scrollThrough(page).catch(() => {});
 
+    // Assert the page actually LAID OUT at the width we asked for. With
+    // `isMobile: true`, Chromium honours the page's own <meta name=viewport>;
+    // a document without `width=device-width` falls back to a 980px layout
+    // viewport and the "390px mobile" capture is really a shrunk 980px desktop
+    // one — measured, not assumed: a page with no meta viewport reports
+    // innerWidth 980 under exactly this context config. Nothing errors, the
+    // file is written, and it looks like a phone until you read the text.
+    const laidOutAt = await page.evaluate(() => document.documentElement.clientWidth).catch(() => null);
+    const widthOk = laidOutAt !== null && laidOutAt <= viewport.width && laidOutAt >= viewport.width - 24;
+    if (!widthOk) {
+      console.warn(`     WARNING: laid out at ${laidOutAt}px, expected ~${viewport.width}px (missing <meta name=viewport>?)`);
+    }
+
     const outPath = path.join(OUT, shotName(surface.name, theme, viewport));
     await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
     const bytes = statSync(outPath).size;
     console.log(`     saved ${path.relative(ROOT, outPath)} (${(bytes / 1024).toFixed(0)} KB)`);
-    return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, issues: pageIssues.slice(issuesBefore) };
+    return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, laidOutAt, widthOk, issues: pageIssues.slice(issuesBefore) };
   } catch (err) {
     console.warn(`     FAILED: ${err.message}`);
     return { name: surface.name, theme, viewport: viewport.name, status: 'failed', error: err.message, url, issues: pageIssues.slice(issuesBefore) };
@@ -642,6 +655,14 @@ async function main() {
     for (const s of stale) console.warn(`    ${s}`);
   } else {
     console.log(`  all ${expected} captures were written by this run and are non-trivial in size`);
+  }
+
+  const wrongWidth = ok.filter((r) => r.widthOk === false);
+  if (wrongWidth.length) {
+    console.warn(`\n  WARNING: ${wrongWidth.length} capture(s) did not lay out at the requested width:`);
+    for (const r of wrongWidth) console.warn(`    ${r.name}-${r.theme} [${r.viewport}] — ${r.laidOutAt}px`);
+  } else if (ok.length) {
+    console.log('  every capture laid out at its requested viewport width');
   }
 
   // Identical-capture guard. "N captured, 0 failed" once meant 13 byte-identical
