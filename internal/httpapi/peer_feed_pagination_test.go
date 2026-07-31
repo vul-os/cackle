@@ -27,6 +27,10 @@ import (
 // that following it stays BOUNDED: against a peer that lies about where the next
 // page starts, against one that never says it is finished, and against an
 // organiser who edits their programme while the walk is in progress.
+//
+// Each guard below carries a MUTATION note naming the single edit that must turn
+// it red. Every one of them was made and reverted; a guard whose mutation leaves
+// the suite green is not a guard, it is a comment.
 
 // seedPublishedEvents writes n published events straight into the events table
 // and returns their ids in ascending id order.
@@ -92,6 +96,12 @@ func countCachedFor(t *testing.T, h *testHarness, peerID string) (rows, distinct
 // them — the same shape as TestTwoNodesShareEventFeedsAndAttributeThem, because a
 // paging bug that only appears over a real signed request on a real socket is
 // precisely the bug an in-process handler call would miss.
+//
+// MUTATION: set maxFeedPages = 1 (the old single-answer feed) and this fails at
+// fetched=200. MUTATION: stop emitting resp.NextCursor in handlePeerFeed and the
+// walk cannot continue past page one. MUTATION: change the page query's
+// `ORDER BY id` to `ORDER BY starts_at, id` while the cursor still keys on id,
+// and the pages skip and repeat.
 func TestTwoNodesMirrorAFeedLargerThanOnePage(t *testing.T) {
 	ha := newTestHarness(t)
 	fxa := ha.newPublishedEvent(t, "page-a")
@@ -171,6 +181,10 @@ func TestTwoNodesMirrorAFeedLargerThanOnePage(t *testing.T) {
 // TestFeedPageBoundIsStatedNotSilent is the other half of the honesty rule: a
 // programme too big even for the bounded walk is still truncated — and SAYS so,
 // with the number, where an operator will read it.
+//
+// MUTATION: set out.Complete = true unconditionally before the cache is replaced
+// and this fails on the first assertion. MUTATION: drop the page bound from the
+// walk's loop condition and it fails on the page count.
 func TestFeedPageBoundIsStatedNotSilent(t *testing.T) {
 	ha := newTestHarness(t)
 	fxa := ha.newPublishedEvent(t, "bound-a")
@@ -289,6 +303,9 @@ func TestFeedCursorIsATotalOrderOverAnImmutableKey(t *testing.T) {
 // TestFeedCursorRoundTripsAndRefusesJunk pins the wire format. A cursor arrives
 // from another machine and is used to build a SQL predicate, so it is parsed
 // against an allow-list rather than trusted.
+//
+// MUTATION: return the two halves from parseFeedCursor without the per-rune
+// allow-list and eight of the eleven malformed cursors are accepted.
 func TestFeedCursorRoundTripsAndRefusesJunk(t *testing.T) {
 	c := feedCursor{OrgID: "01J000000000000000000000AA", EventID: "01J000000000000000000000BB"}
 	parsed, err := parseFeedCursor(c.String())
@@ -404,6 +421,11 @@ func fetchFeedPage(t *testing.T, to *syncNode, fromHarness *testHarness, cursor 
 // Neither an event appearing nor an event disappearing may cause any OTHER event
 // to be skipped or delivered twice. That is the whole promise of a keyset cursor
 // over an immutable key, and it is the promise an offset cannot make.
+//
+// MUTATION: order the page query by `starts_at, id` while the cursor still keys
+// on id — the ordering an offset-era feed would keep — and this fails with an
+// event arriving twice, because the fixture's start times descend as its ids
+// ascend and the two orders stop agreeing at the page boundary.
 func TestFeedPagesSurviveThePublisherEditingMidWalk(t *testing.T) {
 	ha := newTestHarness(t)
 	fxa := ha.newPublishedEvent(t, "midwalk-a")
@@ -575,6 +597,13 @@ func subscribeTo(t *testing.T, h *testHarness, orgID string, st *feedStub) strin
 // The FIRST case is a positive control: a well-behaved stub IS walked across two
 // pages and stored. Without it, a refusal in any later case could just as well be
 // peer-auth or the enrolment check refusing before the paging guard ever runs.
+//
+// MUTATION: delete the `!next.after(cursor)` check and the two cursor cases walk
+// to the page bound instead of stopping at two requests. MUTATION: delete the
+// empty-NextCursor check and "nowhere to continue from" silently stores a partial
+// walk. MUTATION: delete the len(resp.Events) > maxFeedEvents check and an
+// oversized page is swallowed. MUTATION: drop the page bound from the loop
+// condition and "a peer that never terminates" does exactly that.
 func TestSubscriberBoundsAMisbehavingPublisher(t *testing.T) {
 	cases := []struct {
 		name string
