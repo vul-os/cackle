@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, User, ChevronDown, Building2, LogOut, Moon, Sun } from 'lucide-react';
+import { Menu, User, ChevronDown, Building2, LogOut, Moon, Sun, Check } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { useTheme } from '@/components/theme-provider';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,10 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
 
     return (
         <nav className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-elevated sm:px-6">
-            <div className="flex items-center gap-3">
+            {/* min-w-0 so this group is the one that yields if anything ever
+                has to. The right-hand group is where a user signs out and
+                switches org; it must never be the side that gets squeezed. */}
+            <div className="flex min-w-0 items-center gap-3">
                 {/* This is the ONLY route to the side nav on a phone, on all
                     14 console pages, and gate staff work the door on a phone.
                     It measured 22×22 — under WCAG 2.2 AA's 24×24 floor and
@@ -45,41 +48,71 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                 <Link
                     to="/"
                     aria-label="Cackle home"
-                    className="rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
+                    // Measured at 390px: 46x39 — the lockup's own height,
+                    // because the anchor was a bare inline box wrapping it.
+                    // `inline-flex min-h-[44px] items-center` gives the link
+                    // a real target without resizing the mark: the tile and
+                    // wordmark keep their `size` step and simply centre in a
+                    // taller box, which the 64px bar already had room for.
+                    className="inline-flex min-h-[44px] items-center rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar-background"
                 >
                     <BrandLockup size="md" tone="onDark" hideWordBelowSm />
                 </Link>
             </div>
 
-            <div className="flex items-center gap-2">
-                {/* Measured at 390px: this trigger is 220×36 — the width is
-                    fine, the height is not. `h-11` (44) replaces the
-                    default-size button's implicit 36 without touching the
-                    icon, label or chevron inside it, and needs no
-                    counteracting margin — the row centres it vertically
-                    inside the 64px top bar regardless of its height, so
-                    growing it does not shove anything sideways. Only visible
-                    when an account has more than one org, which is why a
-                    single-org measurement pass never catches it. */}
+            {/* shrink-0: this group holds the only route to signing out and
+                to switching org, and it is not allowed to be the thing that
+                gets pushed out of the viewport. It was — see below. */}
+            <div className="flex shrink-0 items-center gap-2">
+                {/* MEASURED DEFECT, both themes, 390px: with a long org name
+                    this trigger was 220px wide, which put the account menu's
+                    right edge at 420px against a 390px viewport — the button
+                    was entirely off-canvas and unreachable. On a phone with
+                    more than one org a user could not sign out or switch org
+                    at all.
+
+                    It survived every sweep this session because the demo box
+                    seeds exactly ONE organisation and this whole block only
+                    renders when there is more than one, so the measurement
+                    pass was structurally blind to it. Reproduced by rewriting
+                    the `/api/auth/me` envelope to carry two orgs, one with a
+                    deliberately long name; `body{overflow-x:hidden}` means
+                    the page never scrolls sideways to reveal it, so only
+                    per-element rects show it at all.
+
+                    Below sm the trigger collapses to the icon alone — 220px
+                    down to 44px — which is the same trade the wordmark
+                    already makes here (`hideWordBelowSm`). The name has not
+                    vanished: it is the button's accessible name, and the menu
+                    it opens now marks the active org with a check, which it
+                    did not before and which the icon-only state makes
+                    necessary rather than merely nice. From sm up the label
+                    returns, still truncated. */}
                 {orgs?.length > 1 && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
-                                className="h-11 gap-2 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                aria-label={`Switch organisation — currently ${activeOrg?.name || 'none selected'}`}
+                                className="h-11 w-11 shrink-0 gap-2 px-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:w-auto sm:px-4"
                             >
                                 <Building2 size={18} />
-                                <span className="max-w-[140px] truncate">{activeOrg?.name || 'Select org'}</span>
-                                <ChevronDown size={14} />
+                                <span className="hidden max-w-[140px] truncate sm:inline">{activeOrg?.name || 'Select org'}</span>
+                                <ChevronDown size={14} className="hidden sm:block" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)]">
                             <DropdownMenuLabel>Organizations</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             {orgs.map((org) => (
                                 <DropdownMenuItem key={org.id} onClick={() => switchOrg(org.id)}>
-                                    <Building2 className="mr-2 h-4 w-4 text-muted-foreground" />
-                                    {org.name}
+                                    {org.id === activeOrg?.id ? (
+                                        <Check className="mr-2 h-4 w-4 shrink-0 text-primary-emphasis" aria-hidden="true" />
+                                    ) : (
+                                        <Building2 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                    )}
+                                    <span className="truncate">{org.name}</span>
+                                    {org.id === activeOrg?.id && <span className="sr-only"> (current)</span>}
                                 </DropdownMenuItem>
                             ))}
                         </DropdownMenuContent>
@@ -97,7 +130,7 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="-mx-1 h-11 w-11 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    className="-mx-1 h-11 w-11 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                     aria-label="Toggle theme"
                 >
@@ -110,7 +143,7 @@ const TopBar = ({ onMenuClick, toggleButtonRef }) => {
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="-mx-1 h-11 w-11 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                className="-mx-1 h-11 w-11 shrink-0 text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                                 aria-label="Account menu"
                             >
                                 <User size={20} />

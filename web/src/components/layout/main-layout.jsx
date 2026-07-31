@@ -51,9 +51,18 @@ const MainLayout = () => {
     return (
         <MotionConfig reducedMotion="user">
             <div className="flex h-screen flex-col bg-background text-foreground">
+                {/* Measured at 390px: 36px tall. The skip link is the FIRST
+                    thing a keyboard or switch user reaches on every console
+                    page, and it is the one control on this shell that exists
+                    only for people who need it — shipping it under target
+                    size is the least defensible place in the app to do that.
+                    `min-h-[44px]` with `inline-flex items-center` raises the
+                    hit area without moving the label off its baseline, and
+                    costs nothing at rest because the element is translated
+                    out of view until focused. */}
                 <a
                     href="#main-content"
-                    className="fixed left-2 top-2 z-[100] -translate-y-16 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-elevated transition-transform focus:translate-y-0"
+                    className="fixed left-2 top-2 z-[100] inline-flex min-h-[44px] -translate-y-16 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-elevated transition-transform focus:translate-y-0"
                 >
                     Skip to content
                 </a>
