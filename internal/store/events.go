@@ -357,7 +357,7 @@ func (s *Store) ListCategoryCounts(ctx context.Context) ([]CategoryCount, error)
 // ListEventsByOrg returns every event (any status) belonging to an org,
 // most recently created first.
 func (s *Store) ListEventsByOrg(ctx context.Context, orgID string) ([]Event, error) {
-	return s.queryEvents(ctx, eventSelectColumns+` FROM events WHERE org_id = ? ORDER BY created_at DESC`, orgID)
+	return s.queryEvents(ctx, eventSelectColumns+` FROM events WHERE org_id = ? ORDER BY created_at DESC, id DESC`, orgID)
 }
 
 // CountTicketsForEvent returns how many tickets have ever been issued for
@@ -473,7 +473,7 @@ func (s *Store) TicketTypeStatsForEvent(ctx context.Context, eventID string) ([]
 		LEFT JOIN orders o ON o.id = oi.order_id
 		WHERE tt.event_id = ?
 		GROUP BY tt.id, tt.name, tt.quantity_total, tt.sort_order
-		ORDER BY tt.sort_order ASC, tt.name ASC`, eventID)
+		ORDER BY tt.sort_order ASC, tt.name ASC, tt.id ASC`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("store: ticket type stats: %w", err)
 	}

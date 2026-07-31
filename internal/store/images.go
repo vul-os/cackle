@@ -88,7 +88,7 @@ func (s *Store) DeleteImage(ctx context.Context, id string) error {
 func (s *Store) ListImagesByEvent(ctx context.Context, eventID string) ([]Image, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, event_id, format, width, height, size_bytes, uploaded_by, created_at
-		FROM images WHERE event_id = ? ORDER BY created_at ASC`, eventID)
+		FROM images WHERE event_id = ? ORDER BY created_at ASC, id ASC`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list images by event: %w", err)
 	}

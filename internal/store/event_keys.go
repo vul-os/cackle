@@ -115,7 +115,7 @@ func (s *Store) CreateEventKey(ctx context.Context, k *EventKey) error {
 func (s *Store) ListEventKeys(ctx context.Context, eventID string) ([]EventKey, error) {
 	return s.queryEventKeys(ctx, `
 		SELECT id, event_id, public_key, created_at, revoked_at
-		FROM event_keys WHERE event_id = ? ORDER BY created_at ASC`, eventID)
+		FROM event_keys WHERE event_id = ? ORDER BY created_at ASC, id ASC`, eventID)
 }
 
 // ActiveEventKeys returns every non-revoked issuer key for an event, oldest
@@ -130,7 +130,7 @@ func (s *Store) ListEventKeys(ctx context.Context, eventID string) ([]EventKey, 
 func (s *Store) ActiveEventKeys(ctx context.Context, eventID string) ([]EventKey, error) {
 	return s.queryEventKeys(ctx, `
 		SELECT id, event_id, public_key, created_at, revoked_at
-		FROM event_keys WHERE event_id = ? AND revoked_at IS NULL ORDER BY created_at ASC`, eventID)
+		FROM event_keys WHERE event_id = ? AND revoked_at IS NULL ORDER BY created_at ASC, id ASC`, eventID)
 }
 
 // LatestActiveEventKey returns the most recently created non-revoked key
@@ -145,7 +145,7 @@ func (s *Store) ActiveEventKeys(ctx context.Context, eventID string) ([]EventKey
 // plaintext — the boot-time migration is not optional.
 //
 // `, id DESC` IS LOAD-BEARING, not tidiness. created_at is written by
-// timeToText (store.go:207) in RFC3339, which has whole-second resolution, so
+// timeToText (store.go:208) in RFC3339, which has whole-second resolution, so
 // a key rotated in the same second as the one it replaces stores a
 // BYTE-IDENTICAL created_at and `ORDER BY created_at DESC` alone has nothing
 // left to choose with. What it returned then was an artifact of the query

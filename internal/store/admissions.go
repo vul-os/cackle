@@ -69,7 +69,7 @@ type AdmissionClaim struct {
 func (s *Store) ListAdmissionClaimsForEvent(ctx context.Context, eventID string) ([]AdmissionClaim, error) {
 	const q = `
 		WITH claims AS (
-			SELECT ticket_id, event_id, gate_id, device_id, scanned_at, result,
+			SELECT id, ticket_id, event_id, gate_id, device_id, scanned_at, result,
 			       reported_result, note,
 			       COALESCE(NULLIF(reported_result, ''), result) AS claimed
 			FROM admissions
@@ -86,7 +86,7 @@ func (s *Store) ListAdmissionClaimsForEvent(ctx context.Context, eventID string)
 		       reported_result, note
 		FROM claims
 		WHERE ticket_id IN (SELECT ticket_id FROM contested)
-		ORDER BY ticket_id, scanned_at, device_id`
+		ORDER BY ticket_id, scanned_at, device_id, id`
 
 	rows, err := s.db.QueryContext(ctx, q, eventID)
 	if err != nil {

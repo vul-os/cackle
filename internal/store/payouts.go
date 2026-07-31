@@ -67,7 +67,7 @@ func (s *Store) CreatePayout(ctx context.Context, p *Payout) error {
 func (s *Store) ListPayoutsForEvent(ctx context.Context, eventID string) ([]Payout, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, event_id, org_id, amount_minor, currency, status, provider_ref, created_at, paid_at
-		FROM payouts WHERE event_id = ? ORDER BY created_at DESC`, eventID)
+		FROM payouts WHERE event_id = ? ORDER BY created_at DESC, id DESC`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list payouts for event: %w", err)
 	}

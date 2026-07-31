@@ -76,7 +76,7 @@ func (s *Store) InviteOrgID(ctx context.Context, inviteID string) (string, error
 func (s *Store) ListPendingOrgInvites(ctx context.Context, orgID string) ([]OrgInvite, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, org_id, email, role, token_hash, invited_by, expires_at, created_at, accepted_at
-		FROM org_invites WHERE org_id = ? AND accepted_at IS NULL ORDER BY created_at DESC`, orgID)
+		FROM org_invites WHERE org_id = ? AND accepted_at IS NULL ORDER BY created_at DESC, id DESC`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list pending org invites: %w", err)
 	}

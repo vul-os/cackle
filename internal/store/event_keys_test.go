@@ -1004,7 +1004,7 @@ func rotateKeyAt(t *testing.T, st *Store, eventID string, at time.Time) *EventKe
 // active keys were created inside the same second.
 //
 // HOW THE TIE IS FORCED, since a test that merely hopes for one proves
-// nothing: timeToText (store.go:207) formats with time.RFC3339, which has
+// nothing: timeToText (store.go:208) formats with time.RFC3339, which has
 // whole-second resolution. The two keys below are created 400ms apart in real
 // time and land on BYTE-IDENTICAL created_at text. `ORDER BY created_at DESC
 // LIMIT 1` therefore has nothing left to order by, and which of the two signs

@@ -266,7 +266,7 @@ func (s *Store) GetOrderByID(ctx context.Context, id string) (*Order, error) {
 // first.
 func (s *Store) ListOrdersForUser(ctx context.Context, userID string) ([]Order, error) {
 	rows, err := s.db.QueryContext(ctx, orderSelectColumns+`
-		FROM orders WHERE user_id = ? ORDER BY created_at DESC`, userID)
+		FROM orders WHERE user_id = ? ORDER BY created_at DESC, id DESC`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list orders for user: %w", err)
 	}
@@ -291,7 +291,7 @@ func (s *Store) ListOrdersForUser(ctx context.Context, userID string) ([]Order, 
 // internal/httpapi/orders_handlers.go.
 func (s *Store) ListOrdersForEvent(ctx context.Context, eventID string) ([]Order, error) {
 	rows, err := s.db.QueryContext(ctx, orderSelectColumns+`
-		FROM orders WHERE event_id = ? ORDER BY created_at DESC`, eventID)
+		FROM orders WHERE event_id = ? ORDER BY created_at DESC, id DESC`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list orders for event: %w", err)
 	}

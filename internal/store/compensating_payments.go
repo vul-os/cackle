@@ -77,7 +77,7 @@ const compensatingPaymentAuditSelectColumns = `SELECT id, original_reference, pa
 // not.
 func (s *Store) ListCompensatingPaymentAudits(ctx context.Context, originalReference string) ([]CompensatingPaymentAudit, error) {
 	rows, err := s.db.QueryContext(ctx,
-		compensatingPaymentAuditSelectColumns+` FROM compensating_payment_audits WHERE original_reference = ? ORDER BY created_at DESC`,
+		compensatingPaymentAuditSelectColumns+` FROM compensating_payment_audits WHERE original_reference = ? ORDER BY created_at DESC, id DESC`,
 		originalReference)
 	if err != nil {
 		return nil, fmt.Errorf("store: list compensating payment audits: %w", err)

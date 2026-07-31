@@ -54,7 +54,7 @@ func (s *Store) ListTicketsForOrder(ctx context.Context, orderID string) ([]Tick
 //
 // The `, id DESC` matters for the same reason as above and for the ordinary
 // one too: issued_at is stored with whole-second resolution (timeToText,
-// store.go:207), so tickets from one order always tie and tickets from
+// store.go:208), so tickets from one order always tie and tickets from
 // different orders tie whenever both settled in the same second. This is the
 // query behind GET /api/tickets — without a tiebreaker a buyer's ticket list
 // is free to come back in a different sequence on each refresh.

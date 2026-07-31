@@ -93,7 +93,7 @@ func (s *Store) GetTicketTypeByID(ctx context.Context, id string) (*TicketType, 
 // display order.
 func (s *Store) ListTicketTypesForEvent(ctx context.Context, eventID string) ([]TicketType, error) {
 	rows, err := s.db.QueryContext(ctx, ticketTypeSelectColumns+`
-		FROM ticket_types WHERE event_id = ? ORDER BY sort_order ASC, name ASC`, eventID)
+		FROM ticket_types WHERE event_id = ? ORDER BY sort_order ASC, name ASC, id ASC`, eventID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list ticket types: %w", err)
 	}

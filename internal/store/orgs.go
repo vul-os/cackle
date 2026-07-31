@@ -237,7 +237,7 @@ func (s *Store) ListOrgsForUser(ctx context.Context, userID string) ([]OrgWithRo
 		FROM org_members m
 		JOIN orgs o ON o.id = m.org_id
 		WHERE m.user_id = ?
-		ORDER BY o.created_at`, userID)
+		ORDER BY o.created_at, o.id`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list orgs for user: %w", err)
 	}
@@ -277,7 +277,7 @@ func (s *Store) ListOrgMembersWithUser(ctx context.Context, orgID string) ([]Org
 		FROM org_members m
 		JOIN users u ON u.id = m.user_id
 		WHERE m.org_id = ?
-		ORDER BY m.created_at ASC`, orgID)
+		ORDER BY m.created_at ASC, m.user_id ASC`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list org members with user: %w", err)
 	}
@@ -301,7 +301,7 @@ func (s *Store) ListOrgMembersWithUser(ctx context.Context, orgID string) ([]Org
 // ListOrgMembers returns every member of an org.
 func (s *Store) ListOrgMembers(ctx context.Context, orgID string) ([]OrgMember, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT org_id, user_id, role, created_at FROM org_members WHERE org_id = ? ORDER BY created_at`, orgID)
+		SELECT org_id, user_id, role, created_at FROM org_members WHERE org_id = ? ORDER BY created_at, user_id`, orgID)
 	if err != nil {
 		return nil, fmt.Errorf("store: list org members: %w", err)
 	}
