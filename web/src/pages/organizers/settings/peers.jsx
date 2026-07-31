@@ -349,7 +349,7 @@ const PeersPage = () => {
                                     <FormItem>
                                         <FormLabel>What to call them</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="The hall down the road" {...field} />
+                                            <Input className="min-h-[44px]" placeholder="The hall down the road" {...field} />
                                         </FormControl>
                                         <FormDescription>Just a label for you. It is not checked against anything.</FormDescription>
                                         <FormMessage />
@@ -363,7 +363,7 @@ const PeersPage = () => {
                                     <FormItem>
                                         <FormLabel>Their address</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="Paste the address they sent you" inputMode="url" {...field} />
+                                            <Input className="min-h-[44px]" placeholder="Paste the address they sent you" inputMode="url" {...field} />
                                         </FormControl>
                                         <FormDescription>
                                             The address of their site on its own — nothing after the host name.
@@ -379,7 +379,7 @@ const PeersPage = () => {
                                     <FormItem>
                                         <FormLabel>Their key</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="64 characters" className="font-mono" {...field} />
+                                            <Input placeholder="64 characters" className="min-h-[44px] font-mono" {...field} />
                                         </FormControl>
                                         <FormDescription>
                                             Check it with them out of band. If the key ever stops matching, Cackle refuses to talk

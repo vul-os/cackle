@@ -74,7 +74,7 @@ const SettingsPage = () => {
                         the top bar's switcher only appears once you already
                         have more than one org, so it can never be the way you
                         get your first (or second). */}
-                    <Button variant="outline" className="w-full sm:w-auto" onClick={() => navigate('/admin/orgs/new')}>
+                    <Button variant="outline" className="min-h-11 w-full sm:w-auto" onClick={() => navigate('/admin/orgs/new')}>
                         <Plus className="mr-2 h-4 w-4" />
                         {orgs.length === 0 ? 'Create your organization' : 'Create another organization'}
                     </Button>
@@ -144,9 +144,15 @@ const SettingsPage = () => {
                     <CardDescription>Choose how Cackle looks on this device</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                         {THEME_OPTIONS.map(({ value, label, icon: Icon }) => (
-                            <Button key={value} variant={theme === value ? 'default' : 'outline'} size="sm" onClick={() => setTheme(value)}>
+                            <Button
+                                key={value}
+                                variant={theme === value ? 'default' : 'outline'}
+                                size="sm"
+                                className="min-h-11"
+                                onClick={() => setTheme(value)}
+                            >
                                 <Icon className="mr-2 h-4 w-4" />
                                 {label}
                             </Button>
@@ -161,7 +167,7 @@ const SettingsPage = () => {
                         <p className="font-medium">Sign out</p>
                         <p className="text-sm text-muted-foreground">End your session on this device.</p>
                     </div>
-                    <Button variant="destructive" onClick={handleSignOut}>
+                    <Button variant="destructive" className="min-h-11" onClick={handleSignOut}>
                         <LogOut className="mr-2 h-4 w-4" />
                         Sign Out
                     </Button>
