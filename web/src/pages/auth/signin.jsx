@@ -1,29 +1,48 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Ticket } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2, LogIn, TriangleAlert, CheckCircle2, ShieldCheck, WifiOff } from 'lucide-react';
 import { useAuthRedirect } from './auth-redirect';
 import SsoButtons from './sso-buttons';
 import { ssoMessageFor } from './sso';
+import { emailError as checkEmail, requiredError } from './validate';
+import { AuthShell, FieldError } from './auth-shell';
 
-import festivalBackground from '/images/celebback.jpg';
+const RAIL_POINTS = [
+    {
+        icon: WifiOff,
+        text: "Password sign-in needs no network to reach — it's what still works when the gate's internet doesn't.",
+    },
+    { icon: ShieldCheck, text: 'One binary, your box. Nothing here phones home.' },
+];
 
 const SignIn = () => {
     const { signIn, refresh } = useAuth();
     const handleSuccessfulAuth = useAuthRedirect();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const emailRef = useRef(null);
+    const passwordRef = useRef(null);
+    const alertRef = useRef(null);
+
+    // A password just changed on /update-password lands here with a router
+    // state flag rather than a toast — a toast fired the instant before a
+    // navigate() unmounts the page that triggered it is exactly the kind of
+    // message that is easy to miss, and this is the one page it matters most
+    // to see.
+    const [passwordUpdated] = useState(() => Boolean(location.state?.passwordUpdated));
 
     // A provider sign-in comes back to this page with ?sso=<reason>. The
     // session, when there is one, arrives as a cookie — never in this URL,
@@ -60,9 +79,34 @@ const SignIn = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [ssoReason]);
 
+    // Focus management for the one error that appears after the fields have
+    // already passed their own checks: a rejected credential. The alert is
+    // conditionally mounted, so the focus call has to wait for the render
+    // that puts it in the DOM rather than firing in the same tick as setError.
+    useEffect(() => {
+        if (error) alertRef.current?.focus();
+    }, [error]);
+
+    const validate = () => {
+        const next = {};
+        const emailMsg = checkEmail(email);
+        const passwordMsg = requiredError(password, 'your password');
+        if (emailMsg) next.email = emailMsg;
+        if (passwordMsg) next.password = passwordMsg;
+        return next;
+    };
+
     const handleSubmit = async (event) => {
         event.preventDefault();
         setError('');
+
+        const errors = validate();
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(errors);
+            (errors.email ? emailRef : passwordRef).current?.focus();
+            return;
+        }
+        setFieldErrors({});
         setIsLoading(true);
         try {
             await signIn(email, password);
@@ -74,88 +118,118 @@ const SignIn = () => {
     };
 
     return (
-        <div
-            className="relative flex min-h-screen items-center justify-center bg-cover bg-center bg-no-repeat p-4"
-            style={{ backgroundImage: `linear-gradient(rgba(10,8,10,0.75), rgba(10,8,10,0.85)), url(${festivalBackground})` }}
+        <AuthShell
+            eyebrow="Sign in"
+            title="Welcome back."
+            description="Get back to the door, your events or an order you placed."
+            points={RAIL_POINTS}
+            formHeading="Sign in"
+            formSubheading="Use the email and password you signed up with."
         >
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="relative z-10 w-full max-w-md">
-                <Card className="border-white/10 bg-card/95 shadow-2xl backdrop-blur">
-                    <CardHeader className="space-y-1 pb-6 text-center">
-                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-                            <Ticket className="h-6 w-6" />
-                        </div>
-                        <CardTitle className="font-display text-3xl font-bold">Welcome back</CardTitle>
-                        <p className="text-sm text-muted-foreground">Sign in to manage your events or tickets</p>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
+            <div className="space-y-5">
+                {passwordUpdated && !error && (
+                    <Alert variant="success">
+                        <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                        <AlertDescription>Your password was updated. Sign in with your new one.</AlertDescription>
+                    </Alert>
+                )}
+
+                {ssoNotice && !error && (
+                    <Alert>
+                        <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+                        <AlertDescription>{ssoNotice}</AlertDescription>
+                    </Alert>
+                )}
+
+                {error && (
+                    <Alert variant="destructive" ref={alertRef} tabIndex={-1}>
+                        <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+                        <AlertTitle>Couldn&apos;t sign you in</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
+
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                    <div className="space-y-1.5">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                            id="email"
+                            ref={emailRef}
+                            type="email"
+                            autoComplete="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value);
+                                if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
+                            }}
+                            disabled={isLoading}
+                            aria-invalid={Boolean(fieldErrors.email)}
+                            aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                            className="min-h-11"
+                        />
+                        <FieldError id="email-error">{fieldErrors.email}</FieldError>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="password">Password</Label>
+                        <Input
+                            id="password"
+                            ref={passwordRef}
+                            type="password"
+                            autoComplete="current-password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => {
+                                setPassword(e.target.value);
+                                if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
+                            }}
+                            disabled={isLoading}
+                            aria-invalid={Boolean(fieldErrors.password)}
+                            aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                            className="min-h-11"
+                        />
+                        <FieldError id="password-error">{fieldErrors.password}</FieldError>
+                    </div>
+                    <Button type="submit" size="lg" className="w-full min-h-11" disabled={isLoading}>
+                        {isLoading ? (
+                            <>
+                                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                                Signing in…
+                            </>
+                        ) : (
+                            <>
+                                <LogIn className="h-4 w-4" aria-hidden="true" />
+                                Sign in
+                            </>
                         )}
+                    </Button>
+                </form>
 
-                        {ssoNotice && !error && (
-                            <Alert>
-                                <AlertDescription>{ssoNotice}</AlertDescription>
-                            </Alert>
-                        )}
+                {/* Renders nothing unless this box's operator set one up. Below
+                    the password form on purpose: the password is the sign-in
+                    that works with no internet, and this one cannot. */}
+                <SsoButtons disabled={isLoading} />
 
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    placeholder="you@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    disabled={isLoading}
-                                    required
-                                    className="min-h-11"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password">Password</Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    disabled={isLoading}
-                                    required
-                                    className="min-h-11"
-                                />
-                            </div>
-                            <Button type="submit" size="lg" className="w-full" disabled={isLoading}>
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Signing in...
-                                    </>
-                                ) : (
-                                    'Sign In'
-                                )}
-                            </Button>
-                        </form>
-
-                        {/* Renders nothing unless this box's operator set one
-                            up. Below the password form on purpose: the
-                            password is the sign-in that works with no
-                            internet, and this one cannot. */}
-                        <SsoButtons disabled={isLoading} />
-                    </CardContent>
-                    <CardFooter className="flex flex-col space-y-2 border-t border-border pt-6">
-                        <Button variant="link" className="min-h-11 text-sm" onClick={() => navigate('/signup')} disabled={isLoading}>
-                            Don&apos;t have an account? Sign up
-                        </Button>
-                        <Button variant="link" className="min-h-11 text-sm text-muted-foreground" onClick={() => navigate('/password-reset')} disabled={isLoading}>
-                            Forgot your password?
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </motion.div>
-        </div>
+                <div className="flex flex-col border-t border-border pt-2">
+                    <Button
+                        variant="link"
+                        className="min-h-11 w-full text-sm"
+                        onClick={() => navigate('/signup')}
+                        disabled={isLoading}
+                    >
+                        Don&apos;t have an account? Sign up
+                    </Button>
+                    <Button
+                        variant="link"
+                        className="min-h-11 w-full text-sm text-muted-foreground"
+                        onClick={() => navigate('/password-reset')}
+                        disabled={isLoading}
+                    >
+                        Forgot your password?
+                    </Button>
+                </div>
+            </div>
+        </AuthShell>
     );
 };
 

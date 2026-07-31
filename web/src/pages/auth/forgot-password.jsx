@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { KeyRound } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { copyTextToClipboard } from '@/pages/organizers/team/invite-link';
 import { resetCommandFor } from './operator-reset';
+import { AuthShell } from './auth-shell';
 
-import rockfestBg from '/images/rockfest.jpg';
+const RAIL_POINTS = [{ icon: Clock, text: 'The link they hand back to you works once, and expires after an hour.' }];
 
 /**
  * Forgot password, told truthfully.
@@ -46,65 +45,54 @@ const ForgotPassword = () => {
     };
 
     return (
-        <div
-            className="relative flex min-h-screen items-center justify-center p-4"
-            style={{ backgroundImage: `url(${rockfestBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        <AuthShell
+            eyebrow="Forgot password"
+            title="Ask the operator."
+            description="Cackle does not send email, so no reset link is coming from anywhere. Whoever runs this box can make you one in seconds."
+            points={RAIL_POINTS}
+            formHeading="Forgot password"
+            formSubheading="Type your email, then hand the command below to whoever operates this Cackle server."
         >
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="relative z-10 w-full max-w-md">
-                <Card className="border-white/10 bg-card/95 shadow-2xl backdrop-blur">
-                    <CardHeader className="text-center">
-                        <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
-                            <KeyRound className="h-6 w-6" />
-                        </div>
-                        <CardTitle className="font-display text-2xl font-bold">Forgot password</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            Cackle does not send email, so there is no reset link on the way. Whoever runs this Cackle server can
-                            make you one in a few seconds — ask them to run this on the machine it&apos;s installed on, and to send
-                            you the link it prints.
-                        </p>
+            <div className="space-y-5">
+                <div className="space-y-1.5">
+                    <Label htmlFor="email">Your email address</Label>
+                    <Input
+                        id="email"
+                        type="email"
+                        value={email}
+                        placeholder="you@example.com"
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="min-h-11"
+                    />
+                </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Your email address</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                value={email}
-                                placeholder="you@example.com"
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="min-h-11"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="reset-command">Command to send them</Label>
-                            <div className="flex flex-col gap-2 sm:flex-row">
-                                <input
-                                    id="reset-command"
-                                    readOnly
-                                    value={command}
-                                    onFocus={(e) => e.target.select()}
-                                    className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                />
-                                <Button type="button" variant="outline" onClick={handleCopy} className="min-h-11 shrink-0 sm:w-28">
-                                    {copied ? 'Copied' : 'Copy'}
-                                </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                The link it prints works once and expires after an hour. If you run this server yourself, that
-                                command is all you need.
-                            </p>
-                        </div>
-
-                        <Button variant="outline" className="min-h-11 w-full" onClick={() => navigate('/login')}>
-                            Back to sign in
+                <div className="space-y-1.5">
+                    <Label htmlFor="reset-command">Command to send them</Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        <input
+                            id="reset-command"
+                            readOnly
+                            value={command}
+                            onFocus={(e) => e.target.select()}
+                            className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        />
+                        <Button type="button" variant="outline" onClick={handleCopy} className="min-h-11 shrink-0 sm:w-28">
+                            {copied ? 'Copied' : 'Copy'}
                         </Button>
-                    </CardContent>
-                </Card>
-            </motion.div>
-        </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Run on the machine Cackle is installed on. The link it prints works once and expires after an hour — that
+                        command is all a self-hosted operator needs.
+                    </p>
+                </div>
+
+                <div className="border-t border-border pt-2">
+                    <Button variant="outline" className="min-h-11 w-full" onClick={() => navigate('/login')}>
+                        Back to sign in
+                    </Button>
+                </div>
+            </div>
+        </AuthShell>
     );
 };
 
