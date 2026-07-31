@@ -1,4 +1,41 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
+import plugin from 'tailwindcss/plugin';
+
+// WCAG 2.5.8 (Target Size, Minimum, AA) sizes the TARGET, not the artwork.
+// A checkbox and a radio are drawn at 16px because that is what reads
+// correctly beside a line of 14px label text — growing the box to 24px to
+// satisfy the criterion would be fixing the wrong number.
+//
+// `hit-area-24` is the right number: a transparent 24x24 pseudo-element
+// centred on the control, at zero visual cost. It lives here, as ONE named
+// utility, rather than as a run of `after:*` classes copy-pasted into each
+// primitive — two hand-maintained copies of a hit area are two hit areas
+// that will eventually differ, and the whole point is that the number is
+// exact.
+//
+// It is EXACTLY 24, and that is a ceiling as much as a floor. Two adjacent
+// expanded targets whose areas overlap are worse than the small targets they
+// replaced: a tap near the boundary lands on the wrong control, silently.
+// 24 is the standard's minimum and, paired with the `m-1` the primitives
+// carry, the largest value that still guarantees adjacent controls' areas
+// abut rather than intersect. Raising it here would quietly break that
+// guarantee everywhere at once — see checkbox.jsx.
+const hitArea = plugin(({ addUtilities }) => {
+    addUtilities({
+        '.hit-area-24': {
+            position: 'relative',
+            '&::after': {
+                content: '""',
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                height: '1.5rem',
+                width: '1.5rem',
+                transform: 'translate(-50%, -50%)',
+            },
+        },
+    });
+});
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
@@ -213,5 +250,5 @@ module.exports = {
             },
         },
     },
-    plugins: [require('tailwindcss-animate'), require('@tailwindcss/typography')],
+    plugins: [require('tailwindcss-animate'), require('@tailwindcss/typography'), hitArea],
 };
