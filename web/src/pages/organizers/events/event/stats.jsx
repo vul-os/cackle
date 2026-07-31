@@ -10,14 +10,24 @@ import { events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import { TicketTypeBreakdown, RatioMeter } from './stats-charts';
 
+// Icon + label on one row, the value on the card's full inner width below it.
+//
+// Beside the icon the value column was 39px wide at 768, and `break-words` duly
+// broke the event's revenue into "R 1" / "0,800.00" — a figure that reads as a
+// different number. Money may only ever break at a separator, never inside a
+// figure, so the fix is to give the figure room (full card width, and a 3-up
+// row only once the content column is wide enough for one) rather than to let
+// it break.
 const StatTile = ({ icon: Icon, label, value, sub }) => (
     <Card>
-        <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-emphasis">
-                <Icon className="h-5 w-5" aria-hidden="true" />
+        <CardContent className="flex flex-col gap-3 p-6">
+            <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary-emphasis">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <p className="min-w-0 text-sm text-muted-foreground">{label}</p>
             </div>
             <div className="min-w-0">
-                <p className="text-sm text-muted-foreground">{label}</p>
                 {/* Plain counts (Sold, Admitted) render in the font's default
                     proportional figures — a lone hero number needs no column
                     to align against (dataviz: tabular-nums is for columns).
@@ -25,7 +35,7 @@ const StatTile = ({ icon: Icon, label, value, sub }) => (
                     always carries its own `tnum` — that's money.jsx's own
                     call (a currency amount that could tick upward while read
                     must not visibly reflow), not a choice made here. */}
-                <p className="break-words text-2xl font-bold leading-tight">{value}</p>
+                <p className="text-2xl font-bold leading-tight md:text-xl xl:text-2xl">{value}</p>
                 {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
             </div>
         </CardContent>
@@ -98,7 +108,9 @@ const EventStatsPage = () => {
 
             {loading && (
                 <div className="space-y-6" role="status" aria-label="Loading stats">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {/* same breakpoints as the loaded grid, so the skeleton does
+                        not reflow into a different shape the moment data lands */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {[0, 1, 2].map((i) => (
                             <Skeleton key={i} className="h-24" />
                         ))}
@@ -112,7 +124,12 @@ const EventStatsPage = () => {
 
             {!loading && !error && stats && (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    {/* 3-up only from xl. With the console sidebar in place a
+                        768px window leaves ~470px of content and a 1280px one
+                        ~896px (the max-w-4xl cap); a third of the former cannot
+                        hold a revenue figure at any legible size, so the row
+                        goes 1-up / 2-up / 3-up as the column earns it. */}
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <StatTile icon={Ticket} label="Sold" value={stats.sold ?? 0} sub={totalCapacity ? `of ${totalCapacity} capacity` : undefined} />
                         <StatTile icon={Coins} label="Revenue" value={<Money minor={stats.revenue_minor ?? 0} currency={currency} />} />
                         <StatTile

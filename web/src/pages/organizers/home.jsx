@@ -18,24 +18,37 @@ const statusVariant = {
     cancelled: 'destructive',
 };
 
+// The icon and the label ride one row; the VALUE gets the card's full inner
+// width on the row below.
+//
+// It used to sit in a column beside the icon, which cost the number ~60px of a
+// ~257px tile. A multi-currency revenue rollup could not fit a single figure in
+// what was left, so `break-words` broke one mid-digits — "KWD 1,437.0" on one
+// line and "00" on the next, which reads as a different number, on the one
+// figure in the product where a misreading matters most. Two consequences of
+// that stacking are fixed here as well: the "·" separator no longer lands alone
+// on a line (see RevenueValue), and the icon no longer drifts out of line with
+// the other three tiles, because it now sits on a row of its own height rather
+// than centred against a value 1–3 lines tall.
+//
+// The value's type size steps DOWN as the grid gains columns, because a tile in
+// a 4-up row is far narrower than a full-width one on a phone. Measured against
+// the widest real demo figure ("KWD 1,437.000", 180px at 24px / 150px at 20px)
+// every band keeps at least 27px of slack, so a figure never has to break.
 const StatTile = ({ icon: Icon, label, value, loading }) => (
     <Card>
-        <CardContent className="flex items-center gap-4 p-5">
-            <div className="rounded-xl bg-primary/10 p-3 text-primary-emphasis">
-                <Icon className="h-5 w-5" />
+        <CardContent className="flex flex-col gap-3 p-5">
+            <div className="flex items-center gap-3">
+                <div className="shrink-0 rounded-xl bg-primary/10 p-2.5 text-primary-emphasis">
+                    <Icon className="h-5 w-5" />
+                </div>
+                <p className="min-w-0 text-sm text-muted-foreground">{label}</p>
             </div>
-            <div className="min-w-0 flex-1">
-                <p className="text-sm text-muted-foreground">{label}</p>
-                {loading ? (
-                    <Skeleton className="mt-1.5 h-7 w-20" />
-                ) : (
-                    // break-words (not truncate): revenue can be a per-currency
-                    // breakdown ("R 3,894.00 · ¥13,500 · KWD 98.250 · ...") when
-                    // an org's events span multiple currencies — wrapping beats
-                    // silently cutting a real figure off with an ellipsis.
-                    <p className="break-words text-2xl font-bold leading-tight tabular-nums">{value}</p>
-                )}
-            </div>
+            {loading ? (
+                <Skeleton className="h-7 w-24" />
+            ) : (
+                <p className="text-2xl font-bold leading-tight tabular-nums sm:text-xl 2xl:text-2xl">{value}</p>
+            )}
         </CardContent>
     </Card>
 );
@@ -57,8 +70,17 @@ const RevenueValue = ({ revenueByCurrency }) => {
         <>
             {shown.map(([currency, minor], i) => (
                 <React.Fragment key={currency || i}>
-                    {i > 0 && ' · '}
-                    <Money minor={minor} currency={currency} />
+                    {i > 0 ? ' ' : null}
+                    {/* Each figure is one unbreakable unit, and the separator
+                        is bound to the END of the figure it follows — like a
+                        trailing comma. The only break opportunity left is the
+                        space BETWEEN figures, so a line can end in "· " but a
+                        number can never be cut in half and a lone "·" can never
+                        start (or own) a line. */}
+                    <span className="whitespace-nowrap">
+                        <Money minor={minor} currency={currency} />
+                        {i < shown.length - 1 ? ' ·' : null}
+                    </span>
                 </React.Fragment>
             ))}
         </>
@@ -176,7 +198,12 @@ const HomePage = () => {
             {!state.error && (
                 <>
                     {/* Stats at a glance */}
-                    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {/* 4-up starts at xl, not lg: with the console's fixed
+                        sidebar, a 1024px window leaves the content column
+                        ~660px, and a quarter of that gave the Revenue tile a
+                        58px value column — narrower than any money figure at
+                        any legible size. */}
+                    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <StatTile icon={Calendar} label="Published events" value={published} loading={state.loading} />
                         <StatTile icon={Ticket} label="Tickets sold" value={totals.sold} loading={state.loading} />
                         <StatTile
