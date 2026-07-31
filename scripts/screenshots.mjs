@@ -77,6 +77,10 @@ const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'docs', 'screenshots');
 
 const EXTERNAL_URL = process.env.BASE_URL;
+// The instant the demo data is seeded "at". Fixed so captures are
+// reproducible; see startLocalServer. Any RFC3339 value works — this one is
+// simply a round number comfortably in the demo's event window.
+const SEED_NOW = '2026-06-15T09:00:00Z';
 const LOCAL_PORT = 8087;
 const LOCAL_BASE = `http://127.0.0.1:${LOCAL_PORT}`;
 const BASE = EXTERNAL_URL ?? LOCAL_BASE;
@@ -322,7 +326,18 @@ async function startLocalServer() {
   console.log(`  starting cackle --demo on :${LOCAL_PORT} …`);
   serverProc = spawn(bin, ['--demo', '--addr', `:${LOCAL_PORT}`], {
     cwd: ROOT,
-    env: { ...process.env, CACKLE_DB: ':memory:' },
+    // CACKLE_DEMO_NOW pins the demo seed's clock AND its primary keys, so two
+    // runs of this script produce byte-identical captures unless the UI
+    // actually changed. Without it every ticket serial, QR code and rendered
+    // timestamp re-rolls per run: `git status` shows a diff on every capture,
+    // a real regression is indistinguishable from clock churn, and megabytes
+    // of PNG get committed to say nothing. Overridable, but a DIFFERENT value
+    // rewrites every dated capture, so change it only on purpose.
+    env: {
+      ...process.env,
+      CACKLE_DB: ':memory:',
+      CACKLE_DEMO_NOW: process.env.CACKLE_DEMO_NOW ?? SEED_NOW,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   serverProc.stdout.on('data', (d) => process.stdout.write(`  [cackle] ${d}`));
@@ -806,6 +821,25 @@ async function main() {
     '',
     'To regenerate: `npm run screenshots`',
     'Against a live instance: `BASE_URL=https://... npm run screenshots`',
+    '',
+    '## Reproducibility, and its one limit',
+    '',
+    'The demo seed is PINNED (`CACKLE_DEMO_NOW`, set by this script), so two runs',
+    'against an unchanged UI produce byte-identical captures. That is the point: a',
+    'diff in `git status` after regenerating means the UI actually changed, rather',
+    'than meaning the clock moved. 47 of the 53 captures hold this.',
+    '',
+    '**The six that do not**, and why, so nobody chases it as staleness:',
+    '',
+    '- `my-tickets-{light,dark}.png`',
+    '- `ticket-qr-{light,dark}{,-mobile}.png`',
+    '',
+    'These render a ticket QR, which encodes an Ed25519-signed capability. The',
+    'signing key is generated fresh per run (`internal/tickets/keys.go`), so the',
+    'signature — and therefore the QR pixels — differ every time. Making THAT',
+    'deterministic would mean seeding real key material, which is not a trade',
+    'worth making for a screenshot. Expect these six to churn; the other 47 are',
+    'the ones to read a diff on.',
     '',
     '## Notes',
     '',

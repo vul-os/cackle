@@ -232,6 +232,31 @@ func run(args []string, stdout, stderr *os.File) error {
 	}
 
 	if cfg.Demo {
+		// Reproducible demo data, opt-in, --demo only.
+		//
+		// Setting CACKLE_DEMO_NOW pins the seed clock AND switches primary
+		// keys to a deterministic sequence, so two runs produce a
+		// byte-identical database — which is what makes `npm run screenshots`
+		// diffable. Without it, every ticket serial and every rendered
+		// timestamp differs per run, and a real UI regression is
+		// indistinguishable from clock churn in `git status`.
+		//
+		// The two are deliberately ONE switch: pinning the clock alone still
+		// leaves ULID serials (and the QR codes encoding them) re-rolling, so
+		// a half-applied version would look fixed while still churning.
+		//
+		// IDs from that source are sequential and guessable. That is
+		// acceptable here and nowhere else: --demo runs against a throwaway
+		// database with published credentials, and this is the only call site.
+		if fixed := os.Getenv("CACKLE_DEMO_NOW"); fixed != "" {
+			if !demo.SetFixedNow(fixed) {
+				return fmt.Errorf("demo: CACKLE_DEMO_NOW=%q is not RFC3339", fixed)
+			}
+			if !store.SetDeterministicIDs(1) {
+				return fmt.Errorf("demo: deterministic IDs were already set")
+			}
+			logger.Info("demo seed pinned for reproducibility", "now", fixed)
+		}
 		if err := demo.Seed(ctx, st, eventsSvc, ordersSvc, orgsSvc); err != nil {
 			return fmt.Errorf("demo: seed: %w", err)
 		}

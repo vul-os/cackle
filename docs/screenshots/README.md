@@ -32,6 +32,25 @@ is the stable one and mobile is a suffix on it.
 To regenerate: `npm run screenshots`
 Against a live instance: `BASE_URL=https://... npm run screenshots`
 
+## Reproducibility, and its one limit
+
+The demo seed is PINNED (`CACKLE_DEMO_NOW`, set by this script), so two runs
+against an unchanged UI produce byte-identical captures. That is the point: a
+diff in `git status` after regenerating means the UI actually changed, rather
+than meaning the clock moved. 47 of the 53 captures hold this.
+
+**The six that do not**, and why, so nobody chases it as staleness:
+
+- `my-tickets-{light,dark}.png`
+- `ticket-qr-{light,dark}{,-mobile}.png`
+
+These render a ticket QR, which encodes an Ed25519-signed capability. The
+signing key is generated fresh per run (`internal/tickets/keys.go`), so the
+signature — and therefore the QR pixels — differ every time. Making THAT
+deterministic would mean seeding real key material, which is not a trade
+worth making for a screenshot. Expect these six to churn; the other 47 are
+the ones to read a diff on.
+
 ## Notes
 
 - Organiser-gated surfaces (organiser-home, event-editor, ticket-types,

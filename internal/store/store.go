@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -89,7 +90,88 @@ func (s *Store) Close() error { return s.db.Close() }
 
 // NewID generates a new sortable ULID string, suitable for any primary key
 // in this schema.
-func NewID() string { return ulid.Make().String() }
+//
+// It delegates through idSource so that --demo can make a seeded database
+// REPRODUCIBLE (see SetDeterministicIDs). Nothing else may replace it: the
+// setter is guarded, single-shot, and has no un-setter, so a process that has
+// not deliberately opted in is generating real ULIDs and cannot be talked out
+// of it.
+func NewID() string { return idSource() }
+
+// idSource is the live generator. Never call it directly — NewID is the API.
+var idSource = func() string { return ulid.Make().String() }
+
+// deterministicIDsSet records that the opt-in already happened, so a second
+// call cannot quietly re-seed a running process's key generator.
+var deterministicIDsSet bool
+
+// SetDeterministicIDs makes NewID return a fixed, reproducible sequence.
+//
+// WHY THIS EXISTS, and why it is not a general-purpose hook: docs/screenshots
+// are regenerated from `cackle --demo`, and a run whose ticket serials and
+// timestamps re-roll produces a diff on every single capture. That makes the
+// question "are these screenshots current?" unanswerable — a real UI
+// regression and a fresh ULID look exactly the same in `git status`, so the
+// honest answer becomes "nobody can tell", and megabytes of PNG churn get
+// committed to say nothing.
+//
+// SAFETY. IDs from this source are sequential and completely predictable, so
+// anything that treats an ID as unguessable — a share link, a ticket serial
+// somebody could forge — is insecure under it. It is therefore:
+//
+//   - callable ONCE, and only before the first NewID call in the process;
+//   - wired ONLY from the --demo boot path in cmd/cackle, against an
+//     in-memory database that is discarded when the process exits;
+//   - never reachable from a build that has not passed --demo.
+//
+// It returns false if it was already called, so a caller that assumes it won
+// the race cannot silently proceed on real ULIDs — or, worse, re-seed a
+// generator that has already minted live keys.
+func SetDeterministicIDs(seed uint64) bool {
+	if deterministicIDsSet {
+		return false
+	}
+	deterministicIDsSet = true
+	idSource = DeterministicIDSource(seed)
+	return true
+}
+
+// DeterministicIDSource returns the generator SetDeterministicIDs installs.
+//
+// Exported and pure so its behaviour can be tested without touching the
+// package-global generator: SetDeterministicIDs is single-shot and has no
+// un-setter (deliberately — see above), so a test that called it would leave
+// every later test in this binary running on sequential keys.
+func DeterministicIDSource(seed uint64) func() string {
+	// A counter, not a PRNG: the point is a sequence that is identical run to
+	// run AND ordered, because these IDs are sortable primary keys and demo
+	// data that sorts differently every run defeats the whole exercise.
+	var n uint64
+	return func() string {
+		n++
+		var e [10]byte
+		binary.BigEndian.PutUint64(e[:8], seed)
+		binary.BigEndian.PutUint16(e[8:], uint16(n))
+		// A fixed ULID timestamp too — the millisecond field is part of the
+		// rendered string, so a wall-clock one would churn on its own.
+		var id ulid.ULID
+		copy(id[:6], ulidTime(demoULIDMillis))
+		copy(id[6:], e[:])
+		return id.String()
+	}
+}
+
+// demoULIDMillis is the fixed ULID timestamp used under SetDeterministicIDs:
+// 2026-01-01T00:00:00Z, chosen only because it is stable and obviously
+// synthetic.
+const demoULIDMillis = uint64(1767225600000)
+
+func ulidTime(ms uint64) []byte {
+	return []byte{
+		byte(ms >> 40), byte(ms >> 32), byte(ms >> 24),
+		byte(ms >> 16), byte(ms >> 8), byte(ms),
+	}
+}
 
 // Migrate applies every embedded migration that has not yet been recorded
 // in schema_migrations, in numeric order, each inside its own transaction.

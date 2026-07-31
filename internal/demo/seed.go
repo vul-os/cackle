@@ -230,6 +230,30 @@ func seedEvents() []seedEvent {
 // just the original ticketing flow. It is safe to call on every `--demo`
 // boot: if the demo org already exists, Seed returns immediately without
 // touching anything.
+// now is the clock the seed builds its data around. It is a variable so
+// --demo can be made REPRODUCIBLE: every event date, issue timestamp and
+// admission time below is derived from it, so a wall-clock reading means a
+// freshly seeded database differs from the last one in every rendered date.
+// That is what made docs/screenshots impossible to keep honest — see
+// store.SetDeterministicIDs for the other half and the reasoning.
+//
+// Left as the real clock unless SetFixedNow is called, so a normal --demo
+// still shows events relative to today, which is the point of a demo.
+var now = time.Now
+
+// SetFixedNow pins the seed clock. Call before Seed; --demo wires it from
+// CACKLE_DEMO_NOW (RFC3339). Returns false if the value does not parse, so a
+// typo does not silently fall back to a wall clock and reintroduce the churn
+// this exists to remove.
+func SetFixedNow(rfc3339 string) bool {
+	t, err := time.Parse(time.RFC3339, rfc3339)
+	if err != nil {
+		return false
+	}
+	now = func() time.Time { return t }
+	return true
+}
+
 func Seed(ctx context.Context, st *store.Store, ev *events.Service, or *orders.Service, og *orgs.Service) error {
 	if _, err := st.GetOrgBySlug(ctx, DemoOrgSlug); err == nil {
 		return nil // already seeded
@@ -268,9 +292,9 @@ func Seed(ctx context.Context, st *store.Store, ev *events.Service, or *orders.S
 		"kuwait-gulf-comedy-night": true,
 	}
 
-	now := time.Now()
+	base := now()
 	for _, se := range seedEvents() {
-		eventID, err := seedOneEvent(ctx, ev, orgID, se, now)
+		eventID, err := seedOneEvent(ctx, ev, orgID, se, base)
 		if err != nil {
 			return fmt.Errorf("demo: seed event %q: %w", se.slug, err)
 		}
@@ -476,7 +500,7 @@ func seedOrdersAndAdmissions(ctx context.Context, st *store.Store, ev *events.Se
 				Status:      payments.StatusPaid,
 				AmountMinor: order.TotalMinor,
 				Currency:    order.Currency,
-				PaidAt:      time.Now(),
+				PaidAt:      now(),
 			}
 			_, tickets, err := or.Settle(ctx, result)
 			if err != nil {
@@ -492,7 +516,7 @@ func seedOrdersAndAdmissions(ctx context.Context, st *store.Store, ev *events.Se
 	// Admit ~62% of the issued tickets ("walked through the gate"), leaving a
 	// realistic no-show remainder, so stats show a meaningful admitted count
 	// and admission rate. Deterministic (every ticket whose index mod 8 < 5).
-	admittedAt := time.Now().UTC().Format(time.RFC3339)
+	admittedAt := now().UTC().Format(time.RFC3339)
 	for i, ticketID := range issued {
 		if i%8 >= 5 {
 			continue
