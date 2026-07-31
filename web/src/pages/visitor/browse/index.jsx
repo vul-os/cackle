@@ -11,6 +11,34 @@
 // turned into words in ONE place — @/lib/host — so no page can invent a name
 // or dress a single venue up as a directory. `?host=<org-slug>` narrows the
 // listing to one organisation on a box that hosts several.
+//
+// # The seven "overflowing" elements at 390px — measured, and both false
+//
+// A sweep of this page reports seven element boxes reaching outside a 390px
+// viewport. Measured against check-site.mjs's rule — only a genuine
+// `overflow-x: auto|scroll` ancestor forgives, and the walk stops before
+// <body> so index.css's `body{overflow-x:hidden}` cannot launder anything —
+// both classes are correct by construction, not defects:
+//
+//  1. The header's skip link (`pages/visitor/header.jsx`) is Tailwind's
+//     `sr-only`: 1x1, `position:absolute`, `margin:-1px`, `clip:rect(0,0,0,0)`.
+//     The -1px margin is what puts it at x=-1…0. That is the off-screen
+//     technique itself, it is clipped to nothing, and leftward overhang cannot
+//     extend the scroll area in an LTR document — with body's overflow-x
+//     forced back to `visible` the document still measures
+//     scrollWidth 390 == clientWidth 390. Moving it would break the affordance
+//     to satisfy a measurement.
+//  2. The six category chips (`pages/visitor/events/category-tabs.jsx`) sit in
+//     a real scroll container: computed `overflow-x: auto`, clientWidth 358,
+//     scrollWidth 590, and scrollLeft reaches 232. They scroll; nothing is
+//     silently clipped. `hidden`/`clip` would NOT be forgiven here — that is
+//     the bug class the rule exists to find — but this is not that.
+//
+// Neither is masked by `body { overflow-x: hidden }` in index.css: that rule
+// is the seatbelt for a stray element, and removing it changes nothing here.
+// The multi-organisation branch below was measured too, with a 76-character
+// organisation name, at 390/768/1440 in both themes: the chip row wraps and
+// nothing overflows.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, CalendarX2, X, ExternalLink } from 'lucide-react';
