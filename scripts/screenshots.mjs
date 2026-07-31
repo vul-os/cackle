@@ -2,9 +2,19 @@
 /**
  * Cackle — Playwright screenshotter
  *
- * Captures every major surface at 1440×900 @2x (retina, viewport-only)
- * into docs/screenshots/<surface>-<theme>.png, in BOTH light and dark, then
- * copies the flagship shot to docs/screenshots/hero.png and writes a
+ * Captures every major surface in BOTH themes at BOTH viewports:
+ *
+ *   docs/screenshots/<surface>-<theme>.png          desktop, 1440×900 @2x
+ *   docs/screenshots/<surface>-<theme>-mobile.png   mobile,   390×844 @2x
+ *
+ * The DESKTOP names are deliberately bare — they are the historical names and
+ * site/index.html, docs/*.md and README.md all reference them by name and
+ * theme-swap them at runtime, so renaming them breaks the landing page and the
+ * docs at once. Mobile is therefore a SUFFIX on the existing name rather than a
+ * new naming scheme, and the suffix goes LAST so `<surface>-<theme>` stays the
+ * stable stem both the site's theme-swapper and its viewport-swapper build on.
+ *
+ * It then copies the flagship shot to docs/screenshots/hero.png and writes a
  * generated docs/screenshots/README.md index. The one exception is
  * `landing` (see SURFACES below): it captures the FULL scrollable page, not
  * just the viewport, so the flagship hero.png shot actually shows the
@@ -15,6 +25,9 @@
  *   2. Build the Go binary with the frontend embedded (mirrors `make build`:
  *      copy web/dist -> cmd/cackle/dist, `go build -tags embed_frontend`).
  *   3. Boot it with --demo on port 8087, in-memory DB, zero setup required.
+ *      The binary is rebuilt from the CURRENT tree on every run — a stale
+ *      binary left over from an earlier session photographs an app nobody has
+ *      any more, and looks entirely plausible while doing it.
  *   4. Log in as the seeded demo organiser (see DEMO_EMAIL/DEMO_PASSWORD
  *      below) via the real sign-in form, so organiser-only surfaces render
  *      with real session cookies — no guessing at localStorage token keys.
@@ -46,7 +59,7 @@
  */
 
 import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, existsSync, copyFileSync, rmSync, cpSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync, copyFileSync, rmSync, cpSync, readFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -64,8 +77,31 @@ const BASE = EXTERNAL_URL ?? LOCAL_BASE;
 const DEMO_EMAIL = process.env.CACKLE_DEMO_EMAIL || 'demo@cackle.events';
 const DEMO_PASSWORD = process.env.CACKLE_DEMO_PASSWORD || 'demo1234';
 
-const VIEWPORT = { width: 1440, height: 900 };
-const THEME_STORAGE_KEYS = ['cackle-ui-theme', 'vite-ui-theme']; // shadcn ThemeProvider storageKey — cover both the current and legacy default
+// The app's ThemeProvider reads `cackle-ui-theme`. `vite-ui-theme` is the
+// shadcn template default this app was scaffolded from and is written too, so a
+// stray legacy reader cannot flip a set back to light — getting this key wrong
+// silently produced two *light* sets for an earlier run, with no error anywhere.
+const THEME_STORAGE_KEYS = ['cackle-ui-theme', 'vite-ui-theme'];
+
+// Both viewports every surface is shot at. `suffix` is appended AFTER the
+// theme, so desktop keeps its historical `<surface>-<theme>.png` name (which
+// site/index.html, README.md and docs/*.md all reference literally) and mobile
+// is unambiguously `<surface>-<theme>-mobile.png`.
+//
+// 390×844 is the iPhone 12/13/14 logical viewport — the narrowest width the
+// design spec requires this app to work at, and the one the gate scanner is
+// actually held at. `isMobile` turns on meta-viewport handling and touch, so
+// the capture exercises the same code path a phone does rather than a merely
+// narrow desktop window.
+const VIEWPORTS = [
+  { name: 'desktop', suffix: '', width: 1440, height: 900, isMobile: false, dsf: 2 },
+  { name: 'mobile', suffix: '-mobile', width: 390, height: 844, isMobile: true, dsf: 2 },
+];
+
+/** The one place a capture's filename is decided. */
+function shotName(surface, theme, viewport) {
+  return `${surface}-${theme}${viewport.suffix}.png`;
+}
 
 const HERO_SURFACE = 'landing'; // the homepage — first thing anyone sees
 const HERO_THEME = 'light';
@@ -211,6 +247,10 @@ function writeUnbootableReadme(reason) {
   writeFileSync(path.join(OUT, 'README.md'), notes + '\n');
 }
 
+// Wall-clock start, used by the freshness guard at the end: every capture this
+// run claims to have taken must have an mtime at or after this.
+const RUN_STARTED = Date.now();
+
 let serverProc = null;
 
 function stopServer() {
@@ -224,11 +264,26 @@ function stopServer() {
   }
 }
 
-/** Build web/dist (if missing) and the cackle binary with it embedded. */
+/**
+ * Build web/dist and the cackle binary with it embedded.
+ *
+ * The frontend is rebuilt EVERY run, not just when web/dist is missing. A
+ * left-over dist from an earlier session produces a binary that boots happily
+ * and photographs an app that no longer exists — the resulting images look
+ * entirely plausible and are simply wrong. Set CACKLE_SHOTS_REUSE_DIST=1 to
+ * reuse an existing build when you know it is current (iterating on this
+ * script, say); it is opt-in precisely because the failure is silent.
+ */
 function buildBinary() {
-  if (!existsSync(path.join(ROOT, 'web', 'dist', 'index.html'))) {
+  const distIndex = path.join(ROOT, 'web', 'dist', 'index.html');
+  const reuse = process.env.CACKLE_SHOTS_REUSE_DIST === '1' && existsSync(distIndex);
+  if (reuse) {
+    console.log('  reusing existing web/dist (CACKLE_SHOTS_REUSE_DIST=1) — captures are only as fresh as it is');
+  } else {
     console.log('  building frontend (web/dist) …');
-    execSync('npm ci', { cwd: path.join(ROOT, 'web'), stdio: 'pipe' });
+    if (!existsSync(path.join(ROOT, 'web', 'node_modules'))) {
+      execSync('npm ci', { cwd: path.join(ROOT, 'web'), stdio: 'pipe' });
+    }
     execSync('npm run build', { cwd: path.join(ROOT, 'web'), stdio: 'pipe' });
   }
 
@@ -369,13 +424,18 @@ async function loginViaUI(page) {
   }
 }
 
-async function makeThemeContext(browser, theme) {
+async function makeThemeContext(browser, theme, viewport) {
   const ctx = await browser.newContext({
-    viewport: VIEWPORT,
-    deviceScaleFactor: 2,
+    viewport: { width: viewport.width, height: viewport.height },
+    deviceScaleFactor: viewport.dsf,
     colorScheme: theme,
+    isMobile: viewport.isMobile,
+    hasTouch: viewport.isMobile,
     locale: 'en-US',
   });
+  // ONE argument. `addInitScript(fn, a, b)` silently drops everything after the
+  // first — an entire "dark" sweep once ran against the light theme because of
+  // exactly that, with no error and plausible-looking output. Pass an object.
   await ctx.addInitScript(
     ({ keys, t }) => {
       try {
@@ -389,8 +449,39 @@ async function makeThemeContext(browser, theme) {
   return ctx;
 }
 
-async function capture(page, surface, theme, discoveryCtx, pageIssues = []) {
-  console.log(`  → [${theme}] ${surface.name} — ${surface.description}`);
+/**
+ * Walk the page top-to-bottom in viewport-sized steps, then back to the top.
+ *
+ * A single programmatic `scrollTo(0, bottom)` runs faster than the compositor
+ * delivers IntersectionObserver callbacks, so reveal-on-scroll content never
+ * becomes visible and the capture is of an empty page — which is a capture
+ * artifact, not a bug in the app, and has been mistaken for one before. Lazy
+ * `loading="lazy"` images have the same failure mode. Stepping with a wait per
+ * step gives both a chance to fire; ending back at 0 means a fullPage shot
+ * starts where a reader would.
+ */
+async function scrollThrough(page) {
+  await page.evaluate(async () => {
+    const step = Math.max(200, Math.round(window.innerHeight * 0.75));
+    const wait = () => new Promise((r) => setTimeout(r, 120));
+    for (let y = 0; y < document.body.scrollHeight; y += step) {
+      window.scrollTo(0, y);
+      await wait();
+    }
+    window.scrollTo(0, document.body.scrollHeight);
+    await wait();
+    window.scrollTo(0, 0);
+    await wait();
+  });
+  // Anything that started decoding during the walk gets a moment to finish.
+  await page.evaluate(() => Promise.all(
+    [...document.images].filter((i) => !i.complete).map((i) => i.decode().catch(() => {})),
+  )).catch(() => {});
+  await page.waitForTimeout(250);
+}
+
+async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues = []) {
+  console.log(`  → [${theme}/${viewport.name}] ${surface.name} — ${surface.description}`);
   const issuesBefore = pageIssues.length;
   let url = `${BASE}${surface.path}`;
   if (surface.discover) {
@@ -416,14 +507,16 @@ async function capture(page, surface, theme, discoveryCtx, pageIssues = []) {
       await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
     }
     await page.waitForTimeout(surface.settleMs || 800);
+    await scrollThrough(page).catch(() => {});
 
-    const outPath = path.join(OUT, `${surface.name}-${theme}.png`);
+    const outPath = path.join(OUT, shotName(surface.name, theme, viewport));
     await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
-    console.log(`     saved ${path.relative(ROOT, outPath)}`);
-    return { name: surface.name, theme, status: 'ok', url, issues: pageIssues.slice(issuesBefore) };
+    const bytes = statSync(outPath).size;
+    console.log(`     saved ${path.relative(ROOT, outPath)} (${(bytes / 1024).toFixed(0)} KB)`);
+    return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, issues: pageIssues.slice(issuesBefore) };
   } catch (err) {
     console.warn(`     FAILED: ${err.message}`);
-    return { name: surface.name, theme, status: 'failed', error: err.message, url, issues: pageIssues.slice(issuesBefore) };
+    return { name: surface.name, theme, viewport: viewport.name, status: 'failed', error: err.message, url, issues: pageIssues.slice(issuesBefore) };
   } finally {
     if (surface.seedCart) {
       await page.evaluate(() => localStorage.removeItem('cackle_cart_v1')).catch(() => {});
@@ -438,7 +531,9 @@ async function main() {
   console.log('\nCackle screenshotter');
   console.log(`  target      : ${BASE}${usingExternal ? ' (external)' : ' (local --demo)'}`);
   console.log(`  output      : ${path.relative(ROOT, OUT)}/`);
-  console.log(`  viewport    : 1440×900 @2x (retina), light + dark\n`);
+  console.log(`  viewports   : ${VIEWPORTS.map((v) => `${v.name} ${v.width}×${v.height} @${v.dsf}x`).join(', ')}`);
+  console.log(`  themes      : light + dark`);
+  console.log(`  captures    : ${SURFACES.length} surfaces × 2 themes × ${VIEWPORTS.length} viewports = ${SURFACES.length * 2 * VIEWPORTS.length}\n`);
 
   if (!usingExternal) {
     try {
@@ -469,8 +564,12 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const results = [];
 
-  for (const theme of ['light', 'dark']) {
-    const context = await makeThemeContext(browser, theme);
+  const combos = [];
+  for (const theme of ['light', 'dark']) for (const viewport of VIEWPORTS) combos.push({ theme, viewport });
+
+  for (const { theme, viewport } of combos) {
+    console.log(`\n  ── ${theme} · ${viewport.name} (${viewport.width}×${viewport.height} @${viewport.dsf}x) ──`);
+    const context = await makeThemeContext(browser, theme, viewport);
     if (SURFACES.some((s) => s.grantCamera)) {
       await context.grantPermissions(['camera']).catch(() => {});
     }
@@ -494,16 +593,16 @@ async function main() {
           discoveryCtx.ticketId = await discoverTicket(page);
         }
       } catch (err) {
-        console.warn(`  [${theme}] demo login failed (${err.message}) — auth-gated surfaces will show the sign-in page instead`);
+        console.warn(`  [${theme}/${viewport.name}] demo login failed (${err.message}) — auth-gated surfaces will show the sign-in page instead`);
       }
     }
 
     for (const surface of SURFACES) {
       if (surface.auth && !loggedIn) {
-        results.push({ name: surface.name, theme, status: 'skipped', error: 'demo login unavailable' });
+        results.push({ name: surface.name, theme, viewport: viewport.name, status: 'skipped', error: 'demo login unavailable' });
         continue;
       }
-      results.push(await capture(page, surface, theme, discoveryCtx, pageIssues));
+      results.push(await capture(page, surface, theme, viewport, discoveryCtx, pageIssues));
     }
 
     await context.close();
@@ -516,19 +615,49 @@ async function main() {
   const ok = results.filter((r) => r.status === 'ok');
   const failed = results.filter((r) => r.status === 'failed');
   const skipped = results.filter((r) => r.status === 'skipped');
-  console.log(`\nDone — ${ok.length} captured, ${failed.length} failed, ${skipped.length} skipped`);
+  const expected = SURFACES.length * 2 * VIEWPORTS.length;
+  console.log(
+    `\nDone — ${ok.length} captured, ${failed.length} failed, ${skipped.length} skipped ` +
+      `(expected ${expected} = ${SURFACES.length} surfaces × 2 themes × ${VIEWPORTS.length} viewports)`,
+  );
+
+  // Freshness guard. This script exits 0 by design when the app cannot boot, so
+  // a green exit is not evidence that anything was written — and a directory
+  // full of yesterday's PNGs looks exactly like a directory full of today's.
+  // Assert every expected file exists and was written by THIS run.
+  const stale = [];
+  for (const theme of ['light', 'dark']) {
+    for (const viewport of VIEWPORTS) {
+      for (const s of SURFACES) {
+        const file = path.join(OUT, shotName(s.name, theme, viewport));
+        if (!existsSync(file)) { stale.push(`${path.basename(file)} — MISSING`); continue; }
+        const st = statSync(file);
+        if (st.mtimeMs < RUN_STARTED) stale.push(`${path.basename(file)} — not rewritten by this run`);
+        else if (st.size < 5_000) stale.push(`${path.basename(file)} — only ${st.size} bytes`);
+      }
+    }
+  }
+  if (stale.length) {
+    console.warn(`\n  WARNING: ${stale.length} capture(s) are missing, stale or suspiciously small:`);
+    for (const s of stale) console.warn(`    ${s}`);
+  } else {
+    console.log(`  all ${expected} captures were written by this run and are non-trivial in size`);
+  }
 
   // Identical-capture guard. "N captured, 0 failed" once meant 13 byte-identical
   // copies of the sign-in page, because a silent auth failure sent every
   // auth-gated route to the same redirect. A count is not evidence the shots
-  // differ, so check, and say so loudly when they don't.
+  // differ, so check, and say so loudly when they don't. It also catches the
+  // other silent failure this file has seen: a light/dark pair coming out
+  // byte-identical because the theme never actually flipped.
   const byDigest = new Map();
   for (const r of ok) {
-    const file = path.join(OUT, `${r.name}-${r.theme}.png`);
+    const viewport = VIEWPORTS.find((v) => v.name === r.viewport) ?? VIEWPORTS[0];
+    const file = path.join(OUT, shotName(r.name, r.theme, viewport));
     if (!existsSync(file)) continue;
     const digest = createHash('sha256').update(readFileSync(file)).digest('hex');
     if (!byDigest.has(digest)) byDigest.set(digest, []);
-    byDigest.get(digest).push(`${r.name}-${r.theme}`);
+    byDigest.get(digest).push(path.basename(file, '.png'));
   }
   const collisions = [...byDigest.values()].filter((names) => names.length > 1);
   if (collisions.length) {
@@ -559,7 +688,8 @@ async function main() {
   }
 
   // Hero: the single most representative shot, copied to the gallery top.
-  const heroSrc = path.join(OUT, `${HERO_SURFACE}-${HERO_THEME}.png`);
+  // Desktop — README.md renders it at 900px wide in a GitHub page.
+  const heroSrc = path.join(OUT, shotName(HERO_SURFACE, HERO_THEME, VIEWPORTS[0]));
   if (existsSync(heroSrc)) {
     copyFileSync(heroSrc, path.join(OUT, 'hero.png'));
     console.log(`  copied ${HERO_SURFACE}-${HERO_THEME}.png -> hero.png`);
@@ -573,21 +703,33 @@ async function main() {
   cpSync(OUT, SITE_OUT, { recursive: true });
   console.log(`  mirrored ${OUT} -> ${SITE_OUT}`);
 
+  const statusOf = (name, theme, viewportName) => {
+    const r = results.find((x) => x.name === name && x.theme === theme && x.viewport === viewportName);
+    if (!r) return '—';
+    return r.status === 'ok' ? 'captured' : r.status === 'skipped' ? 'skipped (needs live instance)' : 'failed';
+  };
+
   const notes = [
     '# docs/screenshots',
     '',
     'Generated by `npm run screenshots` (scripts/screenshots.mjs).',
-    'Every surface is captured in **light and dark** at retina (1440×900 @2x)',
-    'against `./cackle --demo`. `hero.png` is a copy of the flagship shot',
-    `(${HERO_SURFACE}, ${HERO_THEME}) — the Cackle homepage.`,
+    'Every surface is captured in **light and dark** at **two viewports** against',
+    '`./cackle --demo`:',
     '',
-    '| File | Surface | Status |',
-    '|------|---------|--------|',
-    ...results.map((r) => {
-      const desc = SURFACES.find((s) => s.name === r.name)?.description ?? r.name;
-      const status = r.status === 'ok' ? 'captured' : r.status === 'skipped' ? 'skipped (needs live instance)' : 'failed';
-      return `| ${r.name}-${r.theme}.png | ${desc} | ${status} |`;
-    }),
+    '- `<surface>-<theme>.png` — desktop, 1440×900 @2x',
+    '- `<surface>-<theme>-mobile.png` — mobile, 390×844 @2x (touch, meta-viewport)',
+    '',
+    'The desktop names carry no viewport suffix on purpose: `site/index.html`,',
+    '`README.md` and the docs chapters reference them literally, so the bare name',
+    'is the stable one and mobile is a suffix on it.',
+    '',
+    `\`hero.png\` is a copy of the flagship shot (${HERO_SURFACE}, ${HERO_THEME}, desktop) — the Cackle homepage.`,
+    '',
+    '| Surface | light | dark | light · mobile | dark · mobile |',
+    '|---|---|---|---|---|',
+    ...SURFACES.map((s) =>
+      `| ${s.description} (\`${s.name}\`) | ${statusOf(s.name, 'light', 'desktop')} | ${statusOf(s.name, 'dark', 'desktop')} | ` +
+      `${statusOf(s.name, 'light', 'mobile')} | ${statusOf(s.name, 'dark', 'mobile')} |`),
     '',
     'To regenerate: `npm run screenshots`',
     'Against a live instance: `BASE_URL=https://... npm run screenshots`',

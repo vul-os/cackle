@@ -21,15 +21,39 @@ npx playwright install chromium   # one-time Chromium download
 npm run screenshots
 ```
 
-The screenshotter (`scripts/screenshots.mjs`) builds the Go binary, boots it
-with `--demo` on port **8087** (so it doesn't collide with a Cackle instance
-you might already have running on 8080), and drives a real Chromium browser
-at 1440×900, deviceScaleFactor 2. It shoots each surface in both light and
-dark mode to `docs/screenshots/<surface>-<theme>.png`, then copies the hero
-shot to `docs/screenshots/hero.png` for the README header. `landing` is the
-one surface captured as the FULL scrollable page rather than just the
-1440×900 viewport, so the flagship `hero.png` shows the demo events listed
-below the hero, not just the hero on its own.
+The screenshotter (`scripts/screenshots.mjs`) rebuilds `web/dist` and the Go
+binary from the current tree, boots it with `--demo` on port **8087** (so it
+doesn't collide with a Cackle instance you might already have running on
+8080), and drives a real Chromium browser. It shoots **every surface in both
+themes at both viewports** — 13 × 2 × 2 = 52 captures:
+
+| | Viewport | File |
+|---|---|---|
+| Desktop | 1440×900, deviceScaleFactor 2 | `docs/screenshots/<surface>-<theme>.png` |
+| Mobile | 390×844, deviceScaleFactor 2, touch + meta-viewport | `docs/screenshots/<surface>-<theme>-mobile.png` |
+
+The desktop files carry **no viewport suffix**, and that is deliberate:
+`site/index.html`, `README.md` and the docs chapters all reference those names
+literally, so the bare `<surface>-<theme>` stem is the stable one and mobile is
+a suffix appended after it. The landing page picks between the two at runtime
+using the reader's own viewport, the same way it already picks a theme.
+
+It then copies the hero shot to `docs/screenshots/hero.png` for the README
+header. `landing` is the one surface captured as the FULL scrollable page
+rather than just the viewport, so the flagship `hero.png` shows the demo events
+listed below the hero, not just the hero on its own.
+
+Every surface is walked top-to-bottom in viewport-sized steps before it is
+shot. A single fast `scrollTo` outruns `IntersectionObserver`, so
+reveal-on-scroll content never becomes visible and the capture comes out
+empty — a capture artifact that has been mistaken for a bug in the app.
+
+After the run the script asserts that **every** expected file exists, was
+written by that run, and is not suspiciously small; that no two captures are
+byte-identical (which is what a silent auth redirect, or a theme that never
+flipped, actually looks like); and that no page logged a console error. It
+still exits `0` regardless — see below — so those warnings are the evidence,
+not the exit code.
 
 If the app can't boot (missing build, port conflict, migration failure),
 the script exits `0` and writes an explanatory
@@ -37,6 +61,10 @@ the script exits `0` and writes an explanatory
 generation should never be the reason CI goes red for an unrelated change.
 
 ## Surfaces captured
+
+Each row exists four times on disk: `-light.png`, `-dark.png`,
+`-light-mobile.png` and `-dark-mobile.png`. The **File** column below writes
+the desktop pair; append `-mobile` for the 390px pair.
 
 | Surface | File | What it shows |
 |---|---|---|
@@ -57,8 +85,9 @@ generation should never be the reason CI goes red for an unrelated change.
 
 ## Adding a new surface
 
-Add the route and a shot call in `scripts/screenshots.mjs`, following the
-existing pattern (navigate, wait for the surface to settle, shoot light,
-toggle theme, shoot dark). Reference the new file from the README gallery
-or this page as appropriate — a screenshot that exists on disk but isn't
-linked from anywhere is dead weight.
+Add an entry to `SURFACES` in `scripts/screenshots.mjs` — the run already
+loops it over both themes and both viewports, so one entry is four captures.
+Give it a `discover` if its path contains a real id, so the shot survives a
+change to the seed data. Reference the new file from the README gallery or
+this page as appropriate — a screenshot that exists on disk but isn't linked
+from anywhere is dead weight.
