@@ -195,8 +195,8 @@ func (s *Store) scanEvent(row *sql.Row) (*Event, error) {
 	return &e, nil
 }
 
-// ListPublishedEvents returns published events, most recently created
-// first, optionally filtered by a case-insensitive substring match against
+// ListPublishedEvents returns published events, most imminent first,
+// optionally filtered by a case-insensitive substring match against
 // title/summary/venue_name, an exact category match, an owning-org
 // restriction, and/or a starts_at range. limit <= 0 defaults to 50; it is
 // always capped at 200. Only status='published' rows are ever returned —
@@ -264,7 +264,13 @@ func (s *Store) ListPublishedEvents(ctx context.Context, query, category string,
 		q += ` AND starts_at <= ?`
 		args = append(args, timeToText(*to))
 	}
-	q += ` ORDER BY starts_at ASC LIMIT ?`
+	// `, id ASC` decides WHICH ROWS ARE ON THE PAGE, not merely their order.
+	// starts_at is an organiser-chosen wall-clock time, so it is usually a
+	// round one and every event starting at 19:00 tonight sorts equal; with a
+	// LIMIT and no offset there is no page two, so an event that loses a tie
+	// is not listed later, it is not listed. Ordering by id as well makes the
+	// page a defined set. See TestListPublishedEventsBreaksStartsAtTies.
+	q += ` ORDER BY starts_at ASC, id ASC LIMIT ?`
 	args = append(args, limit)
 
 	return s.queryEvents(ctx, q, args...)

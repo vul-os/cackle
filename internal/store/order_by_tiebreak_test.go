@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"sort"
 	"testing"
 	"time"
@@ -175,4 +177,130 @@ func mustTiebreakUser(t *testing.T, st *Store) string {
 		t.Fatalf("CreateUser: %v", err)
 	}
 	return u.ID
+}
+
+// mustPublishedEventsAt creates one org and a published event per id, every
+// one starting at exactly the same instant, INSERTED in the order given. Pass
+// descending ids to put rowid order and id order at odds.
+func mustPublishedEventsAt(t *testing.T, st *Store, startsAt time.Time, ids []string) (orgID string) {
+	t.Helper()
+	ctx := context.Background()
+
+	org := &Org{Name: "Tiebreak Ltd", Slug: "tiebreak-" + NewID()}
+	if err := st.CreateOrg(ctx, org); err != nil {
+		t.Fatalf("CreateOrg: %v", err)
+	}
+	for _, id := range ids {
+		ev := &Event{
+			ID: id, OrgID: org.ID, Slug: "ev-" + id, Title: "Event " + id, Status: "published",
+			StartsAt: startsAt, EndsAt: startsAt.Add(time.Hour), Currency: "ZAR",
+		}
+		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("generate key: %v", err)
+		}
+		if err := st.CreateEventWithKey(ctx, ev, &EventKey{PublicKey: pub, PrivateKey: priv}); err != nil {
+			t.Fatalf("CreateEventWithKey(%s): %v", id, err)
+		}
+	}
+	return org.ID
+}
+
+func eventIDs(rows []Event) []string {
+	out := make([]string, len(rows))
+	for i, r := range rows {
+		out[i] = r.ID
+	}
+	return out
+}
+
+// TestListPublishedEventsBreaksStartsAtTies covers ListPublishedEvents, where
+// the missing tiebreaker does something worse than reorder a list: combined
+// with LIMIT it leaves WHICH ROWS ARE ON THE PAGE unspecified.
+//
+// starts_at ties are not an edge case for this table the way they are for an
+// audit log. It is an organiser-chosen wall-clock time, so it is almost always
+// a round one, and every event on a box that starts at 19:00 on the same
+// evening sorts equal. This route has a LIMIT and no offset — there is no page
+// two — so an event losing a coin toss is not shown later, it is not shown.
+//
+// A BACKSTOP TO AVOID. Passing an org filter makes SQLite serve this from
+// idx_events_org_status_id (migration 0008), whose third column is `id`, so the
+// scan feeds the sorter in id order and the answer comes out right WITHOUT any
+// tiebreaker — vacuously green. This test therefore uses the unfiltered
+// whole-box listing, which is both the default and the case SQLite serves from
+// idx_events_status, in rowid order. The plan-dependence test below covers the
+// filtered case by showing that accident is only an accident.
+//
+// MUTATION: drop `, id ASC` from ListPublishedEvents and this fails, returning
+// the two events that should have been below the cut.
+func TestListPublishedEventsBreaksStartsAtTies(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	startsAt := time.Date(2026, 9, 9, 19, 0, 0, 0, time.UTC)
+	ids := []string{"01EVENT0000000000000000004", "01EVENT0000000000000000003", "01EVENT0000000000000000002", "01EVENT0000000000000000001"}
+	mustPublishedEventsAt(t, st, startsAt, ids)
+
+	var rowCount, distinct int
+	if err := st.db.QueryRow(`SELECT COUNT(*), COUNT(DISTINCT starts_at) FROM events WHERE status = 'published'`).Scan(&rowCount, &distinct); err != nil {
+		t.Fatalf("count distinct starts_at: %v", err)
+	}
+	if rowCount != len(ids) || distinct != 1 {
+		t.Fatalf("the tie was not forced: %d published events over %d distinct starts_at values, want %d over 1", rowCount, distinct, len(ids))
+	}
+
+	rows, err := st.ListPublishedEvents(ctx, "", "", nil, nil, nil, 2)
+	if err != nil {
+		t.Fatalf("ListPublishedEvents: %v", err)
+	}
+	want := []string{"01EVENT0000000000000000001", "01EVENT0000000000000000002"}
+	got := eventIDs(rows)
+	if len(got) != len(want) {
+		t.Fatalf("got %d events, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("the limited page contained %v, want %v — which events are listed at all is undefined", got, want)
+		}
+	}
+}
+
+// TestListPublishedEventsPageIsNotDecidedByTheQueryPlan is the sharper half.
+// The bounded page's COMPOSITION must not change because an index appeared:
+// this returns a public listing, and a would-be attendee cannot tell the
+// difference between "that event is not on tonight" and "that event lost a
+// tie".
+//
+// MUTATION: drop `, id ASC` from ListPublishedEvents and the two plans return
+// different events.
+func TestListPublishedEventsPageIsNotDecidedByTheQueryPlan(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	startsAt := time.Date(2026, 9, 9, 19, 0, 0, 0, time.UTC)
+	ids := []string{"01EVENT0000000000000000004", "01EVENT0000000000000000003", "01EVENT0000000000000000002", "01EVENT0000000000000000001"}
+	orgID := mustPublishedEventsAt(t, st, startsAt, ids)
+
+	viaTempBTree, err := st.ListPublishedEvents(ctx, "", "", []string{orgID}, nil, nil, 2)
+	if err != nil {
+		t.Fatalf("ListPublishedEvents (temp b-tree plan): %v", err)
+	}
+	if _, err := st.db.Exec(`CREATE INDEX tmp_events_starts ON events(status, starts_at)`); err != nil {
+		t.Fatalf("create probe index: %v", err)
+	}
+	viaIndexScan, err := st.ListPublishedEvents(ctx, "", "", []string{orgID}, nil, nil, 2)
+	if err != nil {
+		t.Fatalf("ListPublishedEvents (index-ordered plan): %v", err)
+	}
+
+	a, b := eventIDs(viaTempBTree), eventIDs(viaIndexScan)
+	if len(a) != len(b) {
+		t.Fatalf("page length changed with the query plan: %d vs %d", len(a), len(b))
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			t.Fatalf("the listed events changed with the query plan: %v without an ordering index, %v with one", a, b)
+		}
+	}
 }
