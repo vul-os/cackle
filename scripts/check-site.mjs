@@ -106,11 +106,40 @@ const THEMES = ['dark', 'light'];
 // "no element overflows" mean "many elements were looked at and none did".
 const MIN_ELEMENTS_MEASURED = { landing: 400, docs: 150 };
 
+// Same idea, for the per-breakpoint image scan below: the landing page has a
+// steady 10 <img> elements (chrome logos + the gallery + the 7 themeshots),
+// present at every breakpoint and theme. docs.html's own shell markup has
+// only 2 (the header tile logo and the footer Vulos logo — everything else
+// on that page is chapter content, which docs.html's rail-vs-chapter-table
+// check and docs:links already gate, and which varies chapter to chapter: the
+// breakpoint sweep below runs on whichever chapter the earlier per-chapter
+// walk left the page on, and "changelog" — its last chapter — embeds none).
+// A selector that stopped matching (or a chapter that never finished
+// rendering) would examine zero images and report zero broken — this floor
+// is what makes that impossible to pass silently.
+const IMAGE_FLOOR = { landing: 8, docs: 2 };
+
 // A run that dies early must FAIL, not pass by doing nothing. Every shape
 // contributes a fixed number of assertions, so a short count is itself a bug.
 // Per page: requests, >=400, console, self-contained, images, the overflow
-// coverage floor, and one overflow assertion per breakpoint per theme.
-const CHECKS_PER_PAGE = 6 + BREAKPOINTS.length * THEMES.length;
+// coverage floor, the image coverage floor, and — per breakpoint per theme —
+// one overflow assertion, one "no failed requests", one "no response >= 400"
+// and one "every <img> decoded" assertion.
+//
+// The last three of those four are re-runs of checks that also run once,
+// early, at the page's initial viewport. That earlier run is not redundant
+// with these: the page swaps <img src> to a per-breakpoint capture file (see
+// index.html's setShot()/narrow listener), AFTER the early run already
+// fired, and nothing re-asserted the three request/image checks again until
+// this loop existed — so a capture missing for exactly one breakpoint (its
+// `-mobile` sibling, say) was invisible to "no failed requests" / "no
+// response >= 400" / "every <img> decoded" for this file's entire life.
+// Proven: moving site/screenshots/attendees-dark-mobile.png aside and
+// running this file unmodified still printed "check-site: 57 checks
+// passed". Re-running per breakpoint (watermarked against what "no failed
+// requests" / "no response >= 400" already reported, so nothing is
+// double-counted) is what closes that gap.
+const CHECKS_PER_PAGE = 7 + BREAKPOINTS.length * THEMES.length * 4;
 const CLAIM_CHECKS = 2;                          // landing only, per shape
 const DOCS_CHECKS = 1;                           // docs.html only: rail vs chapter table
 const SELF_TESTS = 3;                            // claim gate, brand-mark provenance, overflow gate — all proving they still bite
@@ -298,6 +327,31 @@ async function setTheme(pg, want) {
     await pg.waitForTimeout(700); // docs.html re-renders the open chapter on a theme change
   }
   return current();
+}
+
+/**
+ * Wait for every <img> currently in the DOM to finish loading — successfully
+ * or not; `.complete` goes true either way, `brokenImages()` is what tells
+ * them apart.
+ *
+ * This exists because of the same footgun the gallery-stepping code above
+ * already names: writing a new `src` while the old request for that element
+ * is still in flight cancels it with a genuine `net::ERR_ABORTED`, which is
+ * indistinguishable from a real failure to a listener that isn't told which
+ * requests were superseded on purpose. The breakpoint sweep below changes
+ * viewport AND theme in the same iteration — both of which reassign `<img
+ * src>` (see index.html's setShot()) — so without this wait, the NEXT
+ * iteration's reassignment routinely aborted the PREVIOUS iteration's still-
+ * settling request, and "no failed requests @<bp> <theme>" failed on
+ * `checkout-light.png` / `attendees-light.png` / … that were never actually
+ * missing, only still loading. Waiting here first is what makes that
+ * assertion mean "a request for a file this page asked for did not
+ * complete", not "a request this page itself superseded got cancelled".
+ */
+async function waitForImagesSettled(pg, timeout = 8000) {
+  await pg
+    .waitForFunction(() => [...document.querySelectorAll('img')].every((i) => i.complete), null, { timeout })
+    .catch(() => {});
 }
 
 /** Every <img> that is in the DOM must have actually decoded. */
@@ -577,12 +631,27 @@ async function main() {
       }
 
       const floor = page === shape.entry ? MIN_ELEMENTS_MEASURED.landing : MIN_ELEMENTS_MEASURED.docs;
+      const imageFloor = page === shape.entry ? IMAGE_FLOOR.landing : IMAGE_FLOOR.docs;
       let leastExamined = Infinity;
+      let leastImagesExamined = Infinity;
+      // Watermarks into `failed`/`bad` (see CHECKS_PER_PAGE's comment above):
+      // each breakpoint asserts only what accrued SINCE the last one, so a
+      // stale failure from an earlier viewport isn't reported six times over.
+      let failedWatermark = failed.length;
+      let badWatermark = bad.length;
       for (const w of BREAKPOINTS) {
         await pg.setViewportSize({ width: w, height: 900 });
+        // Crossing the 700px breakpoint reassigns every themeshot's <img src>
+        // (index.html's narrow listener) on its own, independently of the
+        // theme loop below — settle THIS wave before the theme loop below
+        // fires a second one, or the two reassignments race and abort each
+        // other's still-in-flight requests.
+        await waitForImagesSettled(pg);
         for (const t of THEMES) {
           const got = await setTheme(pg, t);
           await pg.waitForTimeout(280);
+          await waitForImagesSettled(pg); // let this combo's own src swaps finish before judging them
+
           const m = await pg.evaluate(measureOverflow);
           leastExamined = Math.min(leastExamined, m.examined);
           totalMeasured += m.examined;
@@ -591,11 +660,29 @@ async function main() {
             `${got !== t ? ` — page would not switch to ${t}, it is ${got}` : ''}` +
             `${m.offenders.length ? ' — ' + m.offenders.slice(0, 6).join('; ') +
               (m.offenders.length > 6 ? ` (+${m.offenders.length - 6} more)` : '') : ''}`);
+
+          const newFailed = failed.slice(failedWatermark);
+          failedWatermark = failed.length;
+          note(newFailed.length === 0, where,
+            `no failed requests @${w} ${t}${newFailed.length ? ' — ' + newFailed.join('; ') : ''}`);
+
+          const newBad = bad.slice(badWatermark);
+          badWatermark = bad.length;
+          note(newBad.length === 0, where,
+            `no response >= 400 @${w} ${t}${newBad.length ? ' — ' + newBad.join('; ') : ''}`);
+
+          const imgs = await pg.evaluate(() => document.querySelectorAll('img').length);
+          const brokenAtBp = await pg.evaluate(brokenImages);
+          leastImagesExamined = Math.min(leastImagesExamined, imgs);
+          note(brokenAtBp.length === 0, where,
+            `every <img> decoded @${w} ${t} (${imgs} images)${brokenAtBp.length ? ' — ' + brokenAtBp.join('; ') : ''}`);
         }
       }
       // A scan that examined nothing would report no offenders and pass.
       note(leastExamined >= floor, where,
         `every overflow scan measured at least ${floor} elements (thinnest was ${leastExamined})`);
+      note(leastImagesExamined >= imageFloor, where,
+        `every breakpoint's image scan examined at least ${imageFloor} <img> elements (thinnest was ${leastImagesExamined})`);
       await ctx.close();
     }
     server.close();
