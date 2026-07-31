@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { getCoverImageUrl } from './media';
 import { Money } from '@/components/ui/money';
 
@@ -38,6 +37,8 @@ function formatDate(iso) {
 const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
     const coverUrl = getCoverImageUrl(event);
     const price = pricing?.minPriceMinor;
+    const showPrice = !pricing?.soldOut && price !== undefined && price !== null;
+    const showCornerChrome = Boolean(event.category) || showPrice;
 
     return (
         <motion.div
@@ -61,10 +62,28 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
                                 <Calendar className="h-10 w-10 text-primary-emphasis/50" aria-hidden="true" />
                             </div>
                         )}
+                        {showCornerChrome && (
+                            // Demo covers range from a flat product shot to a
+                            // saturated neon sign or a magenta-lit concert —
+                            // an arbitrary photo, not a theme surface. A pill
+                            // that only leans on a badge/brand-fill colour
+                            // (which flips with theme, or can be the same hue
+                            // as the sign behind it) has no guaranteed
+                            // contrast. This gradient plus the media-ink/
+                            // media-ground glass pills below are the same
+                            // fixed-in-both-themes on-photo chrome as
+                            // header.jsx and gallery.jsx, so the corner
+                            // labels stay legible regardless of what's under
+                            // them.
+                            <div
+                                className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-media-ground/70 to-transparent"
+                                aria-hidden="true"
+                            />
+                        )}
                         {event.category && (
-                            <Badge variant="secondary" className="absolute left-3 top-3 capitalize shadow">
+                            <span className="absolute left-3 top-3 rounded-full bg-media-ground/40 px-2.5 py-0.5 text-xs font-semibold capitalize text-media-ink backdrop-blur-sm">
                                 {event.category}
-                            </Badge>
+                            </span>
                         )}
                         {pricing?.soldOut && (
                             // `media-ground` (index.css `--on-media-ground`),
@@ -78,8 +97,8 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
                                 <span className="rounded-full bg-background px-4 py-1.5 text-sm font-semibold">Sold out</span>
                             </div>
                         )}
-                        {!pricing?.soldOut && price !== undefined && price !== null && (
-                            <div className="absolute right-3 top-3 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow">
+                        {showPrice && (
+                            <div className="absolute right-3 top-3 rounded-full bg-media-ground/40 px-3 py-1 text-xs font-semibold text-media-ink backdrop-blur-sm">
                                 {price === 0 ? (
                                     'Free'
                                 ) : (
