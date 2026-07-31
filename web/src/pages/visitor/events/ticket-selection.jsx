@@ -155,7 +155,12 @@ export const MobileStickyCta = ({ event, ticketTypes = [] }) => {
 
     return (
         <div
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] backdrop-blur-md lg:hidden"
+            // Upward shadow (this bar sits at the bottom of the viewport),
+            // so it doesn't match any of the downward `shadow-soft/elevated/
+            // floating` steps — but it still references `--shadow-color`
+            // (index.css), the same token those use, rather than a literal,
+            // so it darkens correctly against both themes' shadow colour.
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-[0_-4px_16px_hsl(var(--shadow-color)/0.08)] backdrop-blur-md lg:hidden"
             data-testid="mobile-ticket-cta"
         >
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">

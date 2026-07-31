@@ -107,7 +107,11 @@ const EventPage = () => {
             <div className="flex flex-col pt-16">
                 <div className="relative h-[50vh] min-h-[320px] sm:h-[60vh]">
                     <EventGallery images={images} title={event.title} className="absolute inset-0" />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    {/* `media-ground` (index.css `--on-media-ground`), not
+                        `black`: this darkens the cover PHOTO so EventHeader's
+                        `media-ink` type reads on it, fixed in both themes for
+                        the same reason the type it enables is fixed. */}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-media-ground/90 via-media-ground/40 to-transparent" />
                     <EventHeader title={event.title} venueName={event.venue_name} category={event.category} />
                 </div>
 

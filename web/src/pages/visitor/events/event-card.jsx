@@ -67,7 +67,14 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
                             </Badge>
                         )}
                         {pricing?.soldOut && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                            // `media-ground` (index.css `--on-media-ground`),
+                            // not `bg-black`: this darkens an arbitrary cover
+                            // PHOTO for legibility, not an app surface, so it
+                            // is fixed in both themes the same way the
+                            // gallery/header on-photo chrome is. The "Sold
+                            // out" pill itself is fully themed (`bg-background`,
+                            // inherited text colour).
+                            <div className="absolute inset-0 flex items-center justify-center bg-media-ground/50">
                                 <span className="rounded-full bg-background px-4 py-1.5 text-sm font-semibold">Sold out</span>
                             </div>
                         )}

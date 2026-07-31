@@ -2,35 +2,48 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ProcessedText = ({ content, className = "" }) => {
+// Every colour below comes from a semantic token, so this flips with the
+// theme instead of needing a `dark:` patch per element. Links and the
+// blockquote rule use `text-primary-emphasis` / `border-primary-emphasis` —
+// the token index.css already defines separately per theme (RED-INK 5.87:1
+// on light, a lifted red in dark) — rather than a hand-picked hex repeated in
+// both a light and a dark class.
+const ProcessedText = ({ content, className = '' }) => {
   if (!content) return null;
 
   const components = {
     h1: ({ children }) => (
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white mt-8 mb-4">{children}</h1>
+      <h1 className="mb-4 mt-8 text-2xl font-bold text-foreground">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="text-xl font-bold text-slate-800 dark:text-white mt-6 mb-3">{children}</h2>
+      <h2 className="mb-3 mt-6 text-xl font-bold text-foreground">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="text-lg font-semibold text-slate-800 dark:text-white mt-4 mb-2">{children}</h3>
+      <h3 className="mb-2 mt-4 text-lg font-semibold text-foreground">{children}</h3>
     ),
     p: ({ children }) => (
-      <p className="text-slate-700 dark:text-gray-200 mt-4 leading-relaxed">{children}</p>
+      <p className="mt-4 leading-relaxed text-foreground">{children}</p>
     ),
+    strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
     ul: ({ children }) => (
-      <ul className="mt-4 space-y-2">{children}</ul>
+      <ul className="mt-4 list-none space-y-2">{children}</ul>
     ),
-    li: ({ children }) => (
-      <li className="flex items-center gap-2">
-        <span className="w-1.5 h-1.5 bg-slate-400 dark:bg-white/50 rounded-full flex-shrink-0" />
-        <span className="text-slate-700 dark:text-gray-200">{children}</span>
-      </li>
+    ol: ({ children }) => (
+      <ol className="mt-4 list-decimal space-y-2 pl-5 marker:text-muted-foreground">{children}</ol>
     ),
+    li: ({ children, ordered }) =>
+      ordered ? (
+        <li className="text-foreground">{children}</li>
+      ) : (
+        <li className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
+          <span className="text-foreground">{children}</span>
+        </li>
+      ),
     a: ({ href, children }) => (
-      <a 
+      <a
         href={href}
-        className="text-red-600 dark:text-[#880424] hover:text-red-700 dark:hover:text-[#a31838] underline transition-colors duration-200"
+        className="text-primary-emphasis underline underline-offset-4 transition-colors duration-200 hover:text-primary-emphasis/80"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -38,21 +51,21 @@ const ProcessedText = ({ content, className = "" }) => {
       </a>
     ),
     code: ({ inline, children }) => (
-      inline ? 
-        <code className="bg-slate-100 dark:bg-black/20 px-1.5 py-0.5 rounded text-sm">{children}</code> :
-        <pre className="bg-slate-100 dark:bg-black/20 p-4 rounded-lg mt-4 mb-4 overflow-x-auto">
-          <code className="text-sm">{children}</code>
+      inline ?
+        <code className="rounded bg-muted px-1.5 py-0.5 text-sm text-foreground">{children}</code> :
+        <pre className="mb-4 mt-4 overflow-x-auto rounded-lg bg-muted p-4">
+          <code className="text-sm text-foreground">{children}</code>
         </pre>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-red-600 dark:border-[#880424] pl-4 italic my-4 text-slate-600 dark:text-gray-300">
+      <blockquote className="my-4 border-l-4 border-primary-emphasis pl-4 italic text-muted-foreground">
         {children}
       </blockquote>
     ),
   };
 
   return (
-    <div className={`prose prose-slate dark:prose-invert max-w-none ${className}`}>
+    <div className={`max-w-none ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={components}

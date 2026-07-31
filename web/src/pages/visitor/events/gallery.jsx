@@ -13,6 +13,15 @@ const SWIPE_THRESHOLD_PX = 40;
  *
  * `images` is [{ id, url, alt, width, height }]. `title` is used as the alt
  * fallback and in the placeholder state.
+ *
+ * The prev/next buttons, dot indicators and counter pill below use the
+ * `media-ink` / `media-ground` tokens (index.css `--on-media` /
+ * `--on-media-ground`), not `text-white` / `bg-black`: they float on top of
+ * an arbitrary photo, not the app's own surface, and a photo does not change
+ * with the OS theme, so these two are fixed the same way in both. `bg-muted`
+ * (the no-image / loading ground) and `text-primary-emphasis` (the
+ * placeholder icon) are the ordinary theme tokens, because those really are
+ * app surfaces.
  */
 const EventGallery = ({ images = [], title = 'Event', className }) => {
     const [index, setIndex] = useState(0);
@@ -133,7 +142,7 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
                 type="button"
                 onClick={goPrev}
                 aria-label="Previous photo"
-                className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-black/60 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white group-hover:opacity-100 group-focus-within:opacity-100"
+                className="absolute left-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-media-ground/40 text-media-ink opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-media-ground/60 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-media-ink group-hover:opacity-100 group-focus-within:opacity-100"
             >
                 <ChevronLeft className="h-5 w-5" />
             </button>
@@ -141,13 +150,13 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
                 type="button"
                 onClick={goNext}
                 aria-label="Next photo"
-                className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-black/60 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white group-hover:opacity-100 group-focus-within:opacity-100"
+                className="absolute right-3 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-media-ground/40 text-media-ink opacity-0 backdrop-blur-sm transition-opacity duration-200 hover:bg-media-ground/60 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-media-ink group-hover:opacity-100 group-focus-within:opacity-100"
             >
                 <ChevronRight className="h-5 w-5" />
             </button>
 
             <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3">
-                <div className="flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 rounded-full bg-media-ground/40 px-3 py-1.5 backdrop-blur-sm">
                     {images.map((img, i) => (
                         <button
                             key={img.id}
@@ -156,13 +165,13 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
                             aria-label={`Go to photo ${i + 1} of ${count}`}
                             aria-current={i === index}
                             className={cn(
-                                'h-1.5 rounded-full transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white',
-                                i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/75',
+                                'h-1.5 rounded-full transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-media-ink',
+                                i === index ? 'w-5 bg-media-ink' : 'w-1.5 bg-media-ink/50 hover:bg-media-ink/75',
                             )}
                         />
                     ))}
                 </div>
-                <span className="rounded-full bg-black/40 px-2 py-1 text-xs font-medium text-white backdrop-blur-sm" aria-hidden="true">
+                <span className="rounded-full bg-media-ground/40 px-2 py-1 text-xs font-medium text-media-ink backdrop-blur-sm" aria-hidden="true">
                     {index + 1} / {count}
                 </span>
             </div>

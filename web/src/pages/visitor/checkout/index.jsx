@@ -21,6 +21,41 @@ import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 // finds out before the round trip.
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+// Checkout runs against LIVE inventory (internal/orders.Service.Create):
+// quantity caps, sales windows and per-order limits are all real, and a
+// buyer sitting on this page for a few minutes — or racing someone else for
+// the last few tickets — can genuinely hit them. The API's error message is
+// the raw sentinel text from internal/orders/orders.go (e.g. "orders: sold
+// out: …"), which is meant for a log line, not a buyer. This maps the known
+// shapes to a state that says what happened and gives a real way forward —
+// everything else falls through to the generic toast below, unclassified
+// rather than guessed at.
+function classifyOrderError(message) {
+    const m = (message || '').toLowerCase();
+    if (m.includes('sold out')) {
+        return {
+            title: 'Sold out',
+            description:
+                "Someone else bought the last of these while you were checking out. Nothing has been charged — head back to your cart to pick a different ticket type or quantity.",
+        };
+    }
+    if (m.includes('max per order')) {
+        return {
+            title: 'Too many for one order',
+            description:
+                'This ticket type limits how many you can buy in a single order. Go back to your cart and lower the quantity.',
+        };
+    }
+    if (m.includes('not currently on sale') || m.includes('is not published')) {
+        return {
+            title: 'No longer available',
+            description:
+                'Sales for this have closed, or the event was taken down since you added it. Nothing has been charged — check your cart for what is still on sale.',
+        };
+    }
+    return null;
+}
+
 const Shell = ({ children }) => (
     <div className="flex min-h-screen flex-col bg-background">
         <Header />
@@ -44,6 +79,10 @@ const CheckoutPage = () => {
     const [redirectUrl, setRedirectUrl] = useState(null);
     const [billingDetails, setBillingDetails] = useState({ name: user?.name || '', email: user?.email || '' });
     const [errors, setErrors] = useState({});
+    // A classified inventory failure (sold out / window closed / per-order
+    // cap) rendered inline in the order summary — see classifyOrderError.
+    // Anything unclassified stays a toast rather than a guessed-at state.
+    const [orderIssue, setOrderIssue] = useState(null);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -72,6 +111,7 @@ const CheckoutPage = () => {
             return;
         }
 
+        setOrderIssue(null);
         setIsProcessing(true);
         try {
             const result = await ordersApi.create({
@@ -107,7 +147,14 @@ const CheckoutPage = () => {
                 navigate('/orders');
             }
         } catch (err) {
-            toast({ title: 'Checkout failed', description: err.message || 'Please try again.', variant: 'destructive' });
+            const known = classifyOrderError(err.message);
+            if (known) {
+                // A real, expected state — not a toast that vanishes before a
+                // phone screen has scrolled back up to see it.
+                setOrderIssue(known);
+            } else {
+                toast({ title: 'Checkout failed', description: err.message || 'Please try again.', variant: 'destructive' });
+            }
         } finally {
             setIsProcessing(false);
         }
@@ -166,6 +213,7 @@ const CheckoutPage = () => {
                         total={eventTotal(eventId)}
                         isProcessing={isProcessing}
                         onCheckout={handleCheckout}
+                        issue={orderIssue}
                     />
                 </div>
             </div>

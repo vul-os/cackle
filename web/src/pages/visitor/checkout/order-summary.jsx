@@ -1,10 +1,11 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Clock, MapPin, Loader2, Lock } from 'lucide-react';
+import { Clock, MapPin, Loader2, Lock, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Money } from '@/components/ui/money';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 function whenLabel(iso) {
     if (!iso) return null;
@@ -15,7 +16,15 @@ function whenLabel(iso) {
     }
 }
 
-const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
+/**
+ * @param {object} props
+ * @param {{title: string, description: string}|null} [props.issue] a
+ *   classified live-inventory failure (sold out / window closed / per-order
+ *   cap) from checkout/index.jsx's classifyOrderError. Rendered inline,
+ *   right where the buyer is about to commit, rather than as a toast that
+ *   is easy to miss on a phone.
+ */
+const OrderSummary = ({ event, items, total, isProcessing, onCheckout, issue = null }) => {
     const when = whenLabel(event.starts_at);
     const ticketCount = items.reduce((n, i) => n + i.quantity, 0);
 
@@ -69,6 +78,14 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout }) => {
                         <Money minor={total} currency={event.currency} />
                     </span>
                 </div>
+
+                {issue && (
+                    <Alert variant="destructive">
+                        <TriangleAlert className="h-4 w-4" aria-hidden="true" />
+                        <AlertTitle>{issue.title}</AlertTitle>
+                        <AlertDescription>{issue.description}</AlertDescription>
+                    </Alert>
+                )}
 
                 <Button className="w-full" size="lg" onClick={onCheckout} disabled={isProcessing}>
                     {isProcessing ? (
