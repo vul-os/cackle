@@ -40,6 +40,30 @@ module.exports = {
                     2: 'hsl(var(--brand-2))',
                     ink: 'hsl(var(--brand-ink))',
                 },
+                // The wash behind a modal or a drawer. `bg-scrim`, never
+                // `bg-black/50` — see index.css for why a neutral black
+                // scrim fails on the ink ground.
+                scrim: 'hsl(var(--scrim))',
+                // Ink for type and linework laid over a PHOTOGRAPH under a
+                // dark gradient. Fixed in both themes on purpose: a cover
+                // image is not a theme surface. Only valid over a scrim or a
+                // dark gradient — see index.css.
+                media: {
+                    ink: 'hsl(var(--on-media))',
+                    'ink-muted': 'hsl(var(--on-media-muted))',
+                    line: 'hsl(var(--on-media-line))',
+                    wash: 'hsl(var(--on-media-wash))',
+                },
+                // The scan screen's fixed canvas, frozen in both themes.
+                // Anything rendering on `.gate-surface` names these instead
+                // of spelling out `text-white` / `bg-white/10`.
+                gate: {
+                    DEFAULT: 'hsl(var(--gate-bg))',
+                    ink: 'hsl(var(--gate-ink))',
+                    'ink-muted': 'hsl(var(--gate-ink-muted))',
+                    line: 'hsl(var(--gate-hairline))',
+                    accent: 'hsl(var(--gate-accent))',
+                },
                 // The three answers a gate gives. Fills only, always under
                 // `text-verdict-ink`, never re-used for ordinary chrome.
                 verdict: {
@@ -131,10 +155,21 @@ module.exports = {
             // lit-up (primary CTAs, the active scan surface) rather than merely
             // raised. Layered shadows (soft ambient + tighter key shadow) read as
             // more considered than Tailwind's single-shadow defaults.
+            //
+            // The three ramp steps are read from the STYLESHEET rather than
+            // written here, because a shadow is a colour and colours flip with
+            // the theme. These were literal `rgb(0 0 0 / 0.04)` triples: a fair
+            // key light on white paper, and effectively invisible on the ink
+            // ground, so in dark mode a raised card and a flat one were the same
+            // object. `--shadow-*` is defined per theme in index.css, where the
+            // dark ramp also adds an inset top highlight — the thing that
+            // actually reads as "lifted" on a dark surface. `glow-primary`
+            // stays inline: it is a brand accent, not part of the ramp, and it
+            // is already token-derived.
             boxShadow: {
-                soft: '0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06)',
-                elevated: '0 2px 4px -2px rgb(0 0 0 / 0.08), 0 8px 20px -6px rgb(0 0 0 / 0.12)',
-                floating: '0 8px 10px -6px rgb(0 0 0 / 0.1), 0 20px 40px -12px rgb(0 0 0 / 0.22)',
+                soft: 'var(--shadow-soft)',
+                elevated: 'var(--shadow-elevated)',
+                floating: 'var(--shadow-floating)',
                 'glow-primary': '0 0 0 1px hsl(var(--primary) / 0.4), 0 4px 24px -4px hsl(var(--primary) / 0.45)',
             },
             transitionTimingFunction: {

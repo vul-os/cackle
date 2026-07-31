@@ -166,6 +166,68 @@
 
     --radius: 0.75rem;
 
+    /* ── Elevation ────────────────────────────────────────────────────────
+       Shadows were the one part of the visual language that never flipped
+       with the theme: they were declared in tailwind.config.js as literal
+       `rgb(0 0 0 / 0.04)` triples, which is a defensible key light on WHITE
+       paper and is very close to nothing on INK. On the dark theme a raised
+       card and a flat one were the same object, so the whole "resting /
+       raised / floating" ramp collapsed into one step exactly where the
+       surfaces are closest in lightness and need it most.
+
+       So elevation is a TOKEN now, like every other themed value. Light mode
+       keeps the restrained paper shadow. Dark mode does two things a light
+       shadow cannot: it drops a much deeper, more opaque shadow (a dark room
+       swallows a 4% wash), and it adds a 1px inset top highlight — on a dark
+       ground, "lifted" reads as an edge catching the light far more than as
+       a shadow underneath. That inset is why these are whole shadow VALUES
+       rather than just a `--shadow-color`: the dark ramp is a different
+       construction, not the same one recoloured. */
+    --shadow-color: 260 18% 9%;
+    --shadow-soft: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05), 0 1px 3px 0 hsl(var(--shadow-color) / 0.07);
+    --shadow-elevated: 0 2px 4px -2px hsl(var(--shadow-color) / 0.09), 0 8px 20px -6px hsl(var(--shadow-color) / 0.13);
+    --shadow-floating: 0 8px 10px -6px hsl(var(--shadow-color) / 0.11), 0 20px 40px -12px hsl(var(--shadow-color) / 0.24);
+
+    /* The wash behind a modal, a drawer or any other layer that takes the
+       page out of play. Not `bg-black/50`: on the ink ground a neutral black
+       scrim reads as a hole punched in the page, because the page underneath
+       is already nearly black. This is the brand's own ink, pushed darker and
+       carried at a higher alpha in dark mode so the dimming is still felt
+       against a dark ground. */
+    --scrim: 260 25% 4% / 0.55;
+
+    /* ── Ink for content sitting on a PHOTOGRAPH ──────────────────────────
+       A cover image is not a theme surface. Whatever the OS theme says, a
+       title laid over a photo under a dark gradient needs light type, and
+       flipping it to ink in light mode would put black text on a black
+       gradient. These are therefore FIXED in both themes — the same reason
+       the verdict floods are fixed — and they exist so that the pages doing
+       this reach for a token that says "on media" instead of `text-white`,
+       which is indistinguishable from the theme-blind kind at a glance and
+       at a grep.
+
+       Only legitimate over a scrim or a dark gradient. Light type straight
+       onto an unknown photograph is not made safe by a token. */
+    --on-media: 0 0% 100%;
+    --on-media-muted: 0 0% 100% / 0.72;
+    --on-media-line: 0 0% 100% / 0.22;
+    --on-media-wash: 0 0% 100% / 0.12;
+
+    /* ── The gate's own fixed surface ─────────────────────────────────────
+       Declared here rather than inside `.gate-surface` (where they used to
+       live as block-local values) so components rendering ON that surface —
+       ConnectionState's `surface="gate"`, the scan view's chrome — can name
+       them instead of hardcoding `text-white` and `bg-white/10`. The values
+       are unchanged and are FROZEN in both themes: the scan screen is read
+       outdoors at a door, and its chrome must not change shade because
+       somebody toggled a theme they never see.
+       `lib/contrast-audit.js` measures these literals as GATE_PAIRS. */
+    --gate-bg: 240 14% 5%;
+    --gate-ink: 0 0% 100%;
+    --gate-ink-muted: 0 0% 78%;
+    --gate-hairline: 0 0% 100% / 0.14;
+    --gate-accent: 0 0% 100% / 0.1;
+
     /* The ticket perforation (see the motif utilities near the bottom). Red
        at low alpha on paper; the dark theme lifts it, because the same alpha
        over ink reads as nothing. */
@@ -283,6 +345,30 @@
     --ring: 0 100% 64.1%;
 
     --radius: 0.75rem;
+
+    /* Elevation on ink. Deeper and far more opaque than the paper ramp — a
+       4% wash over a near-black ground is invisible — plus a 1px inset top
+       highlight, which is what actually reads as "raised" in a dark room.
+       `--shadow-color` goes to true black rather than staying the brand ink:
+       a shadow tinted the same hue as the surface it falls on cannot darken
+       it enough to separate the two. */
+    --shadow-color: 0 0% 0%;
+    --shadow-soft: 0 1px 2px 0 hsl(var(--shadow-color) / 0.4), 0 1px 3px 0 hsl(var(--shadow-color) / 0.5),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.04);
+    --shadow-elevated: 0 2px 4px -2px hsl(var(--shadow-color) / 0.5), 0 8px 20px -6px hsl(var(--shadow-color) / 0.6),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
+    --shadow-floating: 0 8px 10px -6px hsl(var(--shadow-color) / 0.55), 0 20px 40px -12px hsl(var(--shadow-color) / 0.7),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+
+    /* The scrim goes darker AND more opaque on ink, for the reason given in
+       :root — the page it is dimming is already dark, so the same alpha does
+       visibly less work here than it does on paper. */
+    --scrim: 260 30% 2% / 0.72;
+
+    /* --on-media-*, --gate-* and the verdict floods are deliberately NOT
+       redefined here. All three sit on grounds the theme does not own — a
+       photograph, the gate's fixed canvas, a full-bleed verdict — so
+       flipping them would break the only surface they exist for. */
 
     --perforation: 0 100% 64.1% / 0.75;
 
@@ -428,12 +514,17 @@
 /* The gate's own chrome. The scan screen is a fixed dark surface in both
    themes — not a themed page — because it is read outdoors and a light flood
    behind a camera preview is glare. Tokenised rather than hardcoded
-   `bg-zinc-950` so it stays auditable alongside everything else. */
+   `bg-zinc-950` so it stays auditable alongside everything else.
+
+   The four `--gate-*` values used to be declared HERE, block-local, which
+   meant they existed only for elements inside a `.gate-surface` subtree and
+   were unreachable from Tailwind. Anything rendering on this surface had to
+   spell the colours out — `text-white`, `bg-white/10`, `border-white/70` —
+   which is the exact shape of a theme-blind bug and is indistinguishable
+   from one at a grep. They now live in `:root` (see the palette block) and
+   are exposed as `bg-gate` / `text-gate-ink` / `border-gate-line`, so this
+   rule only has to say which of them the surface itself paints with. */
 .gate-surface {
-  --gate-bg: 240 14% 5%;
-  --gate-ink: 0 0% 100%;
-  --gate-ink-muted: 0 0% 78%;
-  --gate-hairline: 0 0% 100% / 0.14;
   background: hsl(var(--gate-bg));
   color: hsl(var(--gate-ink));
 }

@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
+import { Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -46,13 +47,48 @@ const buttonVariants = cva(
   }
 )
 
-const Button = React.forwardRef(({ className, variant, size, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "button"
+/**
+ * `loading` is a prop rather than something each page assembles, because the
+ * pages that needed it were each getting a different two thirds of it right.
+ * Saving an event spun the Save icon but left the button clickable-looking;
+ * other submits swapped in a spinner and dropped the label, so the control
+ * changed width mid-click and the next button moved under the cursor. None of
+ * them told a screen reader anything at all.
+ *
+ * One prop, four guarantees: the button is genuinely `disabled` (a second
+ * click cannot re-submit), it is `aria-busy` so the state is announced and
+ * not merely drawn, the LABEL STAYS so the control keeps its width and the
+ * user keeps their reading, and the spinner is `motion-safe` — under
+ * prefers-reduced-motion it renders as a static glyph rather than as a
+ * near-instant flicker, matching how Skeleton behaves.
+ *
+ * Ignored under `asChild`: Slot renders a single child element and merges
+ * props onto it, so injecting a second element here would throw. A composed
+ * trigger that needs a busy state should render <Button loading> directly.
+ */
+const Button = React.forwardRef(({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+  // Slot renders exactly one child and merges props onto it, so the loading
+  // branch must not hand it a two-element array — not even `[false, child]`,
+  // which is what `{busy && <Loader2/>}` produces when busy is false. The
+  // asChild path therefore returns before any of that.
+  if (asChild) {
+    return (
+      <Slot className={cn(buttonVariants({ variant, size, className }))} ref={ref} disabled={disabled} {...props}>
+        {children}
+      </Slot>
+    );
+  }
   return (
-    (<Comp
+    <button
       className={cn(buttonVariants({ variant, size, className }))}
       ref={ref}
-      {...props} />)
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    >
+      {loading && <Loader2 className="motion-safe:animate-spin" aria-hidden="true" />}
+      {children}
+    </button>
   );
 })
 Button.displayName = "Button"

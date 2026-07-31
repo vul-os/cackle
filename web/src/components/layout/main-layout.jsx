@@ -87,7 +87,11 @@ const MainLayout = () => {
                             <HonestyStrip className="mt-8 rounded-xl border border-border" />
                         </div>
                         {isMobile && isExpanded && (
-                            <div className="fixed inset-0 z-10 animate-fade-in bg-black/50" onClick={() => setIsExpanded(false)} />
+                            // The drawer scrim is the same token the two modal
+                            // overlays use — one themed wash meaning "this
+                            // layer is out of play", rather than three
+                            // separate hardcoded blacks. See index.css.
+                            <div className="fixed inset-0 z-10 animate-fade-in bg-scrim" onClick={() => setIsExpanded(false)} />
                         )}
                     </main>
 

@@ -39,11 +39,18 @@ export function ConnectionState({ online, pendingCount = 0, syncing = false, var
     // on ordinary themed pages it is the muted token. Neither one reaches for
     // --warning, and neither one is allowed to: on a Cackle screen the warning
     // colour belongs to the gate verdict palette alone.
+    //
+    // The gate branch names `--gate-*` tokens rather than spelling out
+    // `bg-white/10 text-white`. The rendered pixels are identical; what
+    // changes is that the colour now has a name and an owner. A raw
+    // `text-white` on this surface is indistinguishable — to a reader and to
+    // a grep — from the theme-blind kind that is a real bug, and being unable
+    // to tell those two apart is what let the theme-blind ones accumulate.
     const neutral =
         surface === 'gate'
-            ? 'bg-white/10 text-white'
+            ? 'bg-gate-accent text-gate-ink'
             : 'bg-muted text-muted-foreground';
-    const positive = surface === 'gate' ? 'bg-white/10 text-white' : 'bg-success/10 text-success';
+    const positive = surface === 'gate' ? 'bg-gate-accent text-gate-ink' : 'bg-success/10 text-success';
 
     if (variant === 'row') {
         return (
@@ -53,7 +60,7 @@ export function ConnectionState({ online, pendingCount = 0, syncing = false, var
                     {label}
                 </span>
                 {!online && (
-                    <span className={surface === 'gate' ? 'text-white/70' : 'text-muted-foreground'}>
+                    <span className={surface === 'gate' ? 'text-gate-ink-muted' : 'text-muted-foreground'}>
                         Tickets are verified on this device. No connection is needed to admit anyone.
                     </span>
                 )}
@@ -82,7 +89,7 @@ export function ConnectionState({ online, pendingCount = 0, syncing = false, var
  * door has already been dealt with.
  */
 export function SyncState({ pendingCount = 0, syncing = false, surface = 'light', className }) {
-    const muted = surface === 'gate' ? 'text-white/70' : 'text-muted-foreground';
+    const muted = surface === 'gate' ? 'text-gate-ink-muted' : 'text-muted-foreground';
 
     if (syncing) {
         return (

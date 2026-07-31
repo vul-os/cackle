@@ -38,7 +38,14 @@ import logo from '/cackle.svg';
 const TONES = {
     auto: 'text-foreground',
     onDark: 'text-sidebar-foreground',
-    onLight: 'text-[hsl(var(--brand-2))]',
+    // `text-brand-2` is the registered utility for INK-as-identity (see
+    // tailwind.config.js). It was an arbitrary `text-[hsl(var(--brand-2))]`,
+    // which resolves to the same pixels but is a bracket escape hatch: it
+    // works whether or not the token is real, so a renamed or deleted token
+    // fails silently to `color: hsl()` and the word renders inheriting
+    // whatever is around it. A registered utility does not exist if its
+    // token does not, so the build is what notices.
+    onLight: 'text-brand-2',
 };
 
 /**
@@ -89,7 +96,7 @@ export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, 
             <span className={hideWordBelowSm ? 'sr-only sm:not-sr-only' : undefined}>Cackle</span>
             {/* aria-hidden: the dot is a graphic device. Spoken, it turns the
                 brand into a sentence fragment. */}
-            <span className="text-[hsl(var(--brand))]" aria-hidden="true">
+            <span className="text-brand" aria-hidden="true">
                 .
             </span>
         </span>
