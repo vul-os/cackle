@@ -462,15 +462,25 @@ async function makeThemeContext(browser, theme, viewport) {
  */
 async function scrollThrough(page) {
   await page.evaluate(async () => {
+    // `behavior: 'instant'` on every hop, because web/src/index.css sets
+    // `html { scroll-behavior: smooth }`. Under that rule a plain
+    // scrollTo(0, 0) ANIMATES: control returns immediately, the page is still
+    // gliding, and the screenshot lands somewhere in the middle of the
+    // journey — with the sticky header sitting over the content it was
+    // scrolled past. That produced a "my tickets" capture whose header
+    // overlapped the Print button and looked exactly like a z-index bug in
+    // the app. Instant hops still pause between steps, which is what
+    // IntersectionObserver needs; it is only the gliding that has to go.
+    const to = (y) => window.scrollTo({ top: y, left: 0, behavior: 'instant' });
     const step = Math.max(200, Math.round(window.innerHeight * 0.75));
     const wait = () => new Promise((r) => setTimeout(r, 120));
     for (let y = 0; y < document.body.scrollHeight; y += step) {
-      window.scrollTo(0, y);
+      to(y);
       await wait();
     }
-    window.scrollTo(0, document.body.scrollHeight);
+    to(document.body.scrollHeight);
     await wait();
-    window.scrollTo(0, 0);
+    to(0);
     await wait();
   });
   // Anything that started decoding during the walk gets a moment to finish.
@@ -519,6 +529,13 @@ async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues 
     await page.mouse.move(0, 0).catch(() => {});
     await page.waitForTimeout(150);
 
+    // And prove it is back at the top. A capture taken part-way through a
+    // scroll is not a picture of the page, it is a picture of a transition.
+    const scrollY = await page.evaluate(() => Math.round(window.scrollY)).catch(() => 0);
+    if (scrollY > 2) {
+      console.warn(`     WARNING: page is still scrolled to ${scrollY}px — captured mid-scroll`);
+    }
+
     // Assert the page actually LAID OUT at the width we asked for. With
     // `isMobile: true`, Chromium honours the page's own <meta name=viewport>;
     // a document without `width=device-width` falls back to a 980px layout
@@ -536,7 +553,7 @@ async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues 
     await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
     const bytes = statSync(outPath).size;
     console.log(`     saved ${path.relative(ROOT, outPath)} (${(bytes / 1024).toFixed(0)} KB)`);
-    return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, laidOutAt, widthOk, issues: pageIssues.slice(issuesBefore) };
+    return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, laidOutAt, widthOk, scrollY, issues: pageIssues.slice(issuesBefore) };
   } catch (err) {
     console.warn(`     FAILED: ${err.message}`);
     return { name: surface.name, theme, viewport: viewport.name, status: 'failed', error: err.message, url, issues: pageIssues.slice(issuesBefore) };
@@ -673,6 +690,14 @@ async function main() {
     for (const r of wrongWidth) console.warn(`    ${r.name}-${r.theme} [${r.viewport}] — ${r.laidOutAt}px`);
   } else if (ok.length) {
     console.log('  every capture laid out at its requested viewport width');
+  }
+
+  const midScroll = ok.filter((r) => r.scrollY > 2);
+  if (midScroll.length) {
+    console.warn(`\n  WARNING: ${midScroll.length} capture(s) were taken mid-scroll:`);
+    for (const r of midScroll) console.warn(`    ${r.name}-${r.theme} [${r.viewport}] — scrollY ${r.scrollY}`);
+  } else if (ok.length) {
+    console.log('  every capture was taken with the page settled at the top');
   }
 
   // Identical-capture guard. "N captured, 0 failed" once meant 13 byte-identical
