@@ -509,6 +509,16 @@ async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues 
     await page.waitForTimeout(surface.settleMs || 800);
     await scrollThrough(page).catch(() => {});
 
+    // Park the pointer in the corner. Playwright's virtual mouse STAYS where it
+    // last clicked — which is the sign-in button — and :hover is recomputed at
+    // that coordinate on every subsequent page. That put a hovered, lifted card
+    // with a red title in the middle of the events grid in every browse capture,
+    // at a different card per viewport because the button is at a different
+    // coordinate. It looks exactly like a deliberate highlight, and it is not
+    // one; it is the harness photographing its own cursor.
+    await page.mouse.move(0, 0).catch(() => {});
+    await page.waitForTimeout(150);
+
     // Assert the page actually LAID OUT at the width we asked for. With
     // `isMobile: true`, Chromium honours the page's own <meta name=viewport>;
     // a document without `width=device-width` falls back to a 980px layout
