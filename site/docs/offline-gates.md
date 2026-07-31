@@ -354,6 +354,47 @@ to this device, re-fetch the scan bundle (`admitted_index`, Step 1). Sync and
 re-pull are separate operations and only doing the first leaves the device's
 view exactly as stale as it was.
 
+### The order a batch is uploaded in
+
+A batch is applied **in the order it arrives**. The first `admitted` claim for
+a ticket keeps `admitted`; every later claim for that same ticket is stored as
+`duplicate`, with what the device actually reported kept in `reported_result`.
+So the position of a claim in the uploaded array is what settles which gate
+holds the admitted row for a contested ticket.
+
+The gate app uploads **oldest scan first**, ordered by a sequence number the
+device assigns when it writes the scan down — deliberately *not* by
+`scanned_at`. A phone's clock is not monotonic: an NTP correction or an
+operator setting the time mid-shift stamps a later scan with an earlier time.
+And it is the phone's *own* clock, which means ordering on it would let a
+device with a backdated clock sort its claims to the front of its own batch.
+The sequence number is assigned by the device's local database, cannot be
+moved by changing the clock, and only ever increases. `scanned_at` is still
+recorded, still uploaded, and is still part of the idempotency key — it is
+simply not the order.
+
+The server does not re-sort what it receives, and that is a decision rather
+than an oversight. It has no trustworthy timestamp for a scan taken while a
+gate was offline; the only thing it observes for itself is arrival. Between
+two devices, that means **whoever syncs first holds the row** — not whoever
+scanned first, which nobody can establish. Both claims are kept either way,
+so the conflict report is the same regardless of who won.
+
+**This settles bookkeeping, not entry.** Both people already walked through
+both doors. A cross-gate double-scan is still detected, never prevented; a
+deterministic winner changes which claim gets the admitted row and what the
+audit trail looks like, and nothing else. See "What this actually guarantees"
+above.
+
+**Upgrading a gate device** with scans still queued is safe. Scans recorded by
+an older version of the app have no sequence number, so on first launch the
+app assigns one to each of them, oldest `scanned_at` first, before anything
+new is recorded. Nothing queued is dropped or re-scanned, everything already
+uploaded stays uploaded, and the old scans keep their place at the front of
+the queue. Their relative order is reconstructed from their timestamps because
+that is the only record those scans ever carried — for scans taken *after* the
+upgrade the order is exact.
+
 ## Practical setup notes
 
 - **Fetch the bundle with time to spare.** Doors-open is the worst possible
