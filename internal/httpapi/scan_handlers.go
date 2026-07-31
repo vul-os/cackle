@@ -98,6 +98,39 @@ func (s *dbSeenSet) Seen(ctx context.Context, ticketID string) (bool, error) {
 // unique index is the final authority on which single row gets to be
 // 'admitted' for a given ticket, no matter how many devices disagreed
 // while offline.
+//
+// BATCH ORDER IS THE WINNER RULE, and it is deliberate rather than incidental.
+// Apply walks the uploaded slice in ARRAY ORDER: the first 'admitted' claim
+// for a ticket keeps 'admitted' and every later one is rewritten. So whichever
+// claim appears earlier in the request body wins a contested ticket.
+// scan_sync_order_test.go pins that by uploading the same two claims in both
+// orders and getting two different winners.
+//
+// Deciding it here instead — sorting the batch by ScannedAt before the loop,
+// so the "earliest scan" wins regardless of how the client ordered it — was
+// considered and is REJECTED. ScannedAt is the wall clock of the device at the
+// door, supplied by that device and checked by nobody. Sorting on it would
+// hand a phone with a skewed or deliberately backdated clock a lever over
+// which gate wins: set the clock back, win every contest. That is not
+// hypothetical arithmetic — making exactly that edit turns
+// TestScanSync_ABackdatedScannedAtDoesNotWinTheTicket red, with the backdated
+// device holding the admitted row.
+//
+// The server has no trustworthy timestamp for a scan that happened while a
+// gate was offline. All it observes is ARRIVAL, and arrival order is what
+// array position already encodes: within one upload, the order that device
+// enqueued its scans (web/src/lib/scan-store.js orders on a local sequence
+// number for the same reason this does not order on a clock); between
+// devices, whoever synced first. Neither is a moral ranking, and no rule
+// could be — two gates that were partitioned from each other have no shared
+// clock to appeal to. What arrival order does have is the one property that
+// matters: no device can move itself up it by lying.
+//
+// This changes nothing about the guarantee. A cross-gate double-scan is
+// DETECTED, NEVER PREVENTED — both people are already inside, and all that is
+// being settled is which claim gets the row and what the audit trail says.
+// reported_result keeps the loser's own verdict so
+// GET /api/events/{id}/admission-conflicts can still see it.
 type dbSyncSink struct {
 	db *sql.DB
 }
