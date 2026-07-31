@@ -1,5 +1,35 @@
 import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+// tailwind-merge ships a fixed idea of which suffixes belong to which class
+// group (e.g. "shadow" only knows "", "inner", "none", a t-shirt-size
+// matcher and an arbitrary-value matcher). It does NOT read
+// `tailwind.config.js`, so a custom key added there under `theme.extend` —
+// `boxShadow.soft`, `fontSize['display-lg']`, `transitionTimingFunction.
+// emphasized`, `animation['fade-in']` — is invisible to it. Without this,
+// `cn('shadow-soft', 'shadow-none')` keeps BOTH classes (they don't look
+// like the same group), and CSS source order — not the later class in the
+// call — decides which one paints. That was a real, silent bug: a page
+// passing `shadow-none` to override `Input`'s `shadow-soft` was a no-op,
+// because Tailwind emits the base "none" step before this file's custom
+// "soft" step, so "soft" always wins regardless of class order.
+//
+// Registering the same custom keys here (as plain suffixes, matching
+// `tailwind.config.js`'s `theme.extend` exactly) teaches tailwind-merge
+// that they conflict with their built-in siblings, so the LAST class in a
+// `cn(...)` call wins again, as every caller assumes it does.
+//
+// Keep this list in lockstep with `tailwind.config.js`'s `extend` block: a
+// new custom `boxShadow`/`fontSize`/`transitionTimingFunction`/`animation`
+// key that isn't added here reintroduces exactly this bug for that key.
+const twMerge = extendTailwindMerge({
+    classGroups: {
+        shadow: [{ shadow: ['soft', 'elevated', 'floating', 'docked', 'glow-primary'] }],
+        'font-size': [{ text: ['display-2xl', 'display-xl', 'display-lg', 'display-md', 'display-sm'] }],
+        ease: [{ ease: ['emphasized'] }],
+        animate: [{ animate: ['accordion-down', 'accordion-up', 'fade-in', 'rise-in', 'pulse-ring', 'shimmer'] }],
+    },
+});
 
 export function cn(...inputs) {
     return twMerge(clsx(inputs));
