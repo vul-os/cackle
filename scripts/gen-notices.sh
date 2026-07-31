@@ -9,10 +9,17 @@
 # every copy — this script reproduces those from the real module/package
 # graphs rather than hand-maintaining a list that drifts.
 #
-#     ./scripts/gen-notices.sh
+#     ./scripts/gen-notices.sh           regenerate THIRD-PARTY-NOTICES.txt
+#     ./scripts/gen-notices.sh --check   exit 1 if the committed file is stale
 #
 # THIRD-PARTY-NOTICES.txt is committed at the repo root. It is NOT
 # hand-maintained — re-run this after changing go.mod or web/package.json.
+# --check resolves the same real dependency graph and diffs it against the
+# committed file WITHOUT writing anything — the working tree is left exactly
+# as it was found, pass or fail. That is the mode CI runs: this file is a
+# legal-compliance artifact (licence attribution), and unlike source code
+# nothing else notices when it silently falls out of sync with a dependency
+# bump, so the check has to be a real diff of the real graph, not a lint.
 #
 # Degrades gracefully for ENVIRONMENT problems: if web/ has no package.json
 # yet (frontend not scaffolded), or a tool can't be installed (no network),
@@ -70,14 +77,34 @@ set -uo pipefail
 # automatically, at which point this whole note can be deleted.
 EXIT_UNKNOWN_LICENCE=4
 
+CHECK=0
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK=1 ;;
+    *)
+      echo "gen-notices.sh: unrecognised argument: $arg" >&2
+      echo "usage: gen-notices.sh [--check]" >&2
+      exit 2
+      ;;
+  esac
+done
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 OUT="THIRD-PARTY-NOTICES.txt"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# Always resolve into a scratch file first. In --check mode this candidate is
+# only ever diffed against the committed $OUT, never copied over it — the
+# generate path below is the sole place $OUT is written.
+CANDIDATE="$TMP/THIRD-PARTY-NOTICES.candidate.txt"
 
-echo "==> generating $OUT"
+if [[ "$CHECK" -eq 1 ]]; then
+  echo "==> checking $OUT against the actual dependency graph (no changes will be written)"
+else
+  echo "==> generating $OUT"
+fi
 
 # ── Go modules ────────────────────────────────────────────────────────────────
 GO_NOTICES="$TMP/go-notices.txt"
@@ -225,6 +252,33 @@ HEADER
     echo
     cat "$GO_NOTICES"
   fi
-} > "$OUT"
+} > "$CANDIDATE"
+
+if [[ "$CHECK" -eq 1 ]]; then
+  # The "Generated:" timestamp is expected to differ on every single run —
+  # it is not dependency drift, it is the clock. Redact it (in both sides of
+  # the comparison) before diffing so --check reports real graph changes
+  # only; a real `notices` run still writes the true timestamp verbatim.
+  redact() { sed 's/^Generated: .*/Generated: <redacted>/'; }
+
+  if [[ ! -f "$OUT" ]]; then
+    echo "==> $OUT does not exist — run 'npm run notices' to create it" >&2
+    exit 1
+  fi
+
+  if diff -u <(redact <"$OUT") <(redact <"$CANDIDATE") >"$TMP/notices.diff"; then
+    echo "==> $OUT matches the actual dependency graph — up to date"
+    exit 0
+  else
+    echo "==> $OUT is OUT OF DATE with the actual dependency graph:" >&2
+    echo >&2
+    cat "$TMP/notices.diff" >&2
+    echo >&2
+    echo "    Run: npm run notices   (or: ./scripts/gen-notices.sh), then commit the result." >&2
+    exit 1
+  fi
+fi
+
+cp "$CANDIDATE" "$OUT"
 
 echo "==> wrote $OUT ($(wc -l < "$OUT" | tr -d ' ') lines)"

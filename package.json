@@ -9,6 +9,7 @@
     "screenshots": "node scripts/screenshots.mjs",
     "demo-screenshots": "node scripts/screenshots.mjs",
     "notices": "bash scripts/gen-notices.sh",
+    "notices:check": "bash scripts/gen-notices.sh --check",
     "docs:sync": "node scripts/sync-docs.mjs",
     "docs:check": "node scripts/sync-docs.mjs --check",
     "docs:links": "node scripts/check-doc-links.mjs",

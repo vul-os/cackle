@@ -168,6 +168,17 @@ jobs:
         working-directory: web
         run: npm ci && npm run build
 
+      # THIRD-PARTY-NOTICES.txt is regenerated from the real Go module graph
+      # (needs `go`) and the real npm graph under web/ (needs web/node_modules,
+      # already installed by the frontend build above) — this is the one job
+      # that already has both toolchains warm, so the check lives here rather
+      # than costing its own job/setup steps. Legal-compliance artifact: add a
+      # dependency and it silently stops matching what's actually redistributed
+      # unless something diffs it against the real graph. --check regenerates
+      # into a scratch dir and diffs; it never writes THIRD-PARTY-NOTICES.txt.
+      - name: Third-party notices match the actual dependency graph
+        run: npm run notices:check
+
       # Mirrors `make build`: copy the built SPA where the embed_frontend
       # build tag expects it, build the real single binary, clean up the copy.
       - name: Build cackle (frontend embedded)
