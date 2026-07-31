@@ -323,6 +323,15 @@ func New(deps Deps) http.Handler {
 	// catch-all below can never shadow it.
 	r.Get("/h/{ref}", s.handleHostPage)
 
+	// GET /o/{slugOrID} is the public, server-rendered ORGANISATION page —
+	// everything one organiser currently has on sale here. A separate
+	// top-level prefix, not a convention inside /h/: an event slug is
+	// validated only as non-empty, so no prefix or reserved word inside /h/
+	// could be kept clear of event slugs. Two namespaces, no precedence rule
+	// to remember, collision structurally impossible. See
+	// org_page_handlers.go for the reasoning and the three visibility guards.
+	r.Get("/o/{ref}", s.handleOrgPage)
+
 	// Everything else falls through to the embedded SPA (or a "not built"
 	// notice), never shadowing /api/* — chi resolves the longest matching
 	// static prefix first, so /api/... always hits the subrouter above.
