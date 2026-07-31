@@ -52,6 +52,18 @@ type Queue interface {
 	Enqueue(ctx context.Context, a QueuedAdmission) error
 	// Pending returns up to limit not-yet-synced admissions, oldest first.
 	// limit <= 0 means "no limit".
+	//
+	// "Oldest first" means INSERTION order, and it is a total order: two
+	// admissions enqueued in the same clock tick still come back in the order
+	// they were enqueued, every call, and a bounded page is a prefix of the
+	// same sequence rather than an arbitrary subset of it. Every
+	// implementation owes the same order for the same enqueues — a caller
+	// swapping one for another must not get a differently ordered batch.
+	//
+	// This is a contract, not a convenience. The server applies a synced batch
+	// in the order it arrives and the first 'admitted' claim for a ticket is
+	// the one that keeps that status, so the order Pending returns is the
+	// order in which a partitioned gate's claims compete.
 	Pending(ctx context.Context, limit int) ([]QueuedAdmission, error)
 	// MarkSynced marks the given admissions (matched by SyncKey) as synced
 	// so they no longer appear in Pending.
@@ -183,9 +195,44 @@ func (q *SQLiteQueue) Enqueue(ctx context.Context, a QueuedAdmission) error {
 	return nil
 }
 
+// Pending orders by rowid — insertion order — and NOT by any timestamp
+// column. The three reasons, in the order they bite:
+//
+//  1. enqueued_at is TEXT written with time.RFC3339Nano, which STRIPS trailing
+//     zeros from the fractional second, and SQLite compares TEXT
+//     lexicographically. Whenever one stamp's fraction is a prefix of the
+//     next's, lexicographic order is the REVERSE of chronological order:
+//     "12:00:00Z" sorts after "12:00:00.5Z" ('Z' > '.'), and "12:00:00.1Z"
+//     sorts after "12:00:00.10001Z" ('Z' > '0'). Both left-hand values are
+//     ones time.Now() emits on its own, so this is not a tie being broken
+//     badly — it is a plain wrong answer, arriving rarely enough to be
+//     mistaken for flake.
+//
+//  2. Equal stamps have no defined order at all. Two enqueues inside one clock
+//     tick tie, and SQLite is free to return them either way.
+//
+//  3. A gate device's clock is not monotonic. An NTP correction mid-event
+//     stamps a later enqueue with an earlier enqueued_at, and any ordering
+//     that trusts the column walks the queue backwards with it.
+//
+// scanned_at was the other candidate and is rejected: it is the wall clock at
+// the door, supplied by the caller from the scanning device, so ordering on it
+// would let a device with a skewed — or deliberately backdated — clock decide
+// where its own claims land in the batch. Since the server applies a batch in
+// order and the first 'admitted' claim for a ticket is the one that keeps that
+// status (httpapi's dbSyncSink), that is a lever over which gate wins a
+// contested ticket. rowid is assigned by SQLite, is total, and nothing in this
+// package deletes a row, so it only ever increases.
+//
+// This also makes SQLiteQueue agree with MemoryQueue, which returns strict
+// insertion order and keeps an existing key's original position when it is
+// re-enqueued — ON CONFLICT DO UPDATE leaves the rowid alone, so both
+// implementations of the one interface now answer identically.
+//
+// enqueued_at stays on the row as a diagnostic; it is simply not an order.
 func (q *SQLiteQueue) Pending(ctx context.Context, limit int) ([]QueuedAdmission, error) {
 	query := `SELECT ticket_id, event_id, gate_id, device_id, scanned_at, result, note
-	           FROM scan_queue WHERE synced = 0 ORDER BY enqueued_at ASC`
+	           FROM scan_queue WHERE synced = 0 ORDER BY rowid ASC`
 	args := []any{}
 	if limit > 0 {
 		query += ` LIMIT ?`
