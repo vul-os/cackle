@@ -238,6 +238,20 @@ code,kbd,pre,.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-num
 /* ── Reveal ──────────────────────────────────────────────────────────────── */
 .rv{opacity:0;transform:translateY(16px);transition:opacity var(--slow) var(--decel),transform var(--slow) var(--decel)}
 .rv.in{opacity:1;transform:none}
+/* One orchestrated entrance for the hero rather than five scattered ones. It
+   is deliberately short — everything has landed inside 680ms — because a
+   landing page that is still assembling itself when the reader arrives is a
+   worse first impression than one that was simply there. `backwards` holds the
+   start state during the delay; the reduced-motion block below cancels the
+   whole thing, which is why the final state is the natural one. */
+@keyframes heroIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.hero-copy>*,.hero-art,.notice-in>*{animation:heroIn .58s var(--decel) backwards}
+.hero-copy>*:nth-child(2){animation-delay:.05s}
+.hero-copy>*:nth-child(3){animation-delay:.1s}
+.hero-copy>*:nth-child(4){animation-delay:.15s}
+.hero-copy>*:nth-child(5){animation-delay:.2s}
+.hero-art{animation-delay:.1s}
+.notice-in>*{animation-delay:.26s}
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   .rv{opacity:1;transform:none;transition:none}
@@ -255,16 +269,39 @@ h2.big{font-size:clamp(30px,4.4vw,50px);margin:16px 0 0;max-width:19ch;letter-sp
 .lead{color:var(--t2);font-size:clamp(16.5px,1.5vw,19px);margin:20px 0 0;max-width:64ch}
 .lead b{color:var(--t1);font-weight:650}
 
-/* ── Hero ────────────────────────────────────────────────────────────────── */
-.hero{padding:clamp(40px,5vw,72px) 0 70px;overflow:hidden}
+/* ── Hero ────────────────────────────────────────────────────────────────────
+   ONE SCREENFUL is the constraint here, not an aspiration. The person this
+   page is for meets it on a 1280×800 laptop, and the whole argument — the
+   sentence, the picture, one obvious next step — has to land before they
+   touch the scroll wheel. It did not: the hero measured 1124px on that laptop
+   and 1132px on a 1440×900, because five separate blocks were stacked in the
+   left column under the buttons.
+
+   Two things moved OUT, and neither was cut: the experimental notice and the
+   audience list are now the full-bleed band immediately below, where the
+   notice is bigger, wider and set larger than it was crammed under the CTAs.
+   Three things stayed, because they are the argument: the headline, one
+   picture, and three facts a reader can check.
+
+   The rhythm is measured in vh as well as px, so a short laptop SHRINKS the
+   hero instead of overflowing it. And the art column is capped by viewport
+   HEIGHT (max-width:62vh, against the drawing's own 640/540 ratio) rather
+   than by width — because at every desktop width it is the picture, not the
+   copy, that sets the row's height.
+   ──────────────────────────────────────────────────────────────────────────── */
+.hero{padding:clamp(30px,4.6vh,58px) 0 clamp(34px,5vh,60px);overflow:hidden}
 .hero::before{
   content:"";position:absolute;inset:-30% -10% auto -10%;height:150%;z-index:-1;pointer-events:none;
   background:
     radial-gradient(720px 400px at 82% 2%,color-mix(in srgb,var(--red) 15%,transparent),transparent 62%),
     radial-gradient(560px 360px at 4% 30%,color-mix(in srgb,var(--red) 7%,transparent),transparent 60%);
 }
-.hero-grid{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,.98fr);gap:clamp(32px,4vw,60px);align-items:center}
-h1{font-size:clamp(37px,6.4vw,72px);letter-spacing:-.045em;margin:20px 0 0;line-height:1.01}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:clamp(28px,3.6vw,56px);align-items:center}
+.hero-copy{min-width:0}
+/* Height-aware as well as width-aware. 6.3vw alone put a 92px headline on a
+   1440-wide window that is only 900 tall; the 9vh term is what makes the type
+   answer to the screenful it has to fit inside. */
+h1{font-size:clamp(36px,min(6.3vw,9vh),70px);letter-spacing:-.045em;margin:15px 0 0;line-height:1.02}
 /* The tear line, under the phrase it belongs to. The padding is what keeps the
    perforation clear of the descenders in "got in" — sitting it at the box edge
    alone puts it straight through the g. */
@@ -274,9 +311,9 @@ h1 .off::after{
   background-image:repeating-linear-gradient(90deg,var(--red) 0 8px,transparent 8px 16px);
   opacity:.75;
 }
-.hero-sub{color:var(--t2);font-size:clamp(16.5px,1.6vw,20px);margin:24px 0 0;max-width:54ch}
+.hero-sub{color:var(--t2);font-size:clamp(16.5px,1.5vw,19px);margin:19px 0 0;max-width:52ch}
 .hero-sub b{color:var(--t1);font-weight:650}
-.cta{display:flex;flex-wrap:wrap;gap:11px;margin-top:30px}
+.cta{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:26px;align-items:center}
 .btn{
   display:inline-flex;align-items:center;gap:9px;padding:12px 20px;border-radius:11px;
   font-weight:750;font-size:15px;border:1px solid transparent;
@@ -289,33 +326,68 @@ h1 .off::after{
 .btn-primary:hover{box-shadow:0 16px 38px -12px var(--red-glow)}
 .btn-ghost{background:var(--panel);border-color:var(--line-2);color:var(--t1)}
 .btn-ghost:hover{border-color:var(--red-edge)}
-
-/* Experimental notice. Up top, in the hero, not buried in a footnote. */
-.warnstrip{
-  margin-top:26px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:13px;align-items:start;
-  border:1px solid var(--red-edge);background:var(--red-wash);border-radius:var(--r);padding:15px 17px;
-  max-width:60ch;
-}
-.warnstrip svg{width:20px;height:20px;color:var(--red-ink);margin-top:2px}
-.warnstrip p{font-size:14.5px;color:var(--t2)}
-.warnstrip b{color:var(--t1);font-weight:750}
+/* Third action, third weight. Three buttons of equal size asked the reader to
+   choose between three equals when only one of them is the thing to do next;
+   the docs are a tertiary path — and already in the header — so they read as a
+   link with an arrow, not as a button. Its 12px block padding keeps the tap
+   target at 45px even though it has no fill. */
+.btn-quiet{padding:12px 4px;color:var(--t2);font-weight:650;border-radius:8px}
+.btn-quiet:hover{color:var(--red-ink)}
+.btn-quiet svg{transition:transform var(--quick) var(--ease)}
+.btn-quiet:hover svg{transform:translateX(3px)}
 
 /* A grid, not a wrapping flex row: three labels of different lengths, and
    flex-wrap drops the longest onto a second line where it reads as a mistake
-   rather than as a third column. */
+   rather than as a third column. The dashed top rule is the stub's tear line —
+   the copy column ends the way a ticket does. */
 .hero-facts{
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 26px;
-  margin-top:30px;padding-top:22px;border-top:2px dashed var(--line-2);max-width:600px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 24px;
+  margin-top:28px;padding-top:19px;border-top:2px dashed var(--line-2);
 }
 .fact{min-width:0}
-.fact b{display:block;font-size:26px;font-weight:800;letter-spacing:-.03em;font-family:var(--mono);color:var(--red-ink)}
-.fact span{font-size:13px;color:var(--t3);display:block;margin-top:2px}
+.fact b{display:block;font-size:clamp(23px,2.1vw,27px);font-weight:800;letter-spacing:-.03em;font-family:var(--mono);color:var(--red-ink);line-height:1.1}
+.fact span{font-size:13px;color:var(--t3);display:block;margin-top:3px;line-height:1.45}
 
-/* Who it is for — plain nouns, no personas. */
-.forwho{
-  margin-top:34px;padding-top:20px;border-top:1px solid var(--line);
-  display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;
+/* ── The limit, torn off the hero ────────────────────────────────────────────
+   This notice was a 60ch box wedged between the CTAs and the stats, and it was
+   a large part of why nothing fitted. It has not been softened, shortened or
+   demoted by moving: it is now the WIDEST element on the page, a full-bleed
+   band on red wash with the sentence set at 16px instead of 14.5px, a stamped
+   STATUS eyebrow and a direct link to the ledger that backs the claim. It sits
+   immediately under the hero, so it is the first thing a scroll reveals and it
+   is unmissable at any width. The wording is unchanged, word for word.
+   ──────────────────────────────────────────────────────────────────────────── */
+.notice{background:var(--red-wash)}
+.notice-in{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px 20px;align-items:center;
+  padding-block:20px;
 }
+/* A fill, not an outline: on the wash an outlined icon disappeared. #FFFFFF on
+   #FF4848 is 3.02:1 — below the text floor, above the 3:1 floor for a
+   graphical object, which is all this glyph is. */
+.notice-ic{
+  width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:var(--red);color:#fff;box-shadow:0 8px 20px -10px var(--red-glow);
+}
+.notice-ic svg{width:22px;height:22px}
+.notice-k{
+  display:block;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--red-ink);margin-bottom:5px;
+}
+.notice-p{font-size:16px;color:var(--t2);max-width:82ch}
+.notice-p b{color:var(--t1);font-weight:800}
+.notice-cta{
+  display:inline-flex;align-items:center;gap:8px;white-space:nowrap;flex:none;
+  font-size:14px;font-weight:750;color:var(--red-ink);background:var(--bg);
+  border:1px solid var(--red-edge);border-radius:10px;padding:11px 15px;
+  transition:border-color var(--quick) var(--ease),background var(--quick) var(--ease);
+}
+.notice-cta:hover{border-color:var(--red)}
+.notice-cta svg{width:14px;height:14px;transition:transform var(--quick) var(--ease)}
+.notice-cta:hover svg{transform:translateX(3px)}
+
+/* Who it is for — plain nouns, no personas. The tear-off under the notice. */
+.forwho{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;padding-block:13px}
 .forwho .l{font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--t3)}
 .forwho span.v{
   font-size:13px;font-weight:600;color:var(--t2);padding:4px 11px;border-radius:999px;
@@ -325,6 +397,13 @@ h1 .off::after{
 /* ── Illustrations ───────────────────────────────────────────────────────── */
 /* Drawn, not photographed — because the thing worth showing is the thing no
    screenshot can contain: a phone at a gate with no signal, still saying yes. */
+/* The hero's art column. Capped by viewport HEIGHT, not width: the drawing is
+   640×540, so height = width / 1.185, and a 62vh ceiling on the WIDTH is what
+   stops the picture from being the thing that pushes the hero off a short
+   laptop. Capping the frame's height instead would letterbox the drawing
+   inside a box that still carries the shadow and the radius — a shadow around
+   nothing. Constraining the column keeps frame and drawing the same object. */
+.hero-art{margin:0;width:100%;max-width:min(100%,62vh);justify-self:end;min-width:0}
 .illo{width:100%;height:auto;border-radius:var(--r-lg);box-shadow:var(--shadow-lift);overflow:hidden}
 /* Belt and braces: var() resolves in SVG presentation attributes in every
    engine that matters, but a real CSS rule cannot be argued with, and the
@@ -603,7 +682,16 @@ pre .k{color:var(--red-ink)}
 .card,.rail,.beat,.lrow,.v,.codewrap,.shot,.tour figure{min-width:0}
 @media (max-width:1080px){
   .secnav{display:none}
-  .hero-grid{grid-template-columns:minmax(0,1fr);gap:40px}
+  .hero-grid{grid-template-columns:minmax(0,1fr);gap:36px}
+  /* One column: the vh cap and the right-alignment are both meaningless now —
+     a scroll is expected here, and a 62vh-wide picture floated right in a
+     full-width column reads as a mistake. */
+  .hero-art{max-width:100%;justify-self:stretch}
+  .hero{padding:clamp(30px,4.6vh,52px) 0 clamp(34px,5vh,52px)}
+  /* One column is up to 1000px wide; the sub-head is held to 52ch, and three
+     stats stretched across the full width against a 530px paragraph reads as
+     two unrelated measures rather than one column. */
+  .hero-facts{max-width:660px}
   .g4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .verdicts,.beats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .anat{grid-template-columns:minmax(0,1fr);gap:30px}
@@ -614,6 +702,14 @@ pre .k{color:var(--red-ink)}
   .lrow{grid-template-columns:minmax(0,1fr);gap:6px}
   .callout{grid-template-columns:minmax(0,1fr)}
   .band{grid-template-columns:minmax(0,1fr)}
+  /* The notice keeps its icon beside the text and drops the link below it,
+     indented to the text column so the band still reads as one block. The
+     paragraph is six lines deep here, and a vertically centred warning glyph
+     beside six lines floats in the middle of nothing — it belongs at the top,
+     next to the sentence it is warning about. */
+  .notice-in{align-items:start}
+  .notice-ic{margin-top:22px}
+  .notice-cta{grid-column:2/-1;justify-self:start;margin-top:2px}
 }
 @media (max-width:560px){
   .wrap{padding:0 18px}
@@ -661,22 +757,27 @@ pre .k{color:var(--red-ink)}
 <!-- ═══ HERO ═══════════════════════════════════════════════════════════════ -->
 <section class="hero" id="top">
   <div class="wrap hero-grid">
-    <div>
+    <div class="hero-copy">
       <span class="eyebrow">Ticketing you run yourself</span>
-      <h1>The wifi died at the door.<br>People <span class="off">still got in</span>.</h1>
-      <p class="hero-sub">Cackle sells your tickets online and checks them at the door on an ordinary phone. When the venue's internet drops — and at some point it will — <b>the queue keeps moving</b>, because the phone already has everything it needs to say yes or no.</p>
+      <!-- The breaks are set by hand because the natural rag was "The wifi
+           died at the / door. / People still got in." — a line containing the
+           single word "door." Three deliberate lines instead, one clause each,
+           each one shorter than the column at every width the headline is
+           still large enough to matter at. -->
+      <h1>The wifi died<br>at the door.<br>People <span class="off">still got in</span>.</h1>
+      <p class="hero-sub">Cackle sells your tickets online, then checks them at the door on an ordinary phone. When the venue's internet drops — and one night it will — <b>the queue keeps moving</b>.</p>
 
+      <!-- One primary, one secondary, one tertiary. Three buttons of equal
+           weight made a reader stop and choose; there is only one thing to do
+           first here, and it is the demo two screens down. -->
       <div class="cta">
         <a class="btn btn-primary" href="#door">Watch the door work
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
         </a>
         <a class="btn btn-ghost" href="#see">See the screens</a>
-        <a class="btn btn-ghost" href="./docs.html">Read the docs</a>
-      </div>
-
-      <div class="warnstrip">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"/><path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20.4h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 17h.01"/></svg>
-        <p><b>Cackle is experimental and not production-ready.</b> It is built, tested and honest about its limits — but try it on a small night before you put a sold-out one through it. Everything below is labelled with what is actually finished.</p>
+        <a class="btn btn-quiet" href="./docs.html">Read the docs
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </a>
       </div>
 
       <div class="hero-facts">
@@ -687,18 +788,9 @@ pre .k{color:var(--red-ink)}
         <div class="fact"><b>1</b><span>file to copy onto a machine — that is the install</span></div>
         <div class="fact"><b>0%</b><span>of your ticket money. Cackle never touches it</span></div>
       </div>
-
-      <div class="forwho">
-        <span class="l">Made for</span>
-        <span class="v">a music venue</span>
-        <span class="v">a conference</span>
-        <span class="v">a church hall</span>
-        <span class="v">a night market</span>
-        <span class="v">a school fête</span>
-      </div>
     </div>
 
-    <div>
+    <figure class="hero-art">
       <!-- ILLUSTRATION 1 — the thing no screenshot can hold: a phone at a gate
            with no signal, still saying ADMIT. Drawn as a two-ink print, with
            the palette wired to CSS variables so it follows the theme. -->
@@ -808,10 +900,39 @@ pre .k{color:var(--red-ink)}
                it. Do not re-add an arm without checking the render. -->
         </g>
       </svg>
-      <p class="illo-cap">The door is not asking anybody's permission. Everything the phone needs to answer was downloaded before the first guest arrived.</p>
-    </div>
+      <figcaption class="illo-cap">The door is not asking anybody's permission. Everything the phone needs to answer was downloaded before the first guest arrived.</figcaption>
+    </figure>
   </div>
 </section>
+
+<!-- ═══ THE LIMIT ══════════════════════════════════════════════════════════
+     Torn straight off the bottom of the hero. This is the same sentence that
+     used to sit inside the hero as a 60ch box under the buttons; it is here
+     because five stacked blocks would not fit one screen, and it is here in
+     this shape — full bleed, on the wash, at 16px, with the ledger one click
+     away — because the fix for "the hero is too tall" must never be "say less
+     about what this cannot do". It is the first thing the page reveals. -->
+<hr class="perf perf-red">
+<aside class="notice" aria-label="Project status">
+  <div class="wrap notice-in">
+    <span class="notice-ic" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M10.3 3.9 2.5 17.4A2 2 0 0 0 4.2 20.4h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 17h.01"/></svg>
+    </span>
+    <p class="notice-p"><span class="notice-k">Where this project actually is</span><b>Cackle is experimental and not production-ready.</b> It is built, tested and honest about its limits — but try it on a small night before you put a sold-out one through it. Everything below is labelled with what is actually finished.</p>
+    <a class="notice-cta" href="#status">See what is finished
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </a>
+  </div>
+</aside>
+<hr class="perf perf-red">
+<div class="wrap forwho">
+  <span class="l">Made for</span>
+  <span class="v">a music venue</span>
+  <span class="v">a conference</span>
+  <span class="v">a church hall</span>
+  <span class="v">a night market</span>
+  <span class="v">a school fête</span>
+</div>
 
 <hr class="perf">
 
