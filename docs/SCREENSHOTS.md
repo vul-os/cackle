@@ -40,8 +40,12 @@ using the reader's own viewport, the same way it already picks a theme.
 
 It then copies the hero shot to `docs/screenshots/hero.png` for the README
 header. `landing` is the one surface captured as the FULL scrollable page
-rather than just the viewport, so the flagship `hero.png` shows the demo events
-listed below the hero, not just the hero on its own.
+rather than just the viewport — at desktop. Nothing consumes a full-page
+mobile landing shot (no page in `site/` shows a `landing` capture at all, and
+the sole place one is embedded — [GETTING-STARTED.md](GETTING-STARTED.md) —
+names the desktop light file specifically), so `landing`'s mobile pair is
+viewport-only, same as every other surface's. Full-page-by-parity there once
+produced a 780×14474, ~5.8MB file that nothing linked to.
 
 Every surface is walked top-to-bottom in viewport-sized steps before it is
 shot. A single fast `scrollTo` outruns `IntersectionObserver`, so
@@ -69,7 +73,7 @@ the desktop pair; append `-mobile` for the 390px pair.
 | Surface | File | What it shows |
 |---|---|---|
 | Hero | `hero.png` | Copied from one of the surfaces below — whichever best represents the product at a glance, currently the **homepage** (`landing`), captured full-page. |
-| Landing | `landing-{light,dark}.png` | The homepage, captured full-page (not just the viewport): hero, category filter, and the featured/upcoming events listing — sourced live from `GET /api/events`, so what's visible is always the real seeded catalogue, not a mockup. |
+| Landing | `landing-{light,dark}.png` | The homepage, captured full-page (not just the viewport): hero, category filter, and the featured/upcoming events listing — sourced live from `GET /api/events`, so what's visible is always the real seeded catalogue, not a mockup. Full-page at desktop only — the `-mobile` pair is viewport-only, like every other surface's. |
 | Browse | `event-browse-{light,dark}.png` | The full events list — search, category filter. |
 | Event detail | `event-detail-{light,dark}.png` | The public event page an attendee lands on: ticket types, pricing, availability. |
 | Checkout | `checkout-{light,dark}.png` | Cart / checkout flow before handoff to the payment provider. |

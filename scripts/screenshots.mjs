@@ -16,9 +16,16 @@
  *
  * It then copies the flagship shot to docs/screenshots/hero.png and writes a
  * generated docs/screenshots/README.md index. The one exception is
- * `landing` (see SURFACES below): it captures the FULL scrollable page, not
- * just the viewport, so the flagship hero.png shot actually shows the
- * demo events listed beneath the marketing hero, not just the hero alone.
+ * `landing` (see SURFACES below): at DESKTOP it captures the FULL scrollable
+ * page, not just the viewport, so the flagship hero.png shot actually shows
+ * the demo events listed beneath the marketing hero, not just the hero
+ * alone. Nothing consumes a full-page MOBILE landing capture — no page in
+ * site/ shows a `landing` themeshot at all, and the one place a landing
+ * capture is actually embedded (docs/GETTING-STARTED.md) uses the desktop
+ * light file by name — so landing's mobile pair stays viewport-only like
+ * every other surface's, rather than full-page by parity with its own
+ * desktop sibling. Full-page-by-parity is exactly what produced a
+ * 780×14474, ~5.8MB `landing-{light,dark}-mobile.png` that nothing linked to.
  *
  * Pipeline:
  *   1. Build web/ (vite build -> web/dist), unless already built.
@@ -121,7 +128,14 @@ const SURFACES = [
     // AND the real featured/upcoming events listing beneath it (sourced
     // live from GET /api/events), so the one screenshot most people will
     // ever see actually shows what's on, not just a tagline.
-    fullPage: true,
+    //
+    // DESKTOP only. Mobile has no equivalent consumer — nothing in site/
+    // shows a `landing` themeshot, and the sole place a landing capture is
+    // embedded (docs/GETTING-STARTED.md) names the desktop light file
+    // specifically — so a full-page mobile capture was pure by-parity
+    // waste: 780×14474, ~5.8MB per theme, referenced by nothing. See
+    // capture() below, where `fullPage` is evaluated per-viewport.
+    fullPage: (viewport) => !viewport.isMobile,
   },
   {
     name: 'event-browse',
@@ -549,8 +563,11 @@ async function capture(page, surface, theme, viewport, discoveryCtx, pageIssues 
       console.warn(`     WARNING: laid out at ${laidOutAt}px, expected ~${viewport.width}px (missing <meta name=viewport>?)`);
     }
 
+    // `fullPage` may be a fixed boolean or a per-viewport predicate (see
+    // `landing` in SURFACES: full-page at desktop, viewport-only at mobile).
+    const fullPage = typeof surface.fullPage === 'function' ? Boolean(surface.fullPage(viewport)) : Boolean(surface.fullPage);
     const outPath = path.join(OUT, shotName(surface.name, theme, viewport));
-    await page.screenshot({ path: outPath, fullPage: Boolean(surface.fullPage) });
+    await page.screenshot({ path: outPath, fullPage });
     const bytes = statSync(outPath).size;
     console.log(`     saved ${path.relative(ROOT, outPath)} (${(bytes / 1024).toFixed(0)} KB)`);
     return { name: surface.name, theme, viewport: viewport.name, status: 'ok', url, bytes, laidOutAt, widthOk, scrollY, issues: pageIssues.slice(issuesBefore) };
