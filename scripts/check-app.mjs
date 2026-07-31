@@ -69,10 +69,27 @@ const MIN_FILES_SCANNED = 100;
 // routes.jsx declares 36 paths. Same reasoning: a parser that stops finding
 // routes must fail, not report that all zero of them are covered.
 const MIN_ROUTES = 30;
+// The theme rule's own floors, and the same argument again. A `className=`
+// extractor that silently stops matching — a JSX refactor, a prop rename, a
+// regex edited in a hurry — reports zero theme violations while looking at
+// nothing at all, which is indistinguishable from success.
+//
+// The denominator is deliberately the count of colour-TAKING classes rather
+// than the count of suspicious ones. The suspicious counts are the wrong
+// floor precisely because the work succeeding drives them toward zero: there
+// are two `dark:` variants left in the whole app, and a floor of two proves
+// nothing about whether anything was read. "How many `bg-`/`text-`/`border-`
+// classes did you look at and clear" does not shrink as the tree gets
+// cleaner. Set at roughly 60% of the counts observed when this landed
+// (~1880 classes, ~1970 regions), so ordinary churn does not trip them and a
+// collapsed extractor does.
+const MIN_STYLE_REGIONS = 1200;
+const MIN_COLOUR_CLASSES = 1150;
 
 const CLAIMS_FILE = join(appDir, 'components', 'honesty', 'claims.js');
 const STRIP_FILE = join(appDir, 'components', 'honesty', 'honesty-strip.jsx');
 const ROUTES_FILE = join(appDir, 'routes.jsx');
+const TAILWIND_CONFIG = join(repoRoot, 'web', 'tailwind.config.js');
 const LAYOUTS = [
   join(appDir, 'components', 'layout', 'blank-layout.jsx'),
   join(appDir, 'components', 'layout', 'main-layout.jsx'),
@@ -279,6 +296,296 @@ const NAVIGATION_CONTEXT = [
   /xmlns(?::\w+)?\s*=\s*["']\s*$/i,
   /location\.href\s*=\s*[`'"]\s*$/i,
 ];
+
+// ── the theme matcher ───────────────────────────────────────────────────────
+//
+// The owner's complaint, in full: "fix cards, deep css classes stick to theme".
+//
+// Every colour in this app is supposed to come from a semantic token, so it
+// flips when the theme does. `web/src/index.css` defines those tokens twice —
+// once under `:root`, once under `.dark` — and `lib/contrast.test.js` measures
+// both sets. All of that is worth nothing to a component that writes
+// `bg-gray-100`, because a raw palette class is the same colour in both
+// themes by construction. The measured, audited, theme-aware palette simply
+// does not apply to it.
+//
+// Nothing was looking for that. Before this matcher existed, planting
+// `bg-gray-100 text-gray-500 dark:bg-gray-800` and `style={{color:'#6b7280'}}`
+// on a page and running the gate produced "25 checks passed".
+//
+// Three shapes are theme-blind, and all three are here:
+//
+//   1. a RAW PALETTE class — `bg-white`, `text-gray-500`, `from-black/70`.
+//      Fixed colours from Tailwind's default ramp. The `.dark` block cannot
+//      reach them.
+//   2. a COLOUR LITERAL — `#880424`, `rgba(10,8,10,0.75)`, `hsl(0 0% 50%)` —
+//      written into a `className` or a `style`. Same problem, spelled out.
+//   3. a `dark:` COLOUR PATCH — `dark:bg-gray-800`, `dark:text-foreground`.
+//      This one looks like the fix and is the tell. If a colour needs a
+//      `dark:` override it was the wrong colour: a semantic token already
+//      flips, so patching one is redundant, and patching a raw palette class
+//      just means shipping two hardcoded colours instead of one.
+//
+// The false-positive side is where this rule earns or loses its keep, because
+// three legitimate cases look exactly like violations from a distance:
+//
+//   * `hsl(var(--chart-3))` and `text-[hsl(var(--brand))]` are TOKEN
+//     REFERENCES that merely happen to be spelled with a colour function.
+//     They are the correct thing. Flagging them would push authors toward
+//     hardcoding, which is the opposite of the point.
+//   * `dark:` on a non-colour utility — `dark:prose-invert`, `dark:opacity-40`,
+//     `dark:border-2`, `dark:shadow-none` — is genuinely theme-specific
+//     TREATMENT, not a second hardcoded colour.
+//   * a QR plate really does have to be white. A camera reads dark modules on
+//     a light ground; a themed plate is an unscannable ticket. That is a
+//     physical constraint, not a styling preference, and it is what THEME_ALLOW
+//     below is for.
+//
+// The `--verdict-*` floods and the `--gate-*`/`--on-media-*` tokens are the
+// same kind of case and need no exception at all: they are already tokens, so
+// `bg-verdict-duplicate` and `text-gate-ink` never match anything here.
+
+const RAW_PALETTE =
+  'white|black|slate|gray|grey|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+
+// Utilities that take a colour. `border`/`divide`/`ring` carry their side and
+// offset suffixes so `border-t-gray-200` and `ring-offset-white` are seen.
+// Deliberately NOT a list of every utility: `p-4` and `text-lg` share prefixes
+// with nothing here, and a utility that cannot take a colour cannot be a
+// theme-blind colour.
+const COLOUR_UTIL =
+  'bg|text|border(?:-[xytlrbse])?|ring(?:-offset)?|from|via|to|fill|stroke|decoration|outline|divide(?:-[xy])?|placeholder|caret|accent|shadow';
+
+// A Tailwind variant chain: `hover:`, `dark:`, `sm:group-hover:`,
+// `[&>svg]:`, `aria-[invalid=true]:` …
+const VARIANT_CHAIN = '(?:[a-z][a-z0-9-]*(?:\\[[^\\]]*\\])?:)*';
+
+// A class token has to START at a token boundary and END at one, or
+// `bg-red-500-legacy` and `to-blackboard` would both be reported as colours.
+const TOKEN_OPEN = '(?:^|[\\s"\'`{(,])';
+const TOKEN_CLOSE = '(?=$|[\\s"\'`})\\],;])';
+
+/** `bg-white`, `dark:hover:text-gray-400/70`, `from-black/70`. */
+const RAW_PALETTE_CLASS = new RegExp(
+  `${TOKEN_OPEN}(${VARIANT_CHAIN}(?:${COLOUR_UTIL})-(?:${RAW_PALETTE})(?:-(?:50|[1-9]00|950))?(?:\\/(?:\\d{1,3}|\\[[^\\]]*\\]))?)${TOKEN_CLOSE}`,
+  'g',
+);
+
+/** `text-[#880424]`, `bg-[rgb(10,8,10)]` — but NOT `text-[hsl(var(--brand))]`. */
+const ARBITRARY_COLOUR_CLASS = new RegExp(
+  `${TOKEN_OPEN}(${VARIANT_CHAIN}(?:${COLOUR_UTIL})-\\[(?:#[0-9a-fA-F]{3,8}|(?:rgba?|hsla?)\\([^\\]]*\\))\\](?:\\/\\d{1,3})?)${TOKEN_CLOSE}`,
+  'g',
+);
+
+/**
+ * Every class token that TAKES a colour, whatever it was given — `bg-card`,
+ * `text-sm`, `border-b`, `from-black/70`. This is the coverage denominator:
+ * the count of things the rule looked at and decided were fine, which is what
+ * separates "nothing is wrong" from "nothing was examined".
+ */
+const COLOUR_UTIL_CLASS = new RegExp(
+  `${TOKEN_OPEN}(${VARIANT_CHAIN}(?:${COLOUR_UTIL})-[a-zA-Z0-9[(#][^\\s"'\`}\\],;]*)${TOKEN_CLOSE}`,
+  'g',
+);
+
+// Non-global twins of the two class matchers. `.test()` on a /g/ regex
+// advances its own lastIndex and therefore returns a DIFFERENT answer on
+// alternate calls for the same input — a guard that is right every other
+// time. The `dark:` pass below asks yes/no questions, so it asks these.
+const RAW_PALETTE_CLASS_ONE = new RegExp(RAW_PALETTE_CLASS.source);
+const ARBITRARY_COLOUR_CLASS_ONE = new RegExp(ARBITRARY_COLOUR_CLASS.source);
+
+/** Every `dark:`-variant utility in the source, colour or not. */
+const DARK_VARIANT = new RegExp(
+  `${TOKEN_OPEN}((?:[a-z][a-z0-9-]*(?:\\[[^\\]]*\\])?:)*dark:${VARIANT_CHAIN}[a-z][a-zA-Z0-9/[\\]().#_-]*)${TOKEN_CLOSE}`,
+  'g',
+);
+
+/**
+ * A colour literal, anywhere. `hsl(var(--x))` is excluded by the matcher
+ * itself rather than by a later filter, because the exclusion IS the rule:
+ * a colour function whose argument is a custom property is a token reference,
+ * and a token reference is the correct thing to write.
+ */
+const COLOUR_LITERAL = /#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{1,5})?\b|(?:rgba?|hsla?)\([^)]*\)/g;
+const NAMED_CSS_COLOUR = new RegExp(`\\b(?:${RAW_PALETTE}|silver|maroon|navy|olive|teal|aqua|fuchsia)\\b`, 'g');
+
+/**
+ * THEME_ALLOW — the only colours permitted to ignore the theme, each with the
+ * reason it is not a styling choice.
+ *
+ * Scoped to a FILE and to specific CLASSES, never to a whole file. That is
+ * deliberate: both entries below sit in files that also carry `text-gray-500`
+ * and `ring-black/10` for the plate's caption and hairline, and neither of
+ * those is physically required by anything. A file-level exemption would
+ * launder them through with the one class that has a real reason.
+ *
+ * An entry that stops suppressing anything FAILS the run rather than sitting
+ * there, so this list can only shrink by being noticed.
+ */
+const THEME_ALLOW = [
+  {
+    file: 'web/src/pages/visitor/ticket/index.jsx',
+    classes: ['bg-white'],
+    why:
+      'the QR plate behind the ticket code. A QR reader needs dark modules on a light ground with real ' +
+      'reflectance contrast; on the dark theme a themed plate is a ticket that will not scan at the door. ' +
+      'This is the physical requirement of the medium, not a styling preference — which is why the class is ' +
+      'paired with `print-keep-color` for exactly the same reason on paper.',
+  },
+  {
+    file: 'web/src/pages/visitor/tickets/printing/layout.jsx',
+    classes: ['bg-white'],
+    why: 'the same QR plate on the printable ticket sheet, for the same physical scanning reason.',
+  },
+];
+
+/** Strip comments so a class named in prose is not read as a class in use. */
+function stripComments(src) {
+  // The `[^:]` guard is the same one hasLineComment() encodes: a URL scheme's
+  // `//` is always preceded by its own `:`, and a real comment marker never is.
+  return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/([^:]|^)\/\/[^\n]*/gm, '$1');
+}
+
+/**
+ * Every `className=` / `class=` / `style=` value in the source, with the
+ * attribute that carried it.
+ *
+ * Attribute-scoped rather than whole-file, because that is where the literal
+ * rule can be applied without ambiguity: `#abc` in a URL fragment or a git sha
+ * is not a colour, and `'white'` is only a colour when something is being
+ * painted with it. Quote- and brace-aware, so `className={cn('a', x ? 'b' :
+ * 'c')}` and a template literal holding `${expr}` are captured whole instead
+ * of being cut at their first inner brace.
+ */
+function styleRegions(src) {
+  const out = [];
+  const re = /\b(className|class|style)\s*=\s*/g;
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    let i = re.lastIndex;
+    while (i < src.length && /\s/.test(src[i])) i++;
+    const opener = src[i];
+    if (opener === '"' || opener === "'") {
+      const end = src.indexOf(opener, i + 1);
+      if (end === -1) continue;
+      out.push({ attr: m[1], value: src.slice(i + 1, end) });
+      re.lastIndex = end + 1;
+    } else if (opener === '{') {
+      let depth = 0, quote = null, j = i;
+      for (; j < src.length; j++) {
+        const ch = src[j];
+        if (quote) {
+          if (ch === quote && src[j - 1] !== '\\') quote = null;
+          continue;
+        }
+        if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+        if (ch === '{') depth++;
+        else if (ch === '}' && --depth === 0) break;
+      }
+      if (j >= src.length) continue;
+      out.push({ attr: m[1], value: src.slice(i + 1, j) });
+      re.lastIndex = j + 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * SEMANTIC_ROOTS is read from tailwind.config.js rather than restated here,
+ * so the `dark:` rule keeps up with the palette by construction. It is used
+ * for one job only: telling `dark:bg-card` (a redundant patch on a token that
+ * already flips) apart from `dark:border-2` (a width) and `dark:prose-invert`
+ * (a treatment).
+ *
+ * Purely numeric keys are dropped, and they matter: `brand: { 2: … }` and
+ * `chart: { 1: … }` contribute the keys "1".."8", which would otherwise make
+ * the legitimate `dark:border-2` look like a colour named 2.
+ */
+function semanticColourRoots(configSrc) {
+  const block = configSrc.match(/colors:\s*\{([\s\S]*?)\n {12}\},/);
+  if (!block) return [];
+  const keys = new Set();
+  for (const m of block[1].matchAll(/^\s*'?([A-Za-z0-9][A-Za-z0-9-]*)'?:\s*(?:'|\{)/gm)) {
+    if (/^\d+$/.test(m[1]) || m[1] === 'DEFAULT') continue;
+    keys.add(m[1]);
+  }
+  return [...keys];
+}
+
+/**
+ * themeViolations classifies one file and returns both the hits and the
+ * counts, so a run that examined nothing cannot report zero problems without
+ * also reporting that it looked at nothing.
+ *
+ * @param {string} relPath repo-relative, for allowlist matching and messages
+ * @param {string} src
+ * @param {string[]} roots semantic colour roots from the Tailwind config
+ */
+function themeViolations(relPath, src, roots) {
+  // Fail-closed. With an empty root list the `dark:` alternation collapses to
+  // `(?:…|)`, which matches the empty string, and every `dark:` utility in the
+  // app becomes a violation. A gate that cannot read the palette must say so,
+  // not guess.
+  if (!roots.length) throw new Error('themeViolations: no semantic colour roots — the Tailwind palette could not be read');
+  const allowed = new Set(THEME_ALLOW.filter((a) => a.file === relPath).flatMap((a) => a.classes));
+  const hits = [];
+  const suppressed = new Set();
+  let regionsScanned = 0, darkClassified = 0, literalsClassified = 0, classesClassified = 0;
+
+  const code = stripComments(src);
+  const bare = (cls) => cls.slice(cls.lastIndexOf(':') + 1).split('/')[0];
+
+  for (const m of code.matchAll(COLOUR_UTIL_CLASS)) classesClassified++;
+
+  for (const re of [RAW_PALETTE_CLASS, ARBITRARY_COLOUR_CLASS]) {
+    re.lastIndex = 0;
+    for (const m of code.matchAll(re)) {
+      const cls = m[1];
+      // `text-[hsl(var(--brand))]` reaches ARBITRARY_COLOUR_CLASS because it
+      // is spelled with a colour function, and it is the CORRECT thing to
+      // write: an arbitrary value wrapping a custom property is a token
+      // reference. The exclusion belongs here rather than in the pattern,
+      // where making the alternation reject `var(` costs more legibility
+      // than one honest line of prose.
+      if (/var\(\s*--/.test(cls)) continue;
+      if (allowed.has(bare(cls))) { suppressed.add(bare(cls)); continue; }
+      hits.push(`theme-blind class \`${cls}\``);
+    }
+  }
+
+  DARK_VARIANT.lastIndex = 0;
+  const darkColourRe = new RegExp(`^(?:${COLOUR_UTIL})-(?:${RAW_PALETTE}|${roots.join('|')})(?:[-/]|$)`);
+  for (const m of code.matchAll(DARK_VARIANT)) {
+    darkClassified++;
+    const util = m[1].slice(m[1].lastIndexOf('dark:') + 5);
+    // Only the ones already reported above are skipped; a `dark:` patch on a
+    // SEMANTIC token is invisible to those matchers and is the whole reason
+    // this third pass exists.
+    if (RAW_PALETTE_CLASS_ONE.test(` ${util} `) || ARBITRARY_COLOUR_CLASS_ONE.test(` ${util} `)) continue;
+    if (darkColourRe.test(util)) hits.push(`\`${m[1]}\` patches a colour with a theme variant — use the token`);
+  }
+
+  for (const { attr, value } of styleRegions(src)) {
+    regionsScanned++;
+    COLOUR_LITERAL.lastIndex = 0;
+    for (const lit of value.match(COLOUR_LITERAL) || []) {
+      literalsClassified++;
+      if (/var\(\s*--/.test(lit)) continue; // a token reference, not a literal
+      hits.push(`colour literal \`${lit}\` in a ${attr}`);
+    }
+    // Named CSS colours are only unambiguous inside a real style declaration,
+    // so this runs on `style` alone. `whiteSpace: 'nowrap'` survives it: the
+    // word boundary refuses to end a match in the middle of an identifier.
+    if (attr !== 'style') continue;
+    for (const named of value.match(NAMED_CSS_COLOUR) || []) {
+      literalsClassified++;
+      hits.push(`named colour \`${named}\` in a style`);
+    }
+  }
+
+  return { hits, suppressed, regionsScanned, darkClassified, literalsClassified, classesClassified };
+}
 
 // ── file collection ─────────────────────────────────────────────────────────
 
@@ -520,6 +827,120 @@ function urlMatcherSelfTest() {
 }
 
 /**
+ * The theme matcher's self-test.
+ *
+ * Weighted deliberately toward the FORGIVE side. Every other matcher in this
+ * file guards copy, where a false positive is an annoyance; this one guards
+ * the styling of every component in the app, where a false positive is worse
+ * than a false negative — it teaches whoever hits it that the gate is noise,
+ * and the next person routes around it. The four must-pass cases below are
+ * the exact three shapes the rule is most likely to get wrong (a token
+ * reference spelled with a colour function, a `dark:` that is treatment
+ * rather than colour, a physically-required white) plus the identifier trap
+ * `whiteSpace`, and each of them is a thing this app really writes.
+ */
+function themeMatcherSelfTest(roots) {
+  const bad = [];
+  const F = 'web/src/pages/fixture.jsx';
+  const run = (src, file = F) => themeViolations(file, src, roots).hits;
+
+  if (!roots.length) return ['theme gate could not read any colour root out of web/tailwind.config.js'];
+
+  const mustCatch = [
+    ['raw palette fill', '<div className="rounded bg-gray-100 p-2" />'],
+    ['raw palette ink', '<p className="text-gray-500">x</p>'],
+    ['bare white', '<div className="bg-white" />'],
+    ['gradient stop', '<div className="bg-gradient-to-t from-black/70 to-transparent" />'],
+    ['variant chain', '<a className="sm:hover:text-slate-800">x</a>'],
+    ['border side', '<div className="border-l-4 border-red-600" />'],
+    ['ring + outline', '<div className="ring-black/10 outline-white" />'],
+    ['dark: patch on a raw palette', '<div className="bg-slate-100 dark:bg-black/20" />'],
+    ['dark: patch on a semantic token', '<div className="bg-card dark:bg-card" />'],
+    ['arbitrary hex in a class', '<code className="dark:text-[#880424]">x</code>'],
+    ['hex in an inline style', "<div style={{ color: '#6b7280' }} />"],
+    ['rgba in an inline style', "<div style={{ backgroundImage: `linear-gradient(rgba(10,8,10,0.75), url(${bg}))` }} />"],
+    ['literal hsl in an inline style', "<div style={{ color: 'hsl(0 0% 50%)' }} />"],
+    ['named colour in a style string', `const html = '<div style="border:3px solid white"></div>';`],
+    // The plate exemption is per FILE and per CLASS. Written in a file that
+    // has no entry, the very same class is still a violation — otherwise the
+    // allowlist would be a phrase anyone could copy.
+    ['an allowlisted class in a file with no entry', '<div className="bg-white p-4" />'],
+  ];
+  for (const [label, src] of mustCatch) {
+    if (run(src).length === 0) bad.push(`theme gate did NOT catch ${label}: ${src}`);
+  }
+
+  const mustPass = [
+    // Token references. The whole point of the rule is to produce these.
+    ['semantic tokens', '<div className="bg-card text-card-foreground border-border" />'],
+    ['brand + emphasis', '<span className="bg-primary text-primary-foreground" /><b className="text-primary-emphasis" />'],
+    // The verdict palette is the scanner's three answers and is untouchable.
+    // It must never be inconvenient to use correctly.
+    ['verdict tokens', '<div className="bg-verdict-duplicate text-verdict-ink" /><div className="bg-verdict-admit" />'],
+    ['gate + media tokens', '<div className="bg-gate text-gate-ink border-gate-line" /><h1 className="text-media-ink" />'],
+    ['token reference in a class', '<span className="text-[hsl(var(--brand))] bg-[hsl(var(--brand-2))]" />'],
+    ['token reference in a style', "<div style={{ background: 'hsl(var(--primary))' }} />"],
+    ['chart series from tokens', 'const seriesColor = (i) => `hsl(var(--chart-${i + 1}))`;'],
+    ['custom property set to a token', `<div style={{ '--notch': 'var(--sidebar-background)' }} />`],
+    // `dark:` that is genuinely theme-specific treatment, not a colour.
+    ['dark:prose-invert', '<div className="prose dark:prose-invert" />'],
+    ['dark: opacity / width / shadow', '<div className="dark:opacity-40 dark:border-2 dark:shadow-none dark:shadow-elevated" />'],
+    ['dark: mix-blend', '<img className="opacity-90 dark:opacity-70 dark:mix-blend-luminosity" />'],
+    // Utilities that merely share a prefix with a colour utility.
+    ['non-colour utilities', '<p className="text-sm text-balance border-b divide-y to-95% from-0%" />'],
+    ['transparent / current / inherit', '<div className="bg-transparent border-transparent fill-current stroke-current text-inherit" />'],
+    // The identifier trap: a CSS property whose NAME contains a colour word.
+    ['whiteSpace is not the colour white', "<td style={{ whiteSpace: 'nowrap' }} />"],
+    // Not a colour: a URL fragment and a short hash both start with '#'.
+    ['a href fragment is not a hex colour', '<a href="/docs#faq">FAQ</a>'],
+    // Prose naming a class is documentation, not a class in use — the same
+    // one-directional comment rule the URL matcher uses.
+    ['a class named in a comment', '// this used to be bg-gray-100 and text-white before the palette landed'],
+    ['a class named in a block comment', '/* replaced bg-slate-50 with bg-muted */'],
+  ];
+  for (const [label, src] of mustPass) {
+    const hits = run(src);
+    if (hits.length) bad.push(`theme gate wrongly flagged ${label}: ${hits.join('; ')}`);
+  }
+
+  // The allowlist really does suppress, in the file it names.
+  const plate = '<div className="print-keep-color bg-white p-4 ring-1 ring-black/10" />';
+  const inPlateFile = run(plate, THEME_ALLOW[0].file);
+  if (inPlateFile.some((h) => h.includes('bg-white'))) {
+    bad.push(`theme gate ignored its own allowlist: ${inPlateFile.join('; ')}`);
+  }
+  // …and suppresses ONLY the class it names. The hairline on that same plate
+  // is not physically required by anything and must still be reported.
+  if (!inPlateFile.some((h) => h.includes('ring-black'))) {
+    bad.push('the plate allowlist leaked past the class it names — ring-black/10 went unreported');
+  }
+  return bad;
+}
+
+/**
+ * Allowlist hygiene. Three ways an exemption list rots, all fatal here:
+ * an entry with no stated reason, an entry naming a file that no longer
+ * exists, and an entry that no longer suppresses anything. The last is the
+ * one that matters most — a stale exemption is how a list that was once
+ * three justified cases becomes a place to put things.
+ */
+function themeAllowlistProblems(counted) {
+  const bad = [];
+  for (const entry of THEME_ALLOW) {
+    const where = `${entry.file} [${entry.classes.join(', ')}]`;
+    if (!entry.classes?.length) bad.push(`${where}: exempts no specific class — a file-wide exemption is not allowed`);
+    if (!entry.why || entry.why.length < 40) bad.push(`${where}: no stated reason`);
+    if (!existsSync(join(repoRoot, entry.file))) bad.push(`${where}: names a file that does not exist`);
+    for (const cls of entry.classes || []) {
+      if (!counted.get(entry.file)?.has(cls)) {
+        bad.push(`${where}: \`${cls}\` no longer appears there — delete this entry, it is now exempting nothing`);
+      }
+    }
+  }
+  return bad;
+}
+
+/**
  * True if `linePrefix` contains a real `//` line-comment marker — one that is
  * NOT the two slashes of a URL scheme (`http://`, `https://`). A scheme's
  * `//` is always immediately preceded by the scheme's own `:`; a comment
@@ -603,6 +1024,13 @@ function main() {
     note(bad.length === 0, `${label} matcher catches what it must and forgives what it must${fail('problems', bad)}`);
   }
 
+  const tailwindSrc = readFileSyncSafe(TAILWIND_CONFIG) || '';
+  const colourRoots = semanticColourRoots(tailwindSrc);
+  const themeBad = themeMatcherSelfTest(colourRoots);
+  note(themeBad.length === 0,
+    `theme matcher catches what it must and forgives what it must, over ${colourRoots.length} colour roots ` +
+      `read from web/tailwind.config.js${fail('problems', themeBad)}`);
+
   const parity = siblingParity();
   note(parity.length === 0, `every prevention pattern check-site.mjs gates is gated here too${fail('drift', parity)}`);
 
@@ -651,9 +1079,15 @@ function main() {
   note(files.length >= MIN_FILES_SCANNED,
     `${files.length} source files found under web/src (floor ${MIN_FILES_SCANNED}) — an emptied glob cannot pass by scanning nothing`);
 
-  const upgraded = [], discovered = [], money = [], privileged = [], remote = [];
+  const upgraded = [], discovered = [], money = [], privileged = [], remote = [], themeBlind = [];
   const shipped = [], testFiles = [];
   let urlsClassified = 0;
+  // Theme coverage. Counted so that "no violations" is always accompanied by
+  // evidence that something was examined — the failure mode this file's
+  // header names, applied to the newest rule in it.
+  let styleRegionsScanned = 0, darkVariantsClassified = 0, colourLiteralsClassified = 0, colourClassesClassified = 0;
+  const themeFilesScanned = [];
+  const allowlistUsed = new Map();
   for (const file of files) {
     const src = readFileSync(file, 'utf8');
     for (const hit of unnegatedClaims(src)) upgraded.push(`${rel(file)}: "${hit}"`);
@@ -677,6 +1111,22 @@ function main() {
     // and their fixtures are deliberately full of unroutable URLs. Excluded
     // files are counted below so a tree that renamed itself into the exclusion
     // shows up as a collapse rather than as a clean run.
+    // The theme rule is about what RENDERS, so it runs over every shipped
+    // .jsx/.js — component, page and lib alike — and skips `*.test.js` for
+    // the same reason the URL rule does: those files are fixtures, several
+    // of them deliberately contain the defects they assert against, and
+    // vite never bundles them.
+    if (!isTest(file)) {
+      const t = themeViolations(rel(file), src, colourRoots);
+      themeFilesScanned.push(file);
+      styleRegionsScanned += t.regionsScanned;
+      darkVariantsClassified += t.darkClassified;
+      colourLiteralsClassified += t.literalsClassified;
+      colourClassesClassified += t.classesClassified;
+      if (t.suppressed.size) allowlistUsed.set(rel(file), t.suppressed);
+      for (const hit of t.hits) themeBlind.push(`${rel(file)}: ${hit}`);
+    }
+
     if (isTest(file)) { testFiles.push(file); continue; }
     shipped.push(file);
     urlsClassified += [...src.matchAll(/https?:\/\/[^\s"'`)<>]+/g)].length;
@@ -696,6 +1146,46 @@ function main() {
   note(remote.length === 0,
     `${urlsClassified} absolute URLs classified across ${shipped.length} shipped files, none fetched at run time${fail('fetched', remote)}`);
 
+  // 4b ── the theme rule. See "the theme matcher" above.
+  log('\ntheme');
+  note(
+    themeFilesScanned.length >= MIN_FILES_SCANNED - 20 &&
+      styleRegionsScanned >= MIN_STYLE_REGIONS &&
+      colourClassesClassified >= MIN_COLOUR_CLASSES,
+    `${colourClassesClassified} colour-taking classes (floor ${MIN_COLOUR_CLASSES}) and ` +
+      `${styleRegionsScanned} className/style regions (floor ${MIN_STYLE_REGIONS}) classified across ` +
+      `${themeFilesScanned.length} files; of those, ${darkVariantsClassified} carried a dark: variant and ` +
+      `${colourLiteralsClassified} held a colour function or literal — ` +
+      'a run that examined nothing cannot report zero theme violations');
+  note(themeBlind.length === 0,
+    `every colour comes from a semantic token and flips with the theme` +
+      fail(`${themeBlind.length} theme-blind`, themeBlind));
+  // Printed with the failure rather than left in this file's header, because
+  // whoever hits this is looking at terminal output, not at the gate's
+  // source, and the wrong reflex — relaxing the matcher or adding an
+  // allowlist entry — is the one that is easiest to reach for.
+  if (themeBlind.length) {
+    console.log(
+      '\n  Fix the COLOUR, not this check. The token for each case:\n' +
+      '    surfaces / type / rules   bg-card · bg-background · bg-muted · text-foreground ·\n' +
+      '                              text-muted-foreground · border-border\n' +
+      '    brand                     bg-primary + text-primary-foreground · text-primary-emphasis\n' +
+      '                              (brand as INK — bg-primary under small text is 3.34:1)\n' +
+      '    over a photograph         text-media-ink · from-media-ground/90 · border-media-ink/20\n' +
+      '    the scan screen           bg-gate · text-gate-ink · text-gate-ink-muted · border-gate-line\n' +
+      '    a modal / drawer wash     bg-scrim\n' +
+      '    elevation                 shadow-soft · shadow-elevated · shadow-floating ·\n' +
+      '                              shadow-docked (casts upward, for a bottom-docked bar)\n' +
+      '                              never a hardcoded rgba() box-shadow — the ramp is themed\n' +
+      '  THEME_ALLOW in this file is for colour a physical device requires, not for\n' +
+      '  colour that is inconvenient to tokenise. It is checked for staleness every run.\n',
+    );
+  }
+  const allowProblems = themeAllowlistProblems(allowlistUsed);
+  note(allowProblems.length === 0,
+    `all ${THEME_ALLOW.length} theme exemptions still apply, name a class rather than a file, and say why` +
+      fail('stale or unjustified', allowProblems));
+
   // 5 ── the no-billing claim, re-proven against the Go source.
   //
   // The app now tells organisers, in writing, that there is no billing system
@@ -714,7 +1204,7 @@ function main() {
   note(billing.length === 0,
     `no fee-collection identifier in the Go source — "no billing system" is still true${fail('found', billing)}`);
 
-  const EXPECTED_CHECKS = 25;
+  const EXPECTED_CHECKS = 29;
   if (ran !== EXPECTED_CHECKS) {
     problems.push(`only ${ran} of ${EXPECTED_CHECKS} checks ran — the run did not complete`);
     console.log(`  FAIL  only ${ran} of ${EXPECTED_CHECKS} checks ran`);

@@ -187,6 +187,14 @@
     --shadow-soft: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05), 0 1px 3px 0 hsl(var(--shadow-color) / 0.07);
     --shadow-elevated: 0 2px 4px -2px hsl(var(--shadow-color) / 0.09), 0 8px 20px -6px hsl(var(--shadow-color) / 0.13);
     --shadow-floating: 0 8px 10px -6px hsl(var(--shadow-color) / 0.11), 0 20px 40px -12px hsl(var(--shadow-color) / 0.24);
+    /* The ramp's fourth step, and the only one that casts UPWARD: a bar
+       docked to the bottom of the viewport (the mobile ticket CTA) lifts off
+       the content scrolling underneath it, so its shadow has to fall the
+       other way. Every other step here points down and none of them can be
+       flipped by a caller, which is why the one surface that needed it had
+       hardcoded `shadow-[0_-4px_16px_rgba(0,0,0,0.08)]` — the same shape of
+       gap as a card header with nowhere to put a button. */
+    --shadow-docked: 0 -4px 16px -2px hsl(var(--shadow-color) / 0.1), 0 -1px 3px 0 hsl(var(--shadow-color) / 0.06);
 
     /* The wash behind a modal, a drawer or any other layer that takes the
        page out of play. Not `bg-black/50`: on the ink ground a neutral black
@@ -206,12 +214,18 @@
        which is indistinguishable from the theme-blind kind at a glance and
        at a grep.
 
+       Two tokens, not a set: `ink` is the light side (type, hairlines, a
+       glassy chip) and `ground` is the dark side (the gradient that makes the
+       ink legible in the first place). Both are declared WITHOUT alpha so
+       Tailwind's `/nn` modifier still works — `from-media-ground/90`,
+       `text-media-ink/70`, `border-media-ink/20` — which is what the pages
+       doing this already need and what a token with baked-in alpha could not
+       give them.
+
        Only legitimate over a scrim or a dark gradient. Light type straight
        onto an unknown photograph is not made safe by a token. */
     --on-media: 0 0% 100%;
-    --on-media-muted: 0 0% 100% / 0.72;
-    --on-media-line: 0 0% 100% / 0.22;
-    --on-media-wash: 0 0% 100% / 0.12;
+    --on-media-ground: 0 0% 0%;
 
     /* ── The gate's own fixed surface ─────────────────────────────────────
        Declared here rather than inside `.gate-surface` (where they used to
@@ -359,6 +373,11 @@
       inset 0 1px 0 0 hsl(0 0% 100% / 0.06);
     --shadow-floating: 0 8px 10px -6px hsl(var(--shadow-color) / 0.55), 0 20px 40px -12px hsl(var(--shadow-color) / 0.7),
       inset 0 1px 0 0 hsl(0 0% 100% / 0.08);
+    /* Docked, on ink: deeper, and the highlight moves to the TOP edge —
+       which on a bottom-docked bar is the edge facing the content, and so
+       the one that reads as the lip of something laid over the page. */
+    --shadow-docked: 0 -4px 18px -2px hsl(var(--shadow-color) / 0.55), 0 -1px 3px 0 hsl(var(--shadow-color) / 0.4),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.07);
 
     /* The scrim goes darker AND more opaque on ink, for the reason given in
        :root — the page it is dimming is already dark, so the same alpha does

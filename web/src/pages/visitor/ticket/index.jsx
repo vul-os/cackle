@@ -10,6 +10,7 @@ import { Calendar, MapPin, User, Armchair, Printer, Download, Ban, ChevronLeft, 
 import { QRCodeSVG } from 'qrcode.react';
 import { tickets as ticketsApi } from '@/lib/api';
 import PrintStyles from '@/pages/visitor/tickets/printing/print-styles';
+import { Separator } from '@/components/ui/separator';
 import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 
@@ -226,8 +227,16 @@ function TicketCard({ ticket }) {
                     never below the fold. */}
                 <div className="flex flex-col gap-8 bg-card px-6 py-8 sm:flex-row sm:items-center sm:gap-10 sm:px-10">
                     <div className="flex flex-col items-center gap-4 sm:order-2 sm:flex-1">
+                        {/* INTENTIONAL raw white, in BOTH themes — not a theme-sweep bug.
+                            A scanner reads printed reflectance and the quiet zone around
+                            the modules, not a design token; a dark-mode-inverted plate
+                            would look "correct" and fail to scan. `text-brand-2` below is
+                            the matching fixed-INK text (17.9:1 on white, measured in
+                            contrast.test.js) for the one state where this plate has no
+                            code to show — it must stay legible on the literal white
+                            behind it, not flip to a near-white muted tone in dark mode. */}
                         <div
-                            className={`print-keep-color print-qr w-[min(100%,20rem)] rounded-2xl bg-white p-4 shadow-soft ring-1 ring-black/10 sm:p-5 ${
+                            className={`print-keep-color print-qr w-[min(100%,20rem)] rounded-2xl bg-white p-4 shadow-soft ring-1 ring-border sm:p-5 ${
                                 isVoid ? 'opacity-60 grayscale' : ''
                             }`}
                             aria-label={
@@ -243,7 +252,7 @@ function TicketCard({ ticket }) {
                                 // 390px phone alike.
                                 <QRCodeSVG value={ticket.capability} size={320} level="H" className="h-auto w-full" />
                             ) : (
-                                <div className="flex aspect-square w-full items-center justify-center text-center text-sm font-medium text-gray-600">
+                                <div className="flex aspect-square w-full items-center justify-center text-center text-sm font-medium text-brand-2/70">
                                     No capability issued for this ticket.
                                 </div>
                             )}
@@ -260,7 +269,11 @@ function TicketCard({ ticket }) {
                         <GateFact icon={User} label="Ticket holder" value={ticket.holder_name || 'Ticket holder'} />
                         {ticket.seat && <GateFact icon={Armchair} label="Seat" value={ticket.seat} />}
 
-                        <div className="border-t border-dashed border-border pt-4">
+                        {/* The tear-line between "who this is for" and the ticket's own
+                            serial/legal footer — the one division on this card that is
+                            genuinely a ticket stub, not a generic rule. */}
+                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' }} />
+                        <div className="pt-3">
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Ticket number</p>
                             <p className="mt-0.5 select-all font-mono text-base font-semibold text-foreground">#{ticket.serial}</p>
                             {!isVoid && (

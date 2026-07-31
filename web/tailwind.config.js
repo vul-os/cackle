@@ -48,11 +48,11 @@ module.exports = {
                 // dark gradient. Fixed in both themes on purpose: a cover
                 // image is not a theme surface. Only valid over a scrim or a
                 // dark gradient — see index.css.
+                // Declared without alpha so `/nn` still applies:
+                // `from-media-ground/90`, `text-media-ink/70`.
                 media: {
                     ink: 'hsl(var(--on-media))',
-                    'ink-muted': 'hsl(var(--on-media-muted))',
-                    line: 'hsl(var(--on-media-line))',
-                    wash: 'hsl(var(--on-media-wash))',
+                    ground: 'hsl(var(--on-media-ground))',
                 },
                 // The scan screen's fixed canvas, frozen in both themes.
                 // Anything rendering on `.gate-surface` names these instead
@@ -170,6 +170,9 @@ module.exports = {
                 soft: 'var(--shadow-soft)',
                 elevated: 'var(--shadow-elevated)',
                 floating: 'var(--shadow-floating)',
+                // Casts upward. For a bar docked to the bottom of the
+                // viewport, whose shadow falls onto the content it covers.
+                docked: 'var(--shadow-docked)',
                 'glow-primary': '0 0 0 1px hsl(var(--primary) / 0.4), 0 4px 24px -4px hsl(var(--primary) / 0.45)',
             },
             transitionTimingFunction: {

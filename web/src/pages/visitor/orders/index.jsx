@@ -14,7 +14,11 @@ import { TAP_BUTTON } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 
 const STATUS_STYLE = {
-    pending: { className: 'bg-warning/15 text-warning-foreground', icon: Clock },
+    // `text-warning` (the base token), not `text-warning-foreground` — the
+    // latter is white-on-solid-fill (badge.jsx) and is nearly invisible on
+    // this 15%-tint wash in both themes. `bg-X/15 text-X` is the pattern
+    // used everywhere else a status gets a soft badge (alert.jsx, quick-info.jsx).
+    pending: { className: 'bg-warning/15 text-warning', icon: Clock },
     paid: { className: 'bg-success/15 text-success', icon: CheckCircle2 },
     failed: { className: 'bg-destructive/15 text-destructive', icon: XCircle },
     refunded: { className: 'bg-muted text-muted-foreground', icon: XCircle },

@@ -2,6 +2,7 @@ import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { MapPin, Ban, Armchair, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { formatDate, formatTime } from '../date-utils';
 
 const STATUS_LABEL = {
@@ -63,14 +64,23 @@ export default function TicketLayout({ ticket, event, type }) {
                                 <div className="text-sm font-semibold text-foreground">Seat {ticket.seat}</div>
                             </div>
                         )}
-                        <div className="border-t border-dashed border-border pt-3 font-mono text-xs text-muted-foreground">
-                            #{ticket.serial}
-                        </div>
+                        {/* The tear-line before the ticket's own serial/legal footer —
+                            a genuine ticket-stub division, not decoration. */}
+                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' }} className="mb-3" />
+                        <div className="font-mono text-xs text-muted-foreground">#{ticket.serial}</div>
                     </div>
 
                     <div className="flex flex-1 flex-col items-center justify-center gap-3 border-t border-dashed border-border pt-6 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+                        {/* INTENTIONAL raw white, in BOTH themes — not a theme-sweep bug.
+                            A scanner reads printed/screen reflectance and the quiet zone
+                            around the modules, not a design token; a dark-mode-inverted
+                            plate would look "correct" and fail to scan. `text-brand-2` below
+                            is the matching fixed-INK text (17.9:1 on white, measured in
+                            contrast.test.js) for the no-capability fallback, so it stays
+                            legible on the literal white behind it rather than flipping to
+                            a near-white muted tone in dark mode. */}
                         <div
-                            className={`print-keep-color print-qr rounded-2xl bg-white p-3 shadow-soft ring-1 ring-black/5 ${
+                            className={`print-keep-color print-qr rounded-2xl bg-white p-3 shadow-soft ring-1 ring-border ${
                                 isVoid ? 'opacity-60 grayscale' : ''
                             }`}
                             aria-label={isVoid ? `QR code, ${status}, not valid for entry` : 'Entry QR code'}
@@ -78,7 +88,7 @@ export default function TicketLayout({ ticket, event, type }) {
                             {ticket.capability ? (
                                 <QRCodeSVG value={ticket.capability} size={140} level="H" />
                             ) : (
-                                <div className="flex h-[140px] w-[140px] items-center justify-center text-center text-xs text-gray-500">
+                                <div className="flex h-[140px] w-[140px] items-center justify-center text-center text-xs text-brand-2/70">
                                     No capability issued
                                 </div>
                             )}

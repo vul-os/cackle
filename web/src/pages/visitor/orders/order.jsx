@@ -34,7 +34,11 @@ function statusColor(status) {
         case 'paid':
             return 'bg-success/15 text-success';
         case 'pending':
-            return 'bg-warning/15 text-warning-foreground';
+            // `text-warning`, not `text-warning-foreground` — the latter is
+            // white-on-solid-fill and is nearly invisible on this soft tint
+            // in both themes. `bg-X/15 text-X` matches every other soft
+            // status badge in the app (alert.jsx, quick-info.jsx).
+            return 'bg-warning/15 text-warning';
         case 'failed':
         case 'cancelled':
             return 'bg-destructive/15 text-destructive';
