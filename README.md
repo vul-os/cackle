@@ -12,7 +12,7 @@ gate — and the gate keeps admitting people even if the venue's network, or
 the server itself, goes down mid-event. It runs as one program you can start
 on a laptop, with no cloud account and nothing else to install.
 
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-F5A623.svg)](LICENSE-MIT)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-14121A.svg)](LICENSE-MIT)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev)
 [![Offline-verified](https://img.shields.io/badge/tickets-Ed25519%20offline--verified-FF4848)](docs/TICKET-FORMAT.md)
