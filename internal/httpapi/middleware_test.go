@@ -72,6 +72,84 @@ func TestCSP_AllowsBlobWorkerForGateScanner(t *testing.T) {
 	}
 }
 
+// TestCSP_DeniesWhatTheAppNeverDoes pins the three directives that are
+// 'none' rather than inheriting default-src's 'self'. Each was verified
+// silent by driving the whole app — public pages, organiser pages, the live
+// scanner — under this policy ENFORCING, not report-only.
+//
+// MUTATION: delete any one of object-src / frame-src / base-uri and this
+// fails naming it. MUTATION: set any of them back to 'self' and it fails,
+// because inheriting default-src is exactly the state this pins against.
+func TestCSP_DeniesWhatTheAppNeverDoes(t *testing.T) {
+	h := newTestHarness(t)
+	directives := parseCSP(t, h.do(http.MethodGet, "/api/events", "", nil).Header().Get("Content-Security-Policy"))
+
+	for _, tc := range []struct{ directive, why string }{
+		{"object-src", "no <object>/<embed> exists; at 'self' an injection could embed an uploaded /media/{id} file"},
+		{"frame-src", "the app frames nothing; checkout redirects at top level, it does not iframe the provider"},
+		{"base-uri", "no page carries a <base>; at 'self' an injected <base> still re-points every relative URL"},
+	} {
+		sources, ok := directives[tc.directive]
+		if !ok {
+			t.Errorf("CSP has no %s directive, so it inherits default-src (%q) — %s",
+				tc.directive, strings.Join(directives["default-src"], " "), tc.why)
+			continue
+		}
+		if len(sources) != 1 || sources[0] != "'none'" {
+			t.Errorf("%s = %q, want exactly 'none' — %s", tc.directive, strings.Join(sources, " "), tc.why)
+		}
+	}
+
+	// frame-ancestors guards the outside-in direction and must stay 'none'
+	// too; frame-src above is the inside-out one. Neither substitutes for
+	// the other.
+	if fa := directives["frame-ancestors"]; len(fa) != 1 || fa[0] != "'none'" {
+		t.Errorf("frame-ancestors = %q, want 'none'", strings.Join(fa, " "))
+	}
+}
+
+// TestCSP_StyleUnsafeInlineIsLoadBearing records WHY style-src carries
+// 'unsafe-inline' when script-src does not, so a future reader does not
+// remove it as a copy-paste leftover. Two independent needs, both measured
+// in a real browser against the built app:
+//
+//   - style-src-elem: index.html carries an inline <style> block (the
+//     anti-FOUC background colour, which must apply before the stylesheet
+//     loads). It reports on EVERY route.
+//   - style-src-attr: inline style="" attributes — 25 in web/src plus
+//     qr-scanner's own scan-region overlay, which sets them on the scanner.
+//
+// A nonce or hash would cover the first but NOT the second: nonces do not
+// apply to style attributes. So 'unsafe-inline' cannot be dropped until
+// every inline style attribute is gone, including the vendored dependency's.
+// It is genuinely required, not a leftover.
+//
+// The test asserts the far more important half: that this laxity is confined
+// to style-src and has not leaked into script-src or default-src.
+func TestCSP_StyleUnsafeInlineIsLoadBearingAndConfined(t *testing.T) {
+	h := newTestHarness(t)
+	directives := parseCSP(t, h.do(http.MethodGet, "/api/events", "", nil).Header().Get("Content-Security-Policy"))
+
+	if !containsSource(directives["style-src"], "'unsafe-inline'") {
+		t.Errorf("style-src = %q dropped 'unsafe-inline'; index.html's inline <style> and every style=\"\" attribute stop applying",
+			strings.Join(directives["style-src"], " "))
+	}
+	for _, name := range []string{"script-src", "default-src", "worker-src"} {
+		if containsSource(directives[name], "'unsafe-inline'") {
+			t.Errorf("%s = %q gained 'unsafe-inline'; only style-src needs it", name, strings.Join(directives[name], " "))
+		}
+	}
+	// No directive anywhere may name a remote origin: the product claim is
+	// that a Cackle page contacts nobody else.
+	for name, sources := range directives {
+		for _, s := range sources {
+			if strings.Contains(s, "//") || strings.HasPrefix(s, "http") || s == "*" {
+				t.Errorf("%s allows %q — a Cackle page must contact no third party", name, s)
+			}
+		}
+	}
+}
+
 // parseCSP splits a policy into directive name -> source list. Names are
 // ASCII case-insensitive per CSP3; source expressions are not.
 func parseCSP(t *testing.T, policy string) map[string][]string {

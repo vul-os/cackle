@@ -49,6 +49,30 @@ func securityHeaders(next http.Handler) http.Handler {
 // third party, and is unreachable to any other origin. No remote host becomes
 // loadable because of it. script-src stays 'self' precisely so a blob: is
 // still refused for a page-level <script>; only the Worker case is allowed.
+//
+// object-src / frame-src / base-uri are 'none' rather than inheriting
+// default-src's 'self'. Each names something the app does not do and should
+// never start doing by accident:
+//
+//	object-src 'none'   there is no <object>/<embed> anywhere in web/src. Left
+//	                    at 'self' an injection could <embed> an operator-
+//	                    uploaded file from /media/{id} and get a plugin
+//	                    document out of it.
+//	frame-src 'none'    the app frames nothing. Checkout hands off to a
+//	                    payment provider by top-level navigation
+//	                    (visitor/checkout/redirect.jsx), never an iframe.
+//	                    With 'self' an injection could frame Cackle's own
+//	                    authenticated routes for a UI-redress attack from
+//	                    inside the origin, which frame-ancestors — an
+//	                    outside-in directive — does not stop.
+//	base-uri 'none'     no page carries a <base>. 'self' would still let an
+//	                    injected <base href="/anything/"> silently re-point
+//	                    every relative URL on the page.
+//
+// img-src keeps `data:`: leaflet's stylesheet ships its three marker/shadow
+// PNGs as data: URLs, and the map chunk loads on any deployment that sets
+// VITE_CACKLE_MAP_TILE_URL. Verified by loading those exact three URLs under
+// a policy without it — all three blocked.
 const contentSecurityPolicy = "default-src 'self'; " +
 	"script-src 'self'; " +
 	"worker-src 'self' blob:; " +
@@ -56,8 +80,10 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"img-src 'self' data: blob:; " +
 	"font-src 'self' data:; " +
 	"connect-src 'self'; " +
+	"object-src 'none'; " +
+	"frame-src 'none'; " +
 	"frame-ancestors 'none'; " +
-	"base-uri 'self'; " +
+	"base-uri 'none'; " +
 	"form-action 'self'"
 
 // corsOptions is same-origin by default: browsers never apply CORS to
