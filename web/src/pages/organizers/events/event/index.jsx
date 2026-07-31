@@ -1,16 +1,52 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
 import { EventPageHeader } from './header';
 import { EventDetailsCard } from './details';
 import DeleteEventDialog from './delete-dialog';
 import { useEventForm } from './event-form-hook';
-import { Spinner } from '@/components/ui/spinner';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { CalendarX } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
+
+/**
+ * Shape of the editor while the event is loading — mirrors the real layout
+ * (back link, title row, nav-button row, the details card's header and its
+ * first section) so the page doesn't jump around once data arrives, and so
+ * "loading" reads as this specific page rather than a generic blank spinner.
+ */
+const EventEditorSkeleton = () => (
+    <div className="mx-auto max-w-4xl" role="status" aria-label="Loading event">
+        <div className="mb-8 space-y-4">
+            <Skeleton className="h-9 w-36" />
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <Skeleton className="h-10 w-72" />
+                <div className="flex flex-wrap gap-2">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <Skeleton key={i} className="h-9 w-28" />
+                    ))}
+                </div>
+            </div>
+        </div>
+        <div className="rounded-xl border border-border">
+            <div className="flex items-center justify-between border-b border-border p-4 sm:p-6">
+                <Skeleton className="h-6 w-36" />
+                <div className="flex gap-2">
+                    <Skeleton className="h-9 w-20" />
+                    <Skeleton className="h-9 w-9" />
+                </div>
+            </div>
+            <div className="space-y-4 p-4 sm:p-6">
+                <Skeleton className="aspect-[21/9] w-full" />
+                <Skeleton className="h-9 w-40" />
+            </div>
+        </div>
+    </div>
+);
 
 function toApiPayload(form) {
     return {
@@ -36,6 +72,7 @@ const EventPage = () => {
     const { activeOrg } = useAuth();
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [loadError, setLoadError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isDuplicating, setIsDuplicating] = useState(false);
@@ -44,10 +81,14 @@ const EventPage = () => {
 
     const { editForm, hasChanges, setHasChanges, handleInputChange, initializeForm } = useEventForm();
 
-    useEffect(() => {
-        if (!id) return;
+    // Split out so the error state's "Try again" button can call the exact
+    // same fetch rather than a copy of it drifting out of sync.
+    const load = useCallback(() => {
+        if (!id) return undefined;
         let cancelled = false;
         setLoading(true);
+        setNotFound(false);
+        setLoadError(null);
         eventsApi
             .get(id)
             .then((data) => {
@@ -56,9 +97,17 @@ const EventPage = () => {
                 initializeForm(event);
                 setLoading(false);
             })
-            .catch(() => {
+            .catch((err) => {
                 if (cancelled) return;
-                setNotFound(true);
+                // A 404 means the event genuinely doesn't exist (deleted, bad
+                // link) — that's an empty state, not an error. Everything else
+                // (network blip, 5xx) is transient and deserves a retry rather
+                // than being told the event is gone.
+                if (err?.status === 404) {
+                    setNotFound(true);
+                } else {
+                    setLoadError(err?.message || 'Could not load this event.');
+                }
                 setLoading(false);
             });
         return () => {
@@ -66,6 +115,11 @@ const EventPage = () => {
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
+
+    useEffect(() => {
+        const cleanup = load();
+        return cleanup;
+    }, [load]);
 
     const handleSave = async () => {
         setIsSubmitting(true);
@@ -163,7 +217,7 @@ const EventPage = () => {
         }
     };
 
-    if (loading) return <Spinner />;
+    if (loading) return <EventEditorSkeleton />;
     if (notFound) {
         return (
             <div className="mx-auto max-w-2xl py-8">
@@ -177,6 +231,13 @@ const EventPage = () => {
                         </button>
                     }
                 />
+            </div>
+        );
+    }
+    if (loadError) {
+        return (
+            <div className="mx-auto max-w-2xl py-8">
+                <ErrorState description={loadError} onRetry={load} />
             </div>
         );
     }

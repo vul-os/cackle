@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Image as ImageIcon, Info, Save, Trash2, Coins, Tag, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Image as ImageIcon, Info, Trash2, Coins, Tag, ArrowRight } from 'lucide-react';
 import DatePickerWithRange from '@/components/date-range-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MarkdownEditor } from './markdown-editor';
@@ -67,22 +67,37 @@ export const EventDetailsCard = ({ editForm, handleInputChange, isSubmitting = f
     const coverUrl = editForm.cover_image_id ? imagesApi.url(editForm.cover_image_id) : editForm.cover_image || null;
 
     return (
-        <Card className="relative">
-            <div className="absolute right-4 top-4 z-10 flex gap-2">
-                <Button variant="ghost" onClick={onSave} disabled={isSubmitting || !hasChanges} className="h-9 gap-2" title="Save changes">
-                    <Save className={`h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
-                    Save
-                </Button>
-                <Button
-                    variant="ghost"
-                    onClick={onDeleteRequest}
-                    disabled={isSubmitting || !editForm.id}
-                    className="h-9 w-9 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    title="Delete event"
-                >
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-            </div>
+        <Card>
+            {/* Save/delete act on THIS card's content (every field below), so they
+                belong in the card's own `actions` slot (added in card.jsx for
+                exactly this — see its doc comment) rather than hand-positioned —
+                the previous absolute-positioned version collided with the "Cover
+                image" section heading directly underneath it at every width. */}
+            <CardHeader
+                className="border-b border-border"
+                actions={
+                    <>
+                        <Button size="lg" loading={isSubmitting} onClick={onSave} disabled={!hasChanges} title="Save changes">
+                            Save
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={onDeleteRequest}
+                            disabled={isSubmitting || !editForm.id}
+                            className="h-11 w-11 p-0 text-destructive hover:border-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete event"
+                            aria-label="Delete event"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </>
+                }
+            >
+                <CardTitle>Event details</CardTitle>
+                <CardDescription role="status" aria-live="polite">
+                    {hasChanges ? 'Unsaved changes' : 'All changes saved'}
+                </CardDescription>
+            </CardHeader>
 
             <CardContent className="space-y-8 pt-6">
                 <Section icon={ImageIcon} title="Cover image">
@@ -98,8 +113,7 @@ export const EventDetailsCard = ({ editForm, handleInputChange, isSubmitting = f
                     <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="mt-3"
+                        className="mt-3 h-11"
                         onClick={() => navigate(`/admin/events/${editForm.id}/images`)}
                         disabled={!editForm.id}
                     >

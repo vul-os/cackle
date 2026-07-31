@@ -102,7 +102,7 @@ const EventTicketTypesPage = () => {
 
     return (
         <div className="mx-auto max-w-4xl">
-            <Button variant="ghost" onClick={() => navigate(`/admin/events/${eventId}`)} className="mb-6">
+            <Button variant="ghost" onClick={() => navigate(`/admin/events/${eventId}`)} className="mb-6 h-11">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Event
             </Button>
@@ -110,7 +110,7 @@ const EventTicketTypesPage = () => {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>{state.event?.title ?? 'Ticket Types'}</CardTitle>
-                    <Button onClick={() => setDialog({ open: true, editing: null })}>
+                    <Button size="lg" onClick={() => setDialog({ open: true, editing: null })}>
                         <Plus className="mr-2 h-4 w-4" />
                         New Ticket Type
                     </Button>
@@ -150,14 +150,16 @@ const EventTicketTypesPage = () => {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting} className="h-11">
+                            Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleDelete();
                             }}
                             disabled={isDeleting}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             Delete
                         </AlertDialogAction>

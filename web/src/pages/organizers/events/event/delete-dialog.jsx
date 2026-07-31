@@ -29,14 +29,16 @@ const DeleteEventDialog = ({ open, onOpenChange, eventTitle, onConfirm, isDeleti
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel disabled={isDeleting} className="h-11">
+                        Cancel
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         onClick={(e) => {
                             e.preventDefault();
                             onConfirm();
                         }}
                         disabled={isDeleting}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     >
                         {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Delete event

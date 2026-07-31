@@ -55,11 +55,16 @@ const TicketTypeItem = memo(({ ticketType, currency, onEdit, onDelete }) => {
                         <Progress value={pctSold} className="h-1.5" />
                     </div>
                 </div>
-                <div className="flex shrink-0 gap-2">
-                    <Button variant="ghost" size="sm" onClick={handleEdit} aria-label={`Edit ${ticketType.name}`}>
+                <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" className="h-11 w-11 p-0" onClick={handleEdit} aria-label={`Edit ${ticketType.name}`}>
                         <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleDelete} aria-label={`Delete ${ticketType.name}`}>
+                    <Button
+                        variant="ghost"
+                        className="h-11 w-11 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={handleDelete}
+                        aria-label={`Delete ${ticketType.name}`}
+                    >
                         <Trash2 className="h-4 w-4" />
                     </Button>
                 </div>

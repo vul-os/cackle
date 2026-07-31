@@ -121,7 +121,7 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                 <UploadCloud className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
                 <p className="text-sm font-medium">Drag and drop images here</p>
                 <p className="text-xs text-muted-foreground">{ACCEPTED_LABEL}</p>
-                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => inputRef.current?.click()} disabled={disabled}>
+                <Button type="button" variant="outline" className="mt-2 h-11" onClick={() => inputRef.current?.click()} disabled={disabled}>
                     Choose files
                 </Button>
                 <input
@@ -144,7 +144,12 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                         <li key={u.key} className="rounded-lg border border-border p-3">
                             <div className="flex items-center justify-between gap-2 text-sm">
                                 <span className="truncate">{u.name}</span>
-                                <button type="button" onClick={() => dismissUpload(u.key)} className="text-muted-foreground hover:text-foreground" aria-label={`Dismiss ${u.name}`}>
+                                <button
+                                    type="button"
+                                    onClick={() => dismissUpload(u.key)}
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    aria-label={`Dismiss ${u.name}`}
+                                >
                                     <X className="h-4 w-4" />
                                 </button>
                             </div>
@@ -167,7 +172,7 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                     <p className="text-sm">No images yet. Add a cover image and a few gallery shots to bring the listing to life.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {images.map((img, index) => {
                         const isCover = img.id === coverImageId;
                         return (
@@ -181,13 +186,19 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                                         Cover
                                     </span>
                                 )}
-                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                                {/* `media-ground` / `media-ink` (index.css): the purpose-built pair
+                                    for type and controls laid over a PHOTOGRAPH under a dark
+                                    gradient — fixed in both themes on purpose, since a cover image
+                                    is not a theme surface. Replaces the raw `bg-black`/`text-white`
+                                    that used to be hardcoded here.
+                                    Always visible on touch (no hover state below `sm`); hover-reveal
+                                    from `sm` up, where a pointer is more likely present. */}
+                                <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-media-ground/80 to-transparent p-1.5 opacity-100 transition-opacity sm:opacity-0 sm:focus-within:opacity-100 sm:group-hover:opacity-100">
                                     <div className="flex gap-1">
                                         <Button
                                             type="button"
-                                            size="icon"
                                             variant="ghost"
-                                            className="h-7 w-7 text-white hover:bg-white/20 hover:text-white"
+                                            className="h-11 w-11 p-0 text-media-ink hover:bg-media-ink/20 hover:text-media-ink"
                                             onClick={() => handleReorder(index, -1)}
                                             disabled={index === 0}
                                             aria-label="Move earlier"
@@ -196,9 +207,8 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                                         </Button>
                                         <Button
                                             type="button"
-                                            size="icon"
                                             variant="ghost"
-                                            className="h-7 w-7 text-white hover:bg-white/20 hover:text-white"
+                                            className="h-11 w-11 p-0 text-media-ink hover:bg-media-ink/20 hover:text-media-ink"
                                             onClick={() => handleReorder(index, 1)}
                                             disabled={index === images.length - 1}
                                             aria-label="Move later"
@@ -210,9 +220,8 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                                         {!isCover && (
                                             <Button
                                                 type="button"
-                                                size="icon"
                                                 variant="ghost"
-                                                className="h-7 w-7 text-white hover:bg-white/20 hover:text-white"
+                                                className="h-11 w-11 p-0 text-media-ink hover:bg-media-ink/20 hover:text-media-ink"
                                                 onClick={() => onCoverChange?.(img.id)}
                                                 title="Set as cover image"
                                                 aria-label="Set as cover image"
@@ -222,9 +231,8 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                                         )}
                                         <Button
                                             type="button"
-                                            size="icon"
                                             variant="ghost"
-                                            className="h-7 w-7 text-white hover:bg-white/20 hover:text-white"
+                                            className="h-11 w-11 p-0 text-media-ink hover:bg-media-ink/20 hover:text-media-ink"
                                             onClick={() => handleDelete(img.id)}
                                             title="Delete image"
                                             aria-label="Delete image"

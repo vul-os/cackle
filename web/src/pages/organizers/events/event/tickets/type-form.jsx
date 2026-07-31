@@ -215,7 +215,7 @@ const TicketTypeForm = ({ initialData = null, currency, onSubmit, isSubmitting =
                     {dateError && <p className="text-sm font-medium text-destructive">{dateError}</p>}
                 </FormItem>
 
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? 'Saving...' : initialData?.id ? 'Update Ticket Type' : 'Create Ticket Type'}
                 </Button>
             </form>
