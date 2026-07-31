@@ -50,8 +50,10 @@ switch that publishes your programme to someone else's website.
 **3. Tickets are always bought from the publisher's own box.** This is
 the rule that keeps the model from collapsing. A borrowed listing carries
 a title, a time, a place, whose event it is, and **a link to that event's
-own page on the publisher's box** (`/h/{event}` — one link per event;
-there is no per-organisation page to link to, see §3). It carries no
+own page on the publisher's box** (`/h/{event}` — one link per event). A
+listing may additionally link to the publisher's **organisation page**,
+`/o/{org}` — that organiser's own "everything we have on" page, on their
+own box, see §2. It carries no
 price, no ticket type, and no checkout. A ticket is signed by the issuing
 organisation's key and verified at that organisation's gate against a
 pinned public key ([TICKET-FORMAT.md](TICKET-FORMAT.md)) — there is no
@@ -110,7 +112,7 @@ payments. [CLUSTERING.md](CLUSTERING.md) is the operator's guide to it,
 including the part where replication makes a cross-gate double admission
 **visible sooner and never prevents one**.
 
-### The public page — one EVENT, not one organisation
+### The public pages — one EVENT at `/h/`, one ORGANISATION at `/o/`
 
 `GET /h/{ref}` — registered on the root router in
 `internal/httpapi/deps.go`, handled by `handleHostPage` in
@@ -124,18 +126,24 @@ invisible to everyone but an admin of its own org.
 id), then loads that event's page document, its ticket types and its
 gallery. See [HOST-PAGES.md](HOST-PAGES.md).
 
-This is worth stating flatly because the natural assumption is the other
-one: **there is no per-organisation public page anywhere in this repo.**
-No route renders "everything this organiser has on". The public listing
-API can be narrowed to one org — see §3 — but nothing server-renders a
-page for one.
+Alongside it, **`GET /o/{ref}` renders one ORGANISATION**: that
+organisation's published events, each linking to its own `/h/` page.
+`{ref}` is an organisation slug or id, registered beside `/h/` on the same
+root router (`internal/httpapi/deps.go:333`) and handled by
+`handleOrgPage` in `internal/httpapi/org_page_handlers.go`. It is resolved
+against this host's display scope by the same `narrowToHostOrg` the
+`?host=` listing filter uses (`resolveScopedOrg`,
+`org_page_handlers.go:113`), so an organisation outside the scope answers
+404 exactly as a nonexistent one does and the route cannot be walked to
+learn who is on a box.
 
-So the link-back target for a borrowed listing is **the publisher's own
-`/h/{event}`, one link per event**. That is enough for rule 3 of §1: a
-visitor who clicks a borrowed listing lands on the publisher's box, on
-the page that sells that event, issued by that org's key. What it does
-not give is a "see everything by this organiser" destination — see §3 for
-that gap, stated as a gap.
+So a borrowed listing now has two link-back targets on the publisher's
+box: **`/h/{event}` per event, and `/o/{org}` for the organiser as a
+whole**. Either satisfies rule 3 of §1 — a visitor who clicks a borrowed
+listing lands on the publisher's box, on a page issued by that org's key.
+See [HOST-PAGES.md](HOST-PAGES.md#the-organisation-page) for the
+organisation page's visibility rules and why it is a separate top-level
+prefix rather than a convention inside `/h/`.
 
 ### The shared merge engine
 
@@ -237,19 +245,25 @@ probe which orgs exist on a box. Both behaviours are tested —
 > This scope finds nobody. It changes what is shown, never what is
 > reachable — there is no discovery anywhere under it.
 
-### The gap: there is no per-organisation page
+### The per-organisation page (was: a gap)
 
-`?host=<org-slug>` narrows an **API listing**. Nothing server-renders a
-public page for an organisation — §2. For federation that is a real gap,
-not a cosmetic one: rule 3 of §1 says a visitor must end up on the
-publisher's own box, and today the only thing to send them to is one
-event at a time. There is no "everything this organiser has on" page on
-either box to link to.
+This chapter used to record, as an open gap, that `?host=<org-slug>`
+narrowed an **API listing** and nothing server-rendered a page for an
+organisation — so the only thing to send a visitor to on the publisher's
+box was one event at a time. That is no longer true: **`GET /o/{ref}` is
+that page**, and `?host=` remains the JSON listing's filter under the same
+scope rule. See
+[HOST-PAGES.md](HOST-PAGES.md#the-organisation-page) for its visibility
+rules, its anti-enumeration property, and why it is a separate top-level
+prefix rather than a convention inside `/h/`.
 
-**This chapter does not solve that, and nobody should read it as
-implying the page exists.** If per-organisation pages are built, they
-belong to whoever owns the host-page surface, and they are a prerequisite
-for a good federated listing rather than a part of federation itself.
+**It closes a link-back gap, and nothing else.** The organisation page is
+not a discovery mechanism: it serves `X-Robots-Tag: noindex`, nothing
+lists these pages, and no route enumerates them. It does not make peer
+listings richer — `/api/peer-events` is untouched. And it is not
+cross-box: `/o/` on box A only ever renders organisations on box A, so a
+borrowed listing that links to a publisher's `/o/` is a link to the
+**publisher's own hostname**, exactly as `/h/` already is.
 
 ### Opt-in peer event feeds — check before you cite
 
@@ -446,7 +460,7 @@ been written with ticketing in mind.
 | Gate ↔ its own server | the operator | admission claims | **built** — [OFFLINE-GATES.md](OFFLINE-GATES.md) |
 | Node ↔ node, same operator | the operator | admission claims | **built** — [CLUSTERING.md](CLUSTERING.md) |
 | Naming whose box this is | the operator | — | **built** — `CACKLE_HOST_SCOPE`, §3 |
-| A public page per organisation | — | — | **not built** — §3, and federation wants it |
+| A public page per organisation | the operator, via `CACKLE_HOST_SCOPE` | — | **built** — `GET /o/{ref}`, §2 (a link-back target, not discovery) |
 | Node ↔ node, two operators | both, separately | published listings | see §3 — check [CHANGELOG.md](../CHANGELOG.md) |
 | Signed public feeds (§22) | the publisher | signed, servable feed objects | **not built**, and blocked in KOTVA — §4 |
 | Subscriptions & push (§25) | subscriber + publisher | subscription objects, hints | **not built**, spec early — §4 |

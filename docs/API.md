@@ -287,7 +287,10 @@ database level — no separate call needed.
 ## Host pages
 
 ```
-GET    /h/{slugOrID}                public HTML page, published events only
+GET    /h/{slugOrID}                public HTML page for ONE EVENT
+GET    /o/{slugOrID}                public HTML page for ONE ORGANISATION,
+                                    its published events → 200 text/html
+                                    no such organisation on this host → 404 text/html
 GET    /api/events/{id}/page        public → {page:{document,is_default,url,updated_at}}
 PUT    /api/events/{id}/page        admin+ auth — the request body IS the document
 DELETE /api/events/{id}/page        admin+ auth — reverts to the default page
@@ -310,6 +313,42 @@ sell a ticket entirely from their own site.
 host-authored HTML, the multi-tenancy rules, and the ticket-purchase flow
 as a worked example. [`host-page-vectors.json`](host-page-vectors.json) is
 the frozen conformance corpus.
+
+### `GET /o/{slugOrID}` — the organisation page
+
+`/h/` is one event; `/o/` is one organisation, listing that organisation's
+**published** events, each linking to its own `/h/` page.
+`{slugOrID}` is an organisation slug or ULID, matched against the
+organisations already in this host's display scope — the same rule
+`GET /api/events?host=` uses. So the `host` query parameter narrows the
+**JSON listing**, and `/o/{ref}` is the **page** for the same
+organisation, under the same scope rule.
+
+- **It is not a JSON route.** There is no `Accept` negotiation and no
+  `/api/orgs/{id}/page`. Do not build a client against one.
+- **No authentication, and no session is read at all.** There is no
+  draft-preview counterpart to `/h/`'s: an organisation page is a list of
+  what is on sale, so there is nothing to build and nothing to preview. A
+  draft-only organisation therefore has no page, not even for its own
+  owner.
+- **The 404 is HTML, not the JSON error envelope**, for the same reason
+  `/h/`'s is — a browser following a link is owed a page.
+- **The 404 is identical for "no such organisation" and "not shown on this
+  host"**: same status, same body bytes, same headers. This is deliberate
+  and tested (`TestOrgPage_OutOfScopeOrgIsIndistinguishableFromNonexistent`).
+  "Improving" the message to say `no such organisation on this host` would
+  reopen an enumeration oracle — the same reasoning as `?host=` above.
+- Responses carry the host-page header set (`setHostPageHeaders`): a
+  strict per-response-nonce CSP with `script-src 'none'`,
+  `form-action 'none'` and the `sandbox` directive, plus
+  `X-Robots-Tag: noindex`.
+- Under `CACKLE_HOST_SCOPE=single` the configured organisation has a page
+  even with nothing published, showing an empty state rather than a 404 —
+  see [CONFIGURATION.md](CONFIGURATION.md#what-your-front-page-shows).
+
+Nothing lists or enumerates these pages: it is a link-back destination,
+not a directory. See
+[HOST-PAGES.md](HOST-PAGES.md#the-organisation-page).
 
 ## Categories
 

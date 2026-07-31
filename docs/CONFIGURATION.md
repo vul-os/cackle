@@ -100,6 +100,36 @@ The listing API reports which of the two you are in
 (`"peers_included": true` under `peers`, `false` under `own` and `single`),
 so anything built on top of Cackle reads the same answer your page does.
 
+### It also decides who has a page of their own
+
+Each organisation your box shows has its own page at `/o/{name}` — "everything
+this organiser has on", server-rendered, no sign-in. **`CACKLE_HOST_SCOPE`
+decides which organisations have one at all**, not only which events the front
+page lists. An organisation outside the scope answers `404`, in exactly the
+way an organisation that does not exist answers, so the address cannot be
+guessed at to find out who is on your machine.
+
+Under **`own`** and **`peers`**, an organisation has a page once it has **at
+least one published event**. An organisation with only drafts has no page —
+its existence and even its name stay private, and there is no preview: the
+page shows published events to everybody, including the organiser's own
+admins, who see the drafts in the app instead.
+
+Under **`single`**, the organisation you named in `CACKLE_HOST_ORG` has a page
+even with nothing published, showing *"Nothing on sale right now"*. That is
+the existing, deliberate behaviour of this scope — a venue between programmes
+is still that venue — now visible as a page. It is not a hole in the
+drafts-stay-private rule: you have named that organisation as the identity of
+the whole box, and `GET /api/events` already returns it.
+
+The flip side of `single`: **every other organisation on the box becomes
+unreachable at `/o/`**, silently and by design. Setting `CACKLE_HOST_ORG` is
+also choosing which single organisation is reachable there.
+
+Nothing indexes or lists these pages ([FEDERATION.md](FEDERATION.md) — Cackle
+still finds nobody for you). They are an address you can put on a poster or
+give to another organiser, nothing more.
+
 ### What the listing API returns
 
 `GET /api/events` answers with the events **and** a `host` object saying

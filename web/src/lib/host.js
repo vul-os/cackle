@@ -86,9 +86,15 @@ export function orgForEvent(host, event) {
 
 /**
  * Where an organisation's label links to: this same listing, narrowed to
- * that organisation. It is not a separate page — `/h/{slug}` is an EVENT's
- * host page, not an organisation's, and there is no organisation page to
- * link to.
+ * that organisation.
+ *
+ * It is not a separate page. An organisation's own page does now exist —
+ * `/o/{slug}`, behind `orgPageHref()` in `@/lib/org-page` — but this is the
+ * LABEL's destination, and a label in a filter row should filter: following
+ * it keeps the visitor's search and category, which is exactly what `?host=`
+ * is for. Leaving the app to a server-rendered page would throw both away.
+ * `org-page.test.js` pins the two as different destinations so they cannot be
+ * quietly collapsed into one.
  */
 export function orgHref(org) {
     return org?.slug ? `/events?host=${encodeURIComponent(org.slug)}` : '/events';
