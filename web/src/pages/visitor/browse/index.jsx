@@ -13,7 +13,7 @@
 // listing to one organisation on a box that hosts several.
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, CalendarX2, X } from 'lucide-react';
+import { Search, CalendarX2, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +31,7 @@ import { minorToMajorNumber } from '@/lib/money';
 import { TAP_BUTTON, TAP_FIELD } from '@/pages/visitor/ui-scale';
 import { humanError } from '@/pages/visitor/errors';
 import { EMPTY_HEADING, emptyDescription, hostHeading, hostOrgs, hostSubheading, orgForEvent, orgHref, showsOrgLabels } from '@/lib/host';
+import { orgPageHref } from '@/lib/org-page';
 import PeerEvents from '@/pages/visitor/events/peer-events';
 
 const PAGE_SIZE = 24;
@@ -262,9 +263,16 @@ export default function BrowsePage() {
                             narrow to one. Rendered strictly on `multi_org` —
                             a single venue gets no row at all, because a row of
                             one is a directory of one, and this box is not a
-                            directory. There is no organisation PAGE to link to
-                            (/h/{ref} resolves an event, not an org); the link
-                            is this same listing, narrowed. */}
+                            directory.
+
+                            These chips stay pointed at this same listing,
+                            narrowed. That is deliberate now that an
+                            organisation DOES have a page of its own (/o/{ref}):
+                            a filter chip should filter, keeping the visitor's
+                            search and category intact, rather than navigate
+                            them off the page they are shopping on. The link to
+                            the organisation's own page sits below, where the
+                            listing has already been narrowed to it. */}
                         {showsOrgLabels(state.host) && (
                             <nav className="mt-5 flex flex-wrap gap-2" aria-label="Organisations on this site">
                                 {hostOrgs(state.host).map((org) => {
@@ -312,6 +320,36 @@ export default function BrowsePage() {
                                     <X className="h-3.5 w-3.5" aria-hidden="true" />
                                     Show everything on this site
                                 </Link>
+                            )}
+
+                            {/* The organiser's own page. Shown once the listing
+                                has been narrowed to one organisation, because
+                                until then there is no single organiser whose
+                                page this would be.
+
+                                It is a plain link out of the app to a
+                                server-rendered page (/o/{slug}) — the address
+                                you would put on a poster, and the one another
+                                operator's box links back to when it shows a
+                                borrowed listing. `orgPageHref` returns null
+                                when there is nothing to link to, and the guard
+                                below renders nothing rather than a dead link.
+
+                                The visible text does not repeat the
+                                organisation's name — the heading two lines
+                                above already says "Events from X", and
+                                "X&rsquo;s own page" reads badly for any name
+                                ending in s. The accessible name carries it, so
+                                the link is still unambiguous read on its own. */}
+                            {state.host?.org && orgPageHref(state.host.org) && (
+                                <a
+                                    href={orgPageHref(state.host.org)}
+                                    aria-label={`${state.host.org.name} — the organiser's own page`}
+                                    className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
+                                >
+                                    <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Organiser&rsquo;s own page
+                                </a>
                             )}
                         </div>
                     </div>

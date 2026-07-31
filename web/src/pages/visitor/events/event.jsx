@@ -14,6 +14,7 @@ import EventHeader from './header';
 import EventQuickInfo from './quick-info';
 import ProcessedText from './processed-text';
 import LocationSection from './location';
+import OrganiserAttribution from './organiser';
 import TicketSelection, { MobileStickyCta } from './ticket-selection';
 import { getEventImages } from './media';
 
@@ -113,6 +114,12 @@ const EventPage = () => {
                 <div className="border-t border-border bg-card shadow-lg">
                     <div className="mx-auto max-w-6xl p-6 sm:p-8">
                         <EventQuickInfo event={event} ticketTypes={ticketTypes} />
+                        {/* Who is actually selling this ticket, and a link to
+                            everything else they have on. Renders nothing on a
+                            box that hosts one organisation, and nothing when
+                            the organiser cannot be resolved — see
+                            ./organiser.jsx. */}
+                        <OrganiserAttribution event={event} className="mt-6" />
                     </div>
                 </div>
 
