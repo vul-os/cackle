@@ -139,17 +139,25 @@ const NEGATOR = /\b(?:not|never|cannot|can't|no|nobody|neither|nor|without|refus
 // negation logic instead of duplicating it, because the reasoning — a bare
 // regex hit is not evidence of a false claim, a NEGATOR in the same sentence
 // is what tells an honest mention from a promise apart — applies to both.
+/**
+ * sentences splits source text into the unit every negation rule in this file
+ * is scoped to.
+ *
+ * Whitespace is collapsed BEFORE splitting, and the reason is specific:
+ * check-site.mjs reads rendered innerText, where a sentence is one line; this
+ * file reads source, where JSX line-wraps mid-sentence. Splitting on newlines
+ * flagged the app's own honest ledger entry — "It is not a backup, and it
+ * does not / prevent a double admission either." — because the wrap put the
+ * negator on the previous line. Joining first restores the sentence scope the
+ * rule is actually about.
+ */
+function sentences(text) {
+  return text.replace(/\s+/g, ' ').split(/(?<=[.!?])\s+/);
+}
+
 function unnegatedClaims(text, patterns = FORBIDDEN_CLAIMS) {
   const hits = [];
-  // Whitespace is collapsed BEFORE splitting, and the reason is specific:
-  // check-site.mjs reads rendered innerText, where a sentence is one line;
-  // this file reads source, where JSX line-wraps mid-sentence. Splitting on
-  // newlines flagged the app's own honest ledger entry — "It is not a backup,
-  // and it does not / prevent a double admission either." — because the
-  // wrap put the negator on the previous line. Joining first restores the
-  // sentence scope the rule is actually about.
-  const flat = text.replace(/\s+/g, ' ');
-  for (const sentence of flat.split(/(?<=[.!?])\s+/)) {
+  for (const sentence of sentences(text)) {
     if (NEGATOR.test(sentence)) continue;
     for (const re of patterns) {
       const m = sentence.match(re);
@@ -196,19 +204,97 @@ const DISCOVERY_CLAIMS = [
 // every run), so ANY fee it appears to charge is fabricated by definition.
 // These target the shapes the deleted page actually used, plus the generic
 // marketing superlative that has no place in a product that is not finished.
+//
+// # The plural hole
+//
+// These patterns ended in `\bfee\b`, and `\b` does not fire between "fee" and
+// "fees" — so every one of them was blind to the plural. That is not a
+// hypothetical: `web/src/pages/organizers/payouts/index.jsx` shipped a column
+// described as "platform fees", implying Cackle takes a cut of every sale. It
+// takes none — `fee_minor` is hardcoded to 0 throughout internal/orders and
+// no code path ever sets it — and the gate said "no fabricated fee, price or
+// superlative". A PAGE AGENT found it by reading. Planting "Platform fees are
+// deducted from every payout." on pricing.jsx and re-running reproduced the
+// pass exactly.
+//
+// Fixed the same way the identifier matcher below was: by enumerating the
+// shapes the thing actually takes. English fees pluralise, possess and
+// hyphenate — "platform fees", "Cackle's fee", "service-fee" — so all three
+// are here, in every pattern that names a fee, a commission or a cut.
+//
+// # Two scoping rules, at two different scopes, for two different reasons
+//
+// NEGATION is scoped to the SENTENCE, because a denial governs a sentence.
+// The app is REQUIRED to talk about fees — it cannot tell an organiser it
+// charges nothing without using the word — so "there is no platform fee" and
+// "Cackle takes no cut of any sale" have to pass. Both are real, shipped
+// copy; the second is the sentence the payouts page was corrected TO. A gate
+// that fires on the honest denial is worse than no gate, because the next
+// person to hit it turns it off.
+//
+// ATTRIBUTION is scoped to the NOUN PHRASE — roughly 40 characters — and not
+// to the sentence, which is the more interesting half. What Cackle's payment
+// PROCESSOR charges is the organiser's own arrangement, is unknowable to
+// Cackle, and is text this product genuinely needs to be able to write. But
+// who charges a fee is decided by the words immediately in front of it, not
+// by anything three clauses away: at sentence scope, "Cackle's fee is
+// separate from your provider's fee" would be forgiven by the word "provider"
+// at the far end of it. That is the same ±200-character mistake check-site.mjs
+// records making with negation, arriving from the other direction.
+const MONEY_NEGATOR =
+  /\b(?:not|never|cannot|can't|no|none|nothing|nobody|neither|nor|without|zero|free|refus\w*|doesn't|won't|isn't|instead of|rather than)\b|\b0\s*%/i;
+
+/** Someone other than Cackle, close enough in front of a fee to own it. */
+const THIRD_PARTY_FEE = /\b(?:processor|provider|gateway|acquirer|issuer|bank|adapter)s?(?:'s|’s)?\b[^.]{0,24}$/i;
+
+// "fee", "fees", "fee's" — and the separator that precedes it, which allows a
+// space or a hyphen but NOT an underscore. `platform_fee` is an identifier,
+// belongs to FEE_IDENTIFIER below, and appears legitimately in this app's own
+// prose: pricing.jsx documents the very grep that proves no such identifier
+// exists, and that grep names all four of them.
+const FEE = "fee(?:s|'s|’s)?";
+const FEE_OWNER = "our|platform|service|application|cackle(?:'s|’s)?";
 
 const FABRICATED_MONEY = [
-  // "Our Fee (0.85%)", "our fee", "platform fee", "service fee"
-  { re: /\b(?:our|platform|service|cackle(?:'s|’s)?)\s+fee\b/i, why: 'names a fee Cackle charges — there is none' },
-  { re: /\b(?:OUR|PLATFORM|SERVICE)_FEE(?:_RATE)?\b/, why: 'a fee-rate constant for a fee that does not exist' },
-  // "we take 0.85%", "a 2% commission", "0.85% cut"
-  { re: /\b\d+(?:\.\d+)?\s*%\s*(?:fee|commission|cut|of every|of each)\b/i, why: 'states a percentage Cackle takes' },
-  { re: /\bfee\s*\(\s*\d+(?:\.\d+)?\s*%/i, why: 'a labelled percentage fee line item' },
-  // Superlatives. Not hedged, not defensible, and unnecessary in either case.
-  { re: /\b(?:the\s+)?(?:lowest|cheapest|best|most\s+affordable|market[- ]leading)\s+(?:fees?|prices?|rates?|pricing)\b/i, why: 'unsubstantiated competitive claim about price' },
-  { re: /\bin the (?:market|industry)\b/i, why: 'unsubstantiated competitive positioning' },
-  { re: /\b(?:industry[- ]leading|world[- ]class|unbeatable|second to none|the (?:only|number one) (?:ticketing|platform))\b/i, why: 'unsubstantiated superlative' },
+  // "Our Fee (0.85%)", "our fee", "platform fees", "Cackle's fee", "service-fee"
+  { re: new RegExp(`\\b(?:${FEE_OWNER})[-\\s]+${FEE}\\b`, 'i'), why: 'names a fee Cackle charges — there is none' },
+  { re: /\b(?:OUR|PLATFORM|SERVICE|APPLICATION)_FEES?(?:_(?:RATE|BPS|AMOUNT))?\b/, why: 'a fee-rate constant for a fee that does not exist' },
+  // "we take 0.85%", "a 2% commission", "0.85% cut", "2% fees"
+  { re: new RegExp(`\\b\\d+(?:\\.\\d+)?\\s*%\\s*(?:${FEE}|commissions?|cuts?|of every|of each)\\b`, 'i'), why: 'states a percentage Cackle takes' },
+  { re: new RegExp(`\\b${FEE}\\s*\\(\\s*\\d+(?:\\.\\d+)?\\s*%`, 'i'), why: 'a labelled percentage fee line item' },
+  // Superlatives, and NOT negatable — see MONEY_NEGATABLE below.
+  { re: /\b(?:the\s+)?(?:lowest|cheapest|best|most\s+affordable|market[- ]leading)\s+(?:fees?|prices?|rates?|pricing|commissions?)\b/i, why: 'unsubstantiated competitive claim about price', negatable: false },
+  { re: /\bin the (?:market|industry)\b/i, why: 'unsubstantiated competitive positioning', negatable: false },
+  { re: /\b(?:industry[- ]leading|world[- ]class|unbeatable|second to none|the (?:only|number one) (?:ticketing|platform))\b/i, why: 'unsubstantiated superlative', negatable: false },
 ];
+
+/**
+ * unnegatedMoney applies both scoping rules and returns the surviving hits.
+ *
+ * `negatable: false` on the three superlative patterns is the same lesson
+ * this file already records about "impossible" in the claim matcher, hit
+ * again from a new direction: "second to none" CONTAINS the word "none", so
+ * making it negatable would hand that pattern its own escape hatch and it
+ * could never fire. And nothing is lost — no honest sentence in this app
+ * needs to deny being the cheapest. A fee, by contrast, is denied in writing
+ * on two shipped pages.
+ */
+function unnegatedMoney(text) {
+  const hits = [];
+  for (const sentence of sentences(text)) {
+    const negated = MONEY_NEGATOR.test(sentence);
+    for (const { re, why, negatable = true } of FABRICATED_MONEY) {
+      if (negated && negatable) continue;
+      const m = sentence.match(re);
+      if (!m) continue;
+      // Attribution, at noun-phrase scope: is somebody other than Cackle
+      // standing immediately in front of this fee?
+      if (negatable && THIRD_PARTY_FEE.test(sentence.slice(Math.max(0, m.index - 40), m.index))) continue;
+      hits.push({ hit: m[0], why });
+    }
+  }
+  return hits;
+}
 
 // ── billing-identifier matcher ──────────────────────────────────────────────
 //
@@ -717,24 +803,73 @@ function discoveryMatcherSelfTest() {
 function moneyMatcherSelfTest() {
   const bad = [];
   const mustCatch = [
-    ['Our Fee (0.85%)', /fee\s*\(/i],
-    ['const OUR_FEE_RATE = 0.0085;', /_FEE/],
-    ['The lowest fees in the market', /lowest/i],
-    ['We take a 2% commission on every ticket.', /%/],
-    ['The industry-leading ticketing platform.', /industry/i],
+    'Our Fee (0.85%)',
+    'const OUR_FEE_RATE = 0.0085;',
+    'The lowest fees in the market',
+    'We take a 2% commission on every ticket.',
+    'The industry-leading ticketing platform.',
+    // The plural family. Every one of these walked straight through the
+    // predecessor, whose patterns all ended in `\bfee\b`.
+    'Platform fees are deducted from every payout.',
+    'Gross sales, platform fees, and net payable per event.',
+    'Service fees apply to each ticket sold.',
+    'Our fees are among the lowest anywhere.',
+    'Application fees are withheld at settlement.',
+    "Cackle's fees are billed monthly.",
+    'Cackle’s fee is 1.5% of face value.',
+    'A service-fee is added at checkout.',
+    'Fees (2.5%) are shown at checkout.',
+    'We keep 2% fees on each sale.',
+    'const PLATFORM_FEES_BPS = 85;',
+    'APPLICATION_FEE_AMOUNT',
+    // "second to none" carries the word "none". If the superlative patterns
+    // were negatable it would forgive itself and could never fire — the same
+    // trap "impossible" sets for the claim matcher.
+    'Cackle is second to none.',
   ];
-  for (const [s] of mustCatch) {
-    if (!FABRICATED_MONEY.some(({ re }) => re.test(s))) bad.push(`money gate did NOT catch: "${s}"`);
-  }
+  for (const s of mustCatch) if (unnegatedMoney(s).length === 0) bad.push(`money gate did NOT catch: "${s}"`);
+
+  // The forgive side, and it is the load-bearing one. The app CANNOT tell an
+  // organiser it charges nothing without writing the word "fee", so every
+  // denial below is real or near-real shipped copy — the second and third are
+  // what the payouts page and the pricing page actually say today.
   const mustPass = [
     'Cackle charges you nothing. There is no billing system in this software.',
     'Cackle takes 0% of what you sell.',
     'No per-ticket cut, no percentage, no monthly plan.',
-    'Ticket price', 'Total', 'Fee breakdown is your provider’s business, not ours.',
+    'Ticket price', 'Total',
+    'Gross sales, fees, and net payable per event. Cackle takes no cut of any sale.',
+    'Cackle has no fees.',
+    'There is no platform fee.',
+    'There are no platform fees, no service fees and no application fees.',
+    '"platform fees" would read as a cut Cackle takes — it takes none.',
+    'Cackle charges no fee of any kind.',
+    'Our fee is zero.',
+    'There is no fee anywhere in this software.',
+    // What a PROCESSOR charges is the organiser's own arrangement and is
+    // honest text this product needs to be able to write. Attribution is
+    // judged at noun-phrase scope: the third party has to be standing in
+    // front of the fee, not merely somewhere in the sentence.
+    'Fee breakdown is your provider’s business, not ours.',
+    'Whatever your payment provider’s service fee comes to is between you and them.',
+    'The processor fees on that sale were deducted before payout.',
+    'Your bank’s fees are not visible to Cackle.',
+    'This column exists for whatever your payment processor may ever deduct.',
+    // A legitimate identifier grep, which pricing.jsx really does print. The
+    // underscore forms belong to FEE_IDENTIFIER and are matched only in
+    // uppercase, so this documentation of their ABSENCE is not a claim.
+    "grep -rn 'platform_fee|service_fee|our_fee|application_fee|commission' internal/ cmd/",
   ];
   for (const s of mustPass) {
-    const hit = FABRICATED_MONEY.find(({ re }) => re.test(s));
-    if (hit) bad.push(`money gate wrongly flagged: "${s}" (${hit.re})`);
+    const hits = unnegatedMoney(s);
+    if (hits.length) bad.push(`money gate wrongly flagged: "${s}" (${hits.map((h) => h.hit).join(', ')})`);
+  }
+
+  // Attribution must not be a sentence-wide escape hatch: naming a provider
+  // anywhere in a sentence cannot launder a fee Cackle attributes to itself.
+  const both = "Cackle's fee is separate from your provider's fee.";
+  if (unnegatedMoney(both).length === 0) {
+    bad.push(`money gate let a Cackle fee through because a provider was named elsewhere in the sentence: "${both}"`);
   }
   return bad;
 }
@@ -1098,10 +1233,7 @@ function main() {
     // peer-events.jsx fires; that string never ships (vite does not bundle
     // `*.test.js`) and is proof the guard works, not evidence of a claim.
     if (!isTest(file)) for (const hit of unnegatedClaims(src, DISCOVERY_CLAIMS)) discovered.push(`${rel(file)}: "${hit}"`);
-    for (const { re, why } of FABRICATED_MONEY) {
-      const m = src.match(re);
-      if (m) money.push(`${rel(file)}: "${m[0]}" — ${why}`);
-    }
+    for (const { hit, why } of unnegatedMoney(src)) money.push(`${rel(file)}: "${hit}" — ${why}`);
     for (const { re, why } of PRIVILEGED_DEFAULT) {
       const m = src.match(re);
       if (m) privileged.push(`${rel(file)}: "${m[0]}" — ${why}`);
