@@ -35,15 +35,31 @@ func (s *Store) GetTicketByID(ctx context.Context, id string) (*Ticket, error) {
 	return s.scanTicket(s.db.QueryRowContext(ctx, ticketSelectColumns+` FROM tickets WHERE id = ?`, id))
 }
 
-// ListTicketsForOrder returns every ticket issued for an order.
+// ListTicketsForOrder returns every ticket issued for an order, in issue
+// order.
+//
+// issued_at ALONE ORDERS NOTHING HERE, so the `, id ASC` is what actually
+// sorts this list. Settlement takes a single paidAt (internal/orders,
+// Service.Settle) and stamps every ticket in the order with it, so all of
+// these rows carry the identical issued_at — not by same-second coincidence
+// but structurally, at full resolution, every time. Ids are ULIDs minted in
+// the issuing loop from a monotonic entropy source, so they carry the order
+// the timestamps threw away.
 func (s *Store) ListTicketsForOrder(ctx context.Context, orderID string) ([]Ticket, error) {
-	return s.queryTickets(ctx, ticketSelectColumns+` FROM tickets WHERE order_id = ? ORDER BY issued_at ASC`, orderID)
+	return s.queryTickets(ctx, ticketSelectColumns+` FROM tickets WHERE order_id = ? ORDER BY issued_at ASC, id ASC`, orderID)
 }
 
 // ListTicketsForUser returns every ticket held by a user, most recently
 // issued first.
+//
+// The `, id DESC` matters for the same reason as above and for the ordinary
+// one too: issued_at is stored with whole-second resolution (timeToText,
+// store.go:207), so tickets from one order always tie and tickets from
+// different orders tie whenever both settled in the same second. This is the
+// query behind GET /api/tickets — without a tiebreaker a buyer's ticket list
+// is free to come back in a different sequence on each refresh.
 func (s *Store) ListTicketsForUser(ctx context.Context, userID string) ([]Ticket, error) {
-	return s.queryTickets(ctx, ticketSelectColumns+` FROM tickets WHERE holder_user_id = ? ORDER BY issued_at DESC`, userID)
+	return s.queryTickets(ctx, ticketSelectColumns+` FROM tickets WHERE holder_user_id = ? ORDER BY issued_at DESC, id DESC`, userID)
 }
 
 // AttendeeRow is one ticket holder row for an event's organiser-facing
