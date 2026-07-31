@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/error-state';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { X } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
@@ -48,6 +49,43 @@ const EMPTY_EVENT = {
 // required fields. Basics-only progress lives in local component state
 // until then — see handleScheduleSubmit.
 
+/**
+ * Loading shape for resuming an existing draft (`/admin/events/:id/wizard`).
+ * A full-screen spinner over blank is a dead end — you can't tell whether
+ * anything is even about to render. This traces the actual layout below
+ * (heading, step pills, a card of field-shaped blocks) so the page never
+ * goes blank while `GET /api/events/:id` + `GET /api/ticket-types` resolve.
+ */
+const WizardSkeleton = () => (
+    <div className="mx-auto max-w-3xl" role="status" aria-label="Loading your draft">
+        <div className="mb-6 flex items-center justify-between">
+            <div className="space-y-2">
+                <Skeleton className="h-8 w-64" />
+                <Skeleton className="h-4 w-80" />
+            </div>
+            <Skeleton className="h-11 w-11 shrink-0 rounded-md" />
+        </div>
+        <div className="mb-8 flex flex-wrap gap-2">
+            <Skeleton className="h-3 w-40" />
+            <div className="flex w-full flex-wrap gap-2">
+                {STEPS.map((s) => (
+                    <Skeleton key={s.key} className="h-11 w-28 rounded-full" />
+                ))}
+            </div>
+        </div>
+        <Card>
+            <CardContent className="space-y-6 pt-6">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-10 w-2/3" />
+                <div className="flex justify-end pt-2">
+                    <Skeleton className="h-11 w-32" />
+                </div>
+            </CardContent>
+        </Card>
+    </div>
+);
+
 function computeInitialStep(event, ticketTypes) {
     if (!event.title) return 0;
     if (!event.starts_at || !event.venue_name) return 1;
@@ -80,6 +118,11 @@ const CreateEventWizard = () => {
     const [maxStepReached, setMaxStepReached] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
+    // Inline, not just a toast — a toast can be missed or dismissed before
+    // it's read, and this is the one form in the product where losing the
+    // reason a save failed means someone re-types a full event. Mirrors the
+    // pattern in organizers/orgs/create.jsx.
+    const [stepError, setStepError] = useState(null);
 
     useEffect(() => {
         if (!routeId) return;
@@ -124,12 +167,14 @@ const CreateEventWizard = () => {
     }, [routeId]);
 
     const goToStep = (index) => {
+        setStepError(null);
         setStep(index);
         setMaxStepReached((m) => Math.max(m, index));
     };
 
     const handleBasicsSubmit = async (data) => {
         setSubmitting(true);
+        setStepError(null);
         try {
             if (!eventId) {
                 // Nothing to persist yet — Create requires starts_at/ends_at too
@@ -147,7 +192,10 @@ const CreateEventWizard = () => {
             }
             goToStep(1);
         } catch (err) {
-            toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+            // Input is never lost on a failed save — `data` only ever flows
+            // into local state on success, and react-hook-form keeps
+            // whatever the organiser typed in the form regardless.
+            setStepError(`${err.message || 'Could not save these details.'} Nothing you typed was lost — try again.`);
         } finally {
             setSubmitting(false);
         }
@@ -155,6 +203,7 @@ const CreateEventWizard = () => {
 
     const handleScheduleSubmit = async (data) => {
         setSubmitting(true);
+        setStepError(null);
         try {
             if (!eventId) {
                 const created = await eventsApi.create({
@@ -189,7 +238,11 @@ const CreateEventWizard = () => {
             setEvent((e) => ({ ...e, ...data }));
             goToStep(2);
         } catch (err) {
-            toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+            // The date/venue/currency the organiser just entered stays right
+            // where they left it — `data` is only merged into `event` state
+            // on success, and the form below keeps its own values either way.
+            const reason = err.message || (eventId ? 'Could not save these details.' : 'Could not create your draft.');
+            setStepError(`${reason} Nothing you entered was lost — try again.`);
         } finally {
             setSubmitting(false);
         }
@@ -197,12 +250,13 @@ const CreateEventWizard = () => {
 
     const handlePublish = async () => {
         setIsPublishing(true);
+        setStepError(null);
         try {
             await eventsApi.publish(eventId);
             toast({ title: 'Published', description: 'Your event is now live.' });
             navigate(`/admin/events/${eventId}`);
         } catch (err) {
-            toast({ title: 'Could not publish', description: err.message, variant: 'destructive' });
+            setStepError(err.message || 'Could not publish this event. Your draft is untouched — try again.');
         } finally {
             setIsPublishing(false);
         }
@@ -219,7 +273,7 @@ const CreateEventWizard = () => {
         }
     };
 
-    if (loading) return <Spinner />;
+    if (loading) return <WizardSkeleton />;
 
     if (loadError) {
         return (
@@ -259,6 +313,12 @@ const CreateEventWizard = () => {
             </div>
 
             <WizardStepper steps={STEPS} currentStep={step} maxStepReached={maxStepReached} onStepClick={goToStep} />
+
+            {stepError && (
+                <Alert variant="destructive" className="mb-6">
+                    <AlertDescription>{stepError}</AlertDescription>
+                </Alert>
+            )}
 
             <Card>
                 <CardContent className="pt-6">

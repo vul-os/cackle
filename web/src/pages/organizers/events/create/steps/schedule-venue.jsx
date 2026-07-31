@@ -166,6 +166,18 @@ const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }) => {
                     />
                 </div>
 
+                {/* Set expectations honestly: the visitor-side location block
+                    fails closed to an address + a link unless whoever runs
+                    this Cackle installs their own map-tile server (see
+                    pages/visitor/events/location.jsx). Most installs don't,
+                    so coordinates should never be sold here as "you'll get a
+                    map" — that's the claim that would actually be false. */}
+                <p className="rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                    These give buyers a “get directions” link, not automatically an embedded map — Cackle doesn’t load map
+                    tiles from anyone else’s server, so event pages keep working with no internet. A map only appears if
+                    whoever runs this Cackle has configured a tile server of their own.
+                </p>
+
                 <FormField
                     control={form.control}
                     name="currency"
@@ -192,11 +204,11 @@ const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }) => {
                 />
 
                 <div className="flex justify-between pt-2">
-                    <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>
+                    <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={submitting}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back
                     </Button>
-                    <Button type="submit" disabled={submitting}>
+                    <Button type="submit" size="lg" disabled={submitting}>
                         {submitting ? 'Saving…' : 'Continue'}
                         {!submitting && <ArrowRight className="ml-2 h-4 w-4" />}
                     </Button>

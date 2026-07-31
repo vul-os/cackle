@@ -19,11 +19,11 @@ const ImagesStep = ({ eventId, images, coverImageId, onImagesChange, onCoverChan
             />
 
             <div className="flex justify-between pt-2">
-                <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>
+                <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={submitting}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
                 </Button>
-                <Button type="button" onClick={onSubmit} disabled={submitting}>
+                <Button type="button" size="lg" onClick={onSubmit} disabled={submitting}>
                     Continue
                     <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

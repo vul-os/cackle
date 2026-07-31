@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ArrowRight } from 'lucide-react';
 import CategorySelect from '@/pages/organizers/events/event/category-select';
 import { MarkdownEditor } from '@/pages/organizers/events/event/markdown-editor';
@@ -41,6 +41,7 @@ const BasicsStep = ({ defaultValues, onSubmit, submitting }) => {
                             <FormControl>
                                 <Input {...field} placeholder="e.g. Sunset Rooftop Sessions" autoFocus disabled={submitting} />
                             </FormControl>
+                            <FormDescription>Buyers see this everywhere — listings, the ticket itself, and their receipt.</FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -65,6 +66,7 @@ const BasicsStep = ({ defaultValues, onSubmit, submitting }) => {
                             <FormControl>
                                 <Textarea {...field} placeholder="One or two sentences shown in listings" disabled={submitting} />
                             </FormControl>
+                            <FormDescription>Shown on event cards before someone clicks in — make it count.</FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -92,7 +94,7 @@ const BasicsStep = ({ defaultValues, onSubmit, submitting }) => {
                 />
 
                 <div className="flex justify-end pt-2">
-                    <Button type="submit" disabled={submitting}>
+                    <Button type="submit" size="lg" disabled={submitting}>
                         {submitting ? 'Saving…' : 'Continue'}
                         {!submitting && <ArrowRight className="ml-2 h-4 w-4" />}
                     </Button>

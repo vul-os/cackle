@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { ticketTypes as ticketTypesApi } from '@/lib/api';
@@ -49,9 +50,13 @@ const TicketsStep = ({ eventId, currency, ticketTypes, onTicketTypesChange, onBa
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">Add at least one ticket type so buyers have something to purchase.</p>
-                <Button type="button" size="sm" onClick={() => setDialog({ open: true, editing: null })}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
+                    A ticket type is what you&apos;re actually selling: a price, how many exist, when they go on sale, and
+                    the most one order can take. All of it is enforced automatically at checkout — nobody can buy more than
+                    you allow or buy after sales close.
+                </p>
+                <Button type="button" size="lg" onClick={() => setDialog({ open: true, editing: null })}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add ticket type
                 </Button>
@@ -60,18 +65,21 @@ const TicketsStep = ({ eventId, currency, ticketTypes, onTicketTypesChange, onBa
             <TicketTypeList ticketTypes={ticketTypes} currency={currency} onEdit={(tt) => setDialog({ open: true, editing: tt })} onDelete={handleDelete} />
 
             {ticketTypes.length === 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    No ticket types yet — you can add them later, but you won't be able to publish until you do.
-                </div>
+                <Alert variant="warning">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                        No ticket types yet — you can come back to this step, but you won&apos;t be able to publish until at
+                        least one exists.
+                    </AlertDescription>
+                </Alert>
             )}
 
             <div className="flex justify-between pt-2">
-                <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>
+                <Button type="button" variant="outline" size="lg" onClick={onBack} disabled={submitting}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back
                 </Button>
-                <Button type="button" onClick={onSubmit} disabled={submitting}>
+                <Button type="button" size="lg" onClick={onSubmit} disabled={submitting}>
                     {submitting ? 'Saving…' : 'Continue'}
                     {!submitting && <ArrowRight className="ml-2 h-4 w-4" />}
                 </Button>
