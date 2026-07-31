@@ -9,10 +9,11 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { SkeletonList } from '@/components/ui/skeleton';
+import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
 import { ArrowLeft, Users, Ticket, Coins, ShieldCheck, Search, Download } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 
 const PAGE_SIZE = 50;
 
@@ -64,7 +65,7 @@ const StatTile = ({ icon: Icon, label, value }) => (
             </div>
             <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="truncate text-2xl font-bold tabular-nums">{value}</p>
+                <p className="tnum truncate text-2xl font-bold">{value}</p>
             </div>
         </CardContent>
     </Card>
@@ -186,7 +187,10 @@ const EventAttendeesPage = () => {
 
     return (
         <div className="mx-auto max-w-6xl">
-            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6">
+            {/* h-11 below `sm` keeps this a real 44px touch target on a phone;
+                sm:h-9 returns it to the compact ghost-button height once
+                there's a pointer, not a thumb, doing the tapping. */}
+            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6 h-11 sm:h-9">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Event
             </Button>
@@ -206,9 +210,9 @@ const EventAttendeesPage = () => {
             </div>
 
             {summaryLoading && (
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3" role="status" aria-label="Loading event summary">
                     {[0, 1, 2].map((i) => (
-                        <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+                        <Skeleton key={i} className="h-24 rounded-xl" />
                     ))}
                 </div>
             )}
@@ -220,7 +224,7 @@ const EventAttendeesPage = () => {
                     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <StatTile icon={Ticket} label="Tickets sold" value={stats.sold ?? 0} />
                         <StatTile icon={ShieldCheck} label="Admitted at the gate" value={stats.admitted ?? 0} />
-                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_minor, currency)} />
+                        <StatTile icon={Coins} label="Revenue" value={<Money minor={stats.revenue_minor ?? 0} currency={currency} />} />
                     </div>
 
                     <Card className="mb-6">
@@ -256,11 +260,15 @@ const EventAttendeesPage = () => {
                                                             </Badge>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell className="text-right tabular-nums">{formatMoney(priceByTypeId[t.ticket_type_id], currency)}</TableCell>
-                                                    <TableCell className="text-right tabular-nums">{t.sold ?? 0}</TableCell>
-                                                    <TableCell className="text-right tabular-nums">{t.quantity_total ?? 0}</TableCell>
-                                                    <TableCell className="text-right tabular-nums">{remaining}</TableCell>
-                                                    <TableCell className="text-right tabular-nums">{formatMoney(t.revenue_minor, currency)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Money minor={priceByTypeId[t.ticket_type_id]} currency={currency} />
+                                                    </TableCell>
+                                                    <TableCell className="tnum text-right">{t.sold ?? 0}</TableCell>
+                                                    <TableCell className="tnum text-right">{t.quantity_total ?? 0}</TableCell>
+                                                    <TableCell className="tnum text-right">{remaining}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Money minor={t.revenue_minor} currency={currency} />
+                                                    </TableCell>
                                                 </TableRow>
                                             );
                                         })}
@@ -269,7 +277,15 @@ const EventAttendeesPage = () => {
                             )}
                         </CardContent>
                         <div className="flex justify-end px-6 pb-4">
-                            <Button variant="outline" size="sm" onClick={handleExportTypeCsv} disabled={byType.length === 0}>
+                            {/* h-11 below `sm` is a real 44px touch target on a phone; sm:h-8
+                                returns it to the compact size="sm" height once there's a pointer. */}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-11 sm:h-8"
+                                onClick={handleExportTypeCsv}
+                                disabled={byType.length === 0}
+                            >
                                 <Download className="mr-2 h-4 w-4" />
                                 Export ticket type summary
                             </Button>
@@ -294,11 +310,11 @@ const EventAttendeesPage = () => {
                                 placeholder="Search by name..."
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                className="h-9 w-48 pl-8"
+                                className="w-48 pl-8"
                             />
                         </div>
                         <Select value={status} onValueChange={setStatus}>
-                            <SelectTrigger className="h-9 w-44">
+                            <SelectTrigger className="w-44">
                                 <SelectValue placeholder="Status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -309,7 +325,13 @@ const EventAttendeesPage = () => {
                                 ))}
                             </SelectContent>
                         </Select>
-                        <Button variant="outline" size="sm" onClick={handleExportAttendeesCsv} disabled={attendees.length === 0}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-11 sm:h-8"
+                            onClick={handleExportAttendeesCsv}
+                            disabled={attendees.length === 0}
+                        >
                             <Download className="mr-2 h-4 w-4" />
                             Export CSV
                         </Button>

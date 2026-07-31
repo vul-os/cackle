@@ -139,7 +139,10 @@ const EventOrdersPage = () => {
 
     return (
         <div className="mx-auto max-w-6xl">
-            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6">
+            {/* h-11 below `sm` keeps this a real 44px touch target on a phone;
+                sm:h-9 returns it to the compact ghost-button height once
+                there's a pointer, not a thumb, doing the tapping. */}
+            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6 h-11 sm:h-9">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Event
             </Button>
@@ -194,7 +197,7 @@ const EventOrdersPage = () => {
                                             </TableCell>
                                             <TableCell className="font-mono text-xs">{order.provider}</TableCell>
                                             <TableCell>{statusBadge(order.status)}</TableCell>
-                                            <TableCell className="text-right tabular-nums">
+                                            <TableCell className="text-right">
                                                 <Money minor={order.total_minor} currency={order.currency || currency} />
                                             </TableCell>
                                             <TableCell className="whitespace-nowrap text-sm text-muted-foreground">

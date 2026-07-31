@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Ticket, Coins, ShieldCheck, BarChart3, Gauge, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Ticket, Coins, ShieldCheck, BarChart3, Gauge } from 'lucide-react';
 import { events as eventsApi } from '@/lib/api';
-import { formatMoney } from '@/lib/money';
+import { Money } from '@/components/ui/money';
 import { TicketTypeBreakdown, RatioMeter } from './stats-charts';
 
 const StatTile = ({ icon: Icon, label, value, sub }) => (
@@ -17,9 +18,13 @@ const StatTile = ({ icon: Icon, label, value, sub }) => (
             </div>
             <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                {/* Proportional figures at display size (dataviz: hero/stat-tile
-                    values use the font's default figures, not tabular-nums —
-                    tabular-nums is reserved for columns that must align). */}
+                {/* Plain counts (Sold, Admitted) render in the font's default
+                    proportional figures — a lone hero number needs no column
+                    to align against (dataviz: tabular-nums is for columns).
+                    Revenue is the one exception: it's a <Money> element, which
+                    always carries its own `tnum` — that's money.jsx's own
+                    call (a currency amount that could tick upward while read
+                    must not visibly reflow), not a choice made here. */}
                 <p className="break-words text-2xl font-bold leading-tight">{value}</p>
                 {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
             </div>
@@ -32,7 +37,7 @@ const EventStatsPage = () => {
     const navigate = useNavigate();
     const [state, setState] = useState({ stats: null, currency: '', eventTitle: '', loading: true, error: null });
 
-    useEffect(() => {
+    const fetchStats = useCallback(() => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         Promise.all([eventsApi.stats(id), eventsApi.get(id)])
@@ -56,6 +61,8 @@ const EventStatsPage = () => {
         };
     }, [id]);
 
+    useEffect(() => fetchStats(), [fetchStats]);
+
     const { stats, currency, eventTitle, loading, error } = state;
     const byType = stats?.by_type ?? [];
 
@@ -71,7 +78,10 @@ const EventStatsPage = () => {
 
     return (
         <div className="mx-auto max-w-4xl">
-            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6">
+            {/* h-11 below `sm` keeps this a real 44px touch target on a phone;
+                sm:h-9 returns it to the compact ghost-button height once
+                there's a pointer, not a thumb, doing the tapping. */}
+            <Button variant="ghost" onClick={() => navigate(`/admin/events/${id}`)} className="mb-6 h-11 sm:h-9">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Back to Event
             </Button>
@@ -87,28 +97,24 @@ const EventStatsPage = () => {
             </div>
 
             {loading && (
-                <div className="space-y-6">
+                <div className="space-y-6" role="status" aria-label="Loading stats">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         {[0, 1, 2].map((i) => (
                             <Skeleton key={i} className="h-24" />
                         ))}
                     </div>
-                    <Skeleton className="h-64" />
+                    <Skeleton className="h-56" />
+                    <Skeleton className="h-40" />
                 </div>
             )}
 
-            {!loading && error && (
-                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border py-16 text-center">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="font-medium">{error}</p>
-                </div>
-            )}
+            {!loading && error && <ErrorState description={error} onRetry={fetchStats} />}
 
             {!loading && !error && stats && (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <StatTile icon={Ticket} label="Sold" value={stats.sold ?? 0} sub={totalCapacity ? `of ${totalCapacity} capacity` : undefined} />
-                        <StatTile icon={Coins} label="Revenue" value={formatMoney(stats.revenue_minor ?? 0, currency)} />
+                        <StatTile icon={Coins} label="Revenue" value={<Money minor={stats.revenue_minor ?? 0} currency={currency} />} />
                         <StatTile
                             icon={ShieldCheck}
                             label="Admitted"

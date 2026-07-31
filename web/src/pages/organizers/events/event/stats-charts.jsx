@@ -70,8 +70,8 @@ export function TicketTypeBreakdown({ byType = [], currency }) {
                                     {t.name}
                                 </span>
                                 <span className="text-muted-foreground">
-                                    <span className="tabular-nums">{sold}</span>
-                                    {t.quantity_total ? <span className="tabular-nums"> / {t.quantity_total}</span> : null} sold
+                                    <span className="tnum">{sold}</span>
+                                    {t.quantity_total ? <span className="tnum"> / {t.quantity_total}</span> : null} sold
                                     {' · '}
                                     <Money minor={t.revenue_minor ?? 0} currency={currency} />
                                 </span>
@@ -113,7 +113,7 @@ export function RatioMeter({ label, value, of, valueLabel, ofLabel, emptyLabel, 
         <div>
             <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
                 <span className="font-medium text-foreground">{label}</span>
-                <span className="tabular-nums text-muted-foreground">
+                <span className="tnum text-muted-foreground">
                     {valueLabel ?? value} of {ofLabel ?? of} · {pct}%
                 </span>
             </div>
