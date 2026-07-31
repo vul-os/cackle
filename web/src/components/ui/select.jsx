@@ -22,7 +22,13 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
       // Matched to <Input>: same height ramp, same hover, same ring. A form
       // where the select and the text field are different heights reads as
       // two components from two libraries.
-      "flex h-10 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-soft ring-offset-background transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-ring/60 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 sm:h-9 sm:text-sm",
+      //
+      // The ramp is h-11 → sm:h-9, and the h-11 half is the same 44px floor
+      // Input and Button hold. This said "matched to <Input>" while being
+      // h-10 (40px) — a claim that had quietly stopped being true, and the
+      // 4px it cost on a phone was exactly the gap the call sites were
+      // patching by hand with `min-h-11`.
+      "flex h-11 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-soft ring-offset-background transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-ring/60 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 sm:h-9 sm:text-sm",
       className
     )}
     {...props}>

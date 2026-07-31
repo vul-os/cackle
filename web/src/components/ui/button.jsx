@@ -32,12 +32,30 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent",
         link: "text-primary-emphasis underline-offset-4 hover:underline active:scale-100",
       },
+      // The three COMPACT sizes are responsive: 44px below `sm`, their
+      // historical desktop height from `sm` up. This is the same shape
+      // `Input` (h-11 → sm:h-9), `SelectTrigger` (h-10 → sm:h-9) and the
+      // toast close button (h-11 w-11 → sm:h-9 sm:w-9) already use, so the
+      // app has ONE rule for touch sizing rather than a second idiom.
+      //
+      // It is here rather than on the pages because it was already on the
+      // pages: roughly forty call sites had each independently bolted a
+      // `min-h-11`, an `h-11` or a `size="lg"` onto a button whose only sin
+      // was being 36px on a phone. A primitive that every caller has to
+      // patch the same way is a primitive with the wrong default. Those
+      // overrides are now redundant and some are actively harmful — a bare
+      // `min-h-11` pins 44px at EVERY width and defeats the `sm:` step back
+      // down, which is why they are listed for removal rather than left.
+      //
+      // `lg` and `xl` are NOT responsive: they are already 44px and 48px,
+      // and they mean "this is a big, deliberate call to action at every
+      // width", not "this needs to be tappable".
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
+        default: "h-11 px-4 py-2 sm:h-9",
+        sm: "h-11 rounded-md px-3 text-xs sm:h-8",
         lg: "h-11 rounded-md px-8 text-base",
         xl: "h-12 rounded-lg px-10 text-base font-semibold",
-        icon: "h-9 w-9",
+        icon: "h-11 w-11 sm:h-9 sm:w-9",
       },
     },
     defaultVariants: {

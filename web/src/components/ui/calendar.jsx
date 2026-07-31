@@ -21,9 +21,22 @@ function Calendar({
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
         nav: "space-x-1 flex items-center",
+        // The `sm:` halves are not decoration. `buttonVariants` is now
+        // responsive (h-11 below sm, h-9 from sm up), and tailwind-merge
+        // only collapses classes within the SAME breakpoint — a bare `h-7`
+        // beats the unprefixed `h-11` and leaves the primitive's `sm:h-9`
+        // standing, which would silently inflate this control from 28px to
+        // 36px on every desktop. Naming both halves pins the calendar's
+        // geometry exactly where it was.
+        //
+        // A 7-column date grid genuinely cannot hold 44px cells inside a
+        // two-month popover, so these stay below the app's touch floor.
+        // That is a pre-existing property of this component and is called
+        // out rather than papered over; it belongs to whoever redesigns the
+        // date-range picker, not to the button's default size.
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+          "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 sm:h-7 sm:w-7"
         ),
         nav_button_previous: "absolute left-1",
         nav_button_next: "absolute right-1",
@@ -40,7 +53,7 @@ function Calendar({
         ),
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-8 w-8 p-0 font-normal aria-selected:opacity-100"
+          "h-8 w-8 p-0 font-normal aria-selected:opacity-100 sm:h-8 sm:w-8"
         ),
         day_range_start: "day-range-start",
         day_range_end: "day-range-end",
