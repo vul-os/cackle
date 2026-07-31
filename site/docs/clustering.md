@@ -196,9 +196,11 @@ A cloud node is on the open internet, so the peer routes are built for that:
 
 - **Every request is signed** with the caller's node key, over a canonical
   envelope covering the method, path, **query string**, body hash, a timestamp
-  and a nonce. The query string is in there because the replication cursor
-  lives in it; a signature that skipped it would let anything on the path
-  rewrite `after=0` and quietly starve a node of history it thinks it received.
+  and a nonce. The query string is in there because every cursor lives in it —
+  `after=` on the ledger pull, and `cursor=` on the event feed described in
+  [FEDERATION.md](FEDERATION.md); a signature that skipped it would let anything
+  on the path rewrite `after=0` and quietly starve a node of history it thinks
+  it received.
 - **Every response is signed too**, bound to the request's nonce. Both
   directions are authenticated per message, and a recorded answer cannot be
   replayed as the answer to a later question.
@@ -260,7 +262,9 @@ limited. These routes are bounded from their first commit:
 | ops per push | 256 |
 | ops per pull page | 128 default, 256 maximum |
 | pages per round | 8 in each direction |
-| rate limit | 5 requests/second per IP, burst 20, shared by both peer routes |
+| listings per event-feed page | 200 |
+| pages per triggered feed fetch | 8 — so at most 1600 listings, and past that the fetch reports itself incomplete rather than truncating quietly |
+| rate limit | 5 requests/second per IP, burst 20, shared by the peer routes |
 | peer request timeout | 30 seconds |
 
 A peer that follows a redirect is refused too: a redirect moves the request to a
