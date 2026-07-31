@@ -58,8 +58,9 @@ func (s *Store) SetSyncPeerFeedStatus(ctx context.Context, id string, at time.Ti
 
 // --- the publish side -------------------------------------------------------
 
-// PublishedEventsForOrg returns the events of one organisation that are
-// PUBLISHED, soonest first.
+// PublishedEventsAfterForOrg returns one page of an organisation's PUBLISHED
+// events, ordered by primary key, starting strictly AFTER afterID. An empty
+// afterID starts at the beginning.
 //
 // `status = 'published'` is the whole authorisation for handing an event to
 // another operator, and it is written as a WHERE clause rather than filtered in
@@ -68,15 +69,29 @@ func (s *Store) SetSyncPeerFeedStatus(ctx context.Context, id string, at time.Ti
 // publish it on somebody else's site before it was published on this one. A
 // cancelled event is excluded too — a listing that sends a stranger to a
 // cancelled show is worse than no listing.
-func (s *Store) PublishedEventsForOrg(ctx context.Context, orgID string, limit int) ([]Event, error) {
+//
+// # Why the page is keyed on `id` and not on `starts_at`
+//
+// This is a keyset seek, not an offset, and the key is the PRIMARY KEY. An offset
+// is unusable here for the obvious reason — unpublish one row behind the cursor
+// and every later row slides forward, so exactly one is skipped and nobody is
+// told. But `ORDER BY starts_at` is unusable too, for a subtler one: starts_at is
+// a column an organiser can edit from the events screen. Reschedule a show while
+// a peer is mid-walk and the row moves ACROSS the cursor — later, and it is never
+// sent at all; earlier, and it is sent twice. `id` is a ULID assigned once at
+// creation and never rewritten, so the order it defines is total, immutable and
+// unique, and a page boundary computed under it stays valid however the rows
+// around it change. Display order is not lost by this: a subscriber re-sorts by
+// starts_at when it reads its cache.
+func (s *Store) PublishedEventsAfterForOrg(ctx context.Context, orgID, afterID string, limit int) ([]Event, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 	return s.queryEvents(ctx, eventSelectColumns+`
 		FROM events
-		WHERE org_id = ? AND status = 'published'
-		ORDER BY starts_at, id
-		LIMIT ?`, orgID, limit)
+		WHERE org_id = ? AND status = 'published' AND id > ?
+		ORDER BY id
+		LIMIT ?`, orgID, afterID, limit)
 }
 
 // --- the subscribe side: a peer's events, as this node last saw them ---------
