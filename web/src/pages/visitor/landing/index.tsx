@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { QrCode, ShieldCheck, WifiOff, ArrowRight, CalendarX2 } from 'lucide-react';
+import { QrCode, ShieldCheck, WifiOff, ArrowRight, CalendarX2, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
@@ -16,6 +16,7 @@ import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { humanError } from '@/pages/visitor/errors';
 import { EMPTY_HEADING, emptyDescription, hostSubheading, orgForEvent, showsOrgLabels } from '@/lib/host';
+import type { CackleEvent, HostView } from '@/lib/api-types';
 
 // The homepage is a preview, but the preview has to actually be wide enough
 // to show what's on — a handful of events isn't a preview, it's the whole
@@ -24,11 +25,17 @@ import { EMPTY_HEADING, emptyDescription, hostSubheading, orgForEvent, showsOrgL
 // else is on" below always covers the rest either way.
 const HOMEPAGE_EVENT_LIMIT = 12;
 
+interface HowItWorksStep {
+    icon: LucideIcon;
+    title: string;
+    description: string;
+}
+
 // Plain language, because the person deciding whether to use this runs a
 // venue, not a distributed system. The signing scheme is true and it is
 // still on the site — one page down, in /docs, under "how it actually
 // works", where an engineer evaluating it will look for it.
-const HOW_IT_WORKS = [
+const HOW_IT_WORKS: HowItWorksStep[] = [
     {
         icon: QrCode,
         title: 'They buy a ticket',
@@ -46,9 +53,16 @@ const HOW_IT_WORKS = [
     },
 ];
 
+interface LandingState {
+    events: CackleEvent[];
+    host: HostView | null;
+    loading: boolean;
+    error: string | null;
+}
+
 const LandingPage = () => {
     const navigate = useNavigate();
-    const [state, setState] = useState({ events: [], host: null, loading: true, error: null });
+    const [state, setState] = useState<LandingState>({ events: [], host: null, loading: true, error: null });
     const [reloadToken, setReloadToken] = useState(0);
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
@@ -63,15 +77,15 @@ const LandingPage = () => {
                 // null and every @/lib/host helper degrades to the name-free
                 // single-tenant page rather than inventing a name.
                 setState({
-                    events: Array.isArray(data) ? data : (data?.events ?? []),
-                    host: Array.isArray(data) ? null : (data?.host ?? null),
+                    events: data.events ?? [],
+                    host: data.host ?? null,
                     loading: false,
                     error: null,
                 });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ events: [], host: null, loading: false, error: err.message || 'Could not load events.' });
+                setState({ events: [], host: null, loading: false, error: err?.message || 'Could not load events.' });
             });
         return () => {
             cancelled = true;
@@ -83,7 +97,7 @@ const LandingPage = () => {
     // The homepage shows a preview only — searching, and picking a category,
     // both send the visitor to the full browse/search/filter surface at
     // /events rather than duplicating that filtering logic here.
-    const handleSearch = (value) => {
+    const handleSearch = (value: string) => {
         const params = new URLSearchParams();
         if (value) params.set('q', value);
         navigate(`/events${params.toString() ? `?${params}` : ''}`);
