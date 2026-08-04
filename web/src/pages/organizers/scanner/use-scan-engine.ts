@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { verifyWithRing } from '@/lib/capability';
-import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced } from '@/lib/scan-store';
+import { verifyWithRing, type KeyRing } from '@/lib/capability';
+import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced, type AdmissionRecord } from '@/lib/scan-store';
 import { scan as scanApi } from '@/lib/api';
 import { useOnline } from '@/lib/use-online';
 import { uuid } from '@/lib/utils';
@@ -8,7 +8,7 @@ import { decideAdmission } from '@/lib/scan-decision';
 
 const DEVICE_ID_KEY = 'cackle_device_id';
 
-export function getDeviceId() {
+export function getDeviceId(): string {
     let id = localStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
         id = uuid();
@@ -65,7 +65,31 @@ export function getDeviceId() {
  * 'invalid' and refused rather than admitted — never guess in the admitting
  * direction.
  */
-export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId }) {
+/** The extra shape a scan can resolve to when the local write itself fails —
+ * a superset AdmissionRecord could never represent, since it never made it
+ * into the store. */
+type ScanFailure = {
+    id: string;
+    event_id: string;
+    ticket_id: null;
+    result: 'invalid';
+    note: string;
+    holder_name: null;
+    at: number;
+};
+
+type ScanResult = (AdmissionRecord & { at: number }) | ScanFailure;
+
+interface UseScanEngineArgs {
+    eventId: string | null | undefined;
+    keyRing: KeyRing;
+    ticketIndex: string[] | null | undefined;
+    ticketIndexPresent: boolean;
+    admittedIndex: string[] | null | undefined;
+    gateId?: string | null;
+}
+
+export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId }: UseScanEngineArgs) {
     const online = useOnline();
     // Always build the set — even when empty — so an authoritative empty
     // index admits nothing. Whether it is consulted at all is gated on
@@ -78,9 +102,9 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
         () => new Set(Array.isArray(admittedIndex) ? admittedIndex : []),
         [admittedIndex],
     );
-    const [tally, setTally] = useState({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
+    const [tally, setTally] = useState<Record<string, number>>({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
     const [pendingCount, setPendingCount] = useState(0);
-    const [lastResult, setLastResult] = useState(null);
+    const [lastResult, setLastResult] = useState<ScanResult | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const deviceId = useRef(getDeviceId());
     const busy = useRef(false);
@@ -129,7 +153,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
     }, [online]);
 
     const handleDecode = useCallback(
-        async (token) => {
+        async (token: string) => {
             if (!eventId || busy.current) return;
             busy.current = true;
             try {
@@ -148,7 +172,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                     wasAdmitted,
                 });
 
-                let record;
+                let record: AdmissionRecord;
                 try {
                     record = await recordScan({
                         eventId,
@@ -164,6 +188,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                     // operator a refusal rather than silently doing nothing,
                     // which would look identical to "the scanner didn't see
                     // the code" and invites a retry that admits.
+                    const message = err instanceof Error ? err.message : String(err);
                     setLastResult({
                         // Still needs a unique id: the result banner is keyed
                         // on it to re-trigger its flash animation.
@@ -171,7 +196,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
                         event_id: eventId,
                         ticket_id: null,
                         result: 'invalid',
-                        note: `Could not record this scan: ${err?.message || err}`,
+                        note: `Could not record this scan: ${message}`,
                         holder_name: null,
                         at: Date.now(),
                     });

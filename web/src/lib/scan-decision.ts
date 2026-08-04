@@ -2,7 +2,7 @@
 //
 // The decision a gate makes about one presented ticket.
 //
-// This is lifted out of `use-scan-engine.js` unchanged in behaviour, for one
+// This is lifted out of `use-scan-engine.ts` unchanged in behaviour, for one
 // reason: it is the most consequential logic in the product and it was only
 // reachable through a React hook, a camera and IndexedDB. Nothing that decides
 // whether a person walks through a door should be that hard to test. Here it
