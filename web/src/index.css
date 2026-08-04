@@ -235,7 +235,7 @@
        are unchanged and are FROZEN in both themes: the scan screen is read
        outdoors at a door, and its chrome must not change shade because
        somebody toggled a theme they never see.
-       `lib/contrast-audit.js` measures these literals as GATE_PAIRS. */
+       `lib/contrast-audit.ts` measures these literals as GATE_PAIRS. */
     --gate-bg: 240 14% 5%;
     --gate-ink: 0 0% 100%;
     --gate-ink-muted: 0 0% 78%;
