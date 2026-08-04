@@ -52,14 +52,14 @@ test('the reset link the CLI prints lands on a route the app declares', () => {
     const routes = read('web/src/routes.tsx');
     assert.match(routes, /path="\/update-password"/, 'no /update-password route — every printed reset link is dead');
 
-    const page = read('web/src/pages/auth/update-password.jsx');
+    const page = read('web/src/pages/auth/update-password.tsx');
     assert.match(page, /searchParams\.get\('token'\)/, 'the update-password page does not read the token from the URL');
 });
 
 test('nothing in the reset flow claims an email was sent', () => {
     const files = {
         'web/src/pages/auth/forgot-password.tsx': read('web/src/pages/auth/forgot-password.tsx'),
-        'web/src/pages/auth/update-password.jsx': read('web/src/pages/auth/update-password.jsx'),
+        'web/src/pages/auth/update-password.tsx': read('web/src/pages/auth/update-password.tsx'),
         'web/src/pages/auth/operator-reset.ts': read('web/src/pages/auth/operator-reset.ts'),
     };
     const forbidden = [

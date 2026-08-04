@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,11 @@ import { AuthShell, FieldError } from './auth-shell';
 
 const RAIL_POINTS = [{ icon: Clock, text: 'This link works once and expires an hour after the operator made it.' }];
 
+interface UpdatePasswordFieldErrors {
+    newPassword?: string;
+    confirmNewPassword?: string;
+}
+
 const UpdatePassword = () => {
     const { updatePassword } = useAuth();
     const [searchParams] = useSearchParams();
@@ -19,24 +24,24 @@ const UpdatePassword = () => {
 
     const [newPassword, setNewPassword] = useState('');
     const [confirmNewPassword, setConfirmNewPassword] = useState('');
-    const [fieldErrors, setFieldErrors] = useState({});
+    const [fieldErrors, setFieldErrors] = useState<UpdatePasswordFieldErrors>({});
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const passwordRef = useRef(null);
-    const confirmRef = useRef(null);
-    const alertRef = useRef(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+    const confirmRef = useRef<HTMLInputElement>(null);
+    const alertRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (error) alertRef.current?.focus();
     }, [error]);
 
-    const clearFieldError = (field) => {
+    const clearFieldError = (field: keyof UpdatePasswordFieldErrors) => {
         setFieldErrors((f) => (f[field] ? { ...f, [field]: undefined } : f));
     };
 
-    const validate = () => {
-        const next = {};
+    const validate = (): UpdatePasswordFieldErrors => {
+        const next: UpdatePasswordFieldErrors = {};
         const passwordMsg = newPasswordError(newPassword);
         const confirmMsg = passwordMsg ? null : confirmPasswordError(newPassword, confirmNewPassword);
         if (passwordMsg) next.newPassword = passwordMsg;
@@ -44,7 +49,7 @@ const UpdatePassword = () => {
         return next;
     };
 
-    const handleSubmit = async (event) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError('');
 
@@ -57,13 +62,17 @@ const UpdatePassword = () => {
         setFieldErrors({});
         setIsLoading(true);
         try {
-            await updatePassword(token, newPassword);
+            // The submit button is disabled whenever there is no token (see
+            // the form below), so by the time this fires the search param
+            // is guaranteed present — the assertion changes nothing about
+            // what runs, only what the compiler already knows from the UI.
+            await updatePassword(token!, newPassword);
             // A toast fired the instant before this navigate() would compete
             // with the unmount it is about to cause. The sign-in page reads
             // this instead, and shows it after it has actually mounted.
             navigate('/login', { state: { passwordUpdated: true } });
         } catch (err) {
-            setError(err.message || 'Could not update your password.');
+            setError(err instanceof Error ? err.message : 'Could not update your password.');
             setIsLoading(false);
         }
     };
@@ -109,7 +118,7 @@ const UpdatePassword = () => {
                             type="password"
                             autoComplete="new-password"
                             value={newPassword}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setNewPassword(e.target.value);
                                 clearFieldError('newPassword');
                             }}
@@ -133,7 +142,7 @@ const UpdatePassword = () => {
                             type="password"
                             autoComplete="new-password"
                             value={confirmNewPassword}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setConfirmNewPassword(e.target.value);
                                 clearFieldError('confirmNewPassword');
                             }}
