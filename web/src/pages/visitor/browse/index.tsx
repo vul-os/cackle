@@ -57,20 +57,33 @@ import { useCategories } from '@/pages/visitor/events/use-categories';
 import { useEventPricing } from '@/pages/visitor/events/use-event-pricing';
 import { minorToMajorNumber } from '@/lib/money';
 import { humanError } from '@/pages/visitor/errors';
-import { EMPTY_HEADING, emptyDescription, hostHeading, hostOrgs, hostSubheading, orgForEvent, orgHref, showsOrgLabels } from '@/lib/host';
+import {
+    EMPTY_HEADING,
+    emptyDescription,
+    hostHeading,
+    hostOrgs,
+    hostSubheading,
+    orgForEvent,
+    orgHref,
+    showsOrgLabels,
+    type HostOrgRef,
+} from '@/lib/host';
 import { orgPageHref } from '@/lib/org-page';
 import PeerEvents from '@/pages/visitor/events/peer-events';
+import type { CackleEvent, HostView } from '@/lib/api-types';
 
 const PAGE_SIZE = 24;
 
-const DATE_FILTERS = {
+type DateFilterKey = 'any' | 'today' | 'week' | 'month';
+
+const DATE_FILTERS: Record<DateFilterKey, { label: string }> = {
     any: { label: 'Any time' },
     today: { label: 'Today' },
     week: { label: 'This week' },
     month: { label: 'This month' },
 };
 
-function dateRangeFor(key) {
+function dateRangeFor(key: DateFilterKey): { from: Date | null; to: Date | null } {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     if (key === 'today') {
@@ -91,19 +104,38 @@ function dateRangeFor(key) {
     return { from: null, to: null };
 }
 
+type PriceFilterKey = 'any' | 'free' | 'under250' | 'under750' | 'over750';
+
 // Price bands compare MAJOR-unit values, not raw minor units — 250 means
 // "250 of whatever the event's own currency is" (250 ZAR, 250 JPY, 250
 // KWD, ...). Cackle never converts currencies, so these bands are
 // deliberately currency-neutral (no "R" prefix) rather than pretending a
 // single absolute threshold means the same thing across every currency
 // an event listing might mix together.
-const PRICE_FILTERS = {
+const PRICE_FILTERS: Record<PriceFilterKey, { label: string; test: (major: number) => boolean }> = {
     any: { label: 'Any price', test: () => true },
     free: { label: 'Free', test: (major) => major === 0 },
     under250: { label: 'Budget (under 250)', test: (major) => major > 0 && major < 250 },
     under750: { label: 'Mid-range (250 – 750)', test: (major) => major >= 250 && major < 750 },
     over750: { label: 'Premium (750+)', test: (major) => major >= 750 },
 };
+
+interface BrowseState {
+    events: CackleEvent[];
+    host: HostView | null;
+    loading: boolean;
+    error: string | null;
+}
+
+/** `hostOrgs()` (@/lib/host) declares every field of a HostOrgRef `unknown`, matching that
+ * module's own defensive stance, regardless of how concretely GET /api/events' `host` typed
+ * it (HostView, in api-types.ts) — narrowed here at the point of use rather than assumed. */
+function orgKey(org: HostOrgRef): string {
+    return typeof org.id === 'string' ? org.id : '';
+}
+function orgLabel(org: HostOrgRef): string {
+    return typeof org.name === 'string' ? org.name : '';
+}
 
 export default function BrowsePage() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -115,12 +147,12 @@ export default function BrowsePage() {
     // not silently widen the page back out to everybody on the box.
     const hostParam = searchParams.get('host') || '';
     const [searchValue, setSearchValue] = useState(query);
-    const [dateFilter, setDateFilter] = useState('any');
-    const [priceFilter, setPriceFilter] = useState('any');
+    const [dateFilter, setDateFilter] = useState<DateFilterKey>('any');
+    const [priceFilter, setPriceFilter] = useState<PriceFilterKey>('any');
     const [limit, setLimit] = useState(PAGE_SIZE);
     const [reloadToken, setReloadToken] = useState(0);
 
-    const [state, setState] = useState({ events: [], host: null, loading: true, error: null });
+    const [state, setState] = useState<BrowseState>({ events: [], host: null, loading: true, error: null });
     const { categories, loading: categoriesLoading, error: categoriesError } = useCategories();
 
     // Keep the search box in sync if the query changes from outside this
@@ -150,15 +182,15 @@ export default function BrowsePage() {
                 // than guessing, so a missing envelope can never produce
                 // marketplace copy.
                 setState({
-                    events: Array.isArray(data) ? data : (data?.events ?? []),
-                    host: Array.isArray(data) ? null : (data?.host ?? null),
+                    events: data.events ?? [],
+                    host: data.host ?? null,
                     loading: false,
                     error: null,
                 });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ events: [], host: null, loading: false, error: err.message || 'Could not load events.' });
+                setState({ events: [], host: null, loading: false, error: err?.message || 'Could not load events.' });
             });
         return () => {
             cancelled = true;
@@ -179,9 +211,9 @@ export default function BrowsePage() {
         });
     }, [state.events, pricing, priceFilter]);
 
-    const handleSearchSubmit = (e) => {
+    const handleSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const params = {};
+        const params: Record<string, string> = {};
         if (searchValue) params.q = searchValue;
         if (category) params.category = category;
         if (hostParam) params.host = hostParam;
@@ -189,8 +221,8 @@ export default function BrowsePage() {
         setLimit(PAGE_SIZE);
     };
 
-    const handleCategorySelect = (slug) => {
-        const params = {};
+    const handleCategorySelect = (slug: string) => {
+        const params: Record<string, string> = {};
         if (query) params.q = query;
         if (slug) params.category = slug;
         if (hostParam) params.host = hostParam;
@@ -244,7 +276,7 @@ export default function BrowsePage() {
                                 <Select
                                     value={dateFilter}
                                     onValueChange={(v) => {
-                                        setDateFilter(v);
+                                        setDateFilter(v as DateFilterKey);
                                         setLimit(PAGE_SIZE);
                                     }}
                                 >
@@ -260,7 +292,7 @@ export default function BrowsePage() {
                                     </SelectContent>
                                 </Select>
 
-                                <Select value={priceFilter} onValueChange={setPriceFilter}>
+                                <Select value={priceFilter} onValueChange={(v) => setPriceFilter(v as PriceFilterKey)}>
                                     <SelectTrigger className="w-[150px]" aria-label="Filter by price">
                                         <SelectValue placeholder="Any price" />
                                     </SelectTrigger>
@@ -306,7 +338,7 @@ export default function BrowsePage() {
                                     const active = state.host?.org?.id === org.id;
                                     return (
                                         <Link
-                                            key={org.id}
+                                            key={orgKey(org)}
                                             to={orgHref(org)}
                                             aria-current={active ? 'true' : undefined}
                                             className={`inline-flex min-h-[44px] items-center rounded-full border px-4 text-sm font-medium transition-colors sm:min-h-[36px] ${
@@ -315,7 +347,7 @@ export default function BrowsePage() {
                                                     : 'border-border bg-background text-foreground/80 hover:border-foreground/30'
                                             }`}
                                         >
-                                            {org.name}
+                                            {orgLabel(org)}
                                         </Link>
                                     );
                                 })}
@@ -370,7 +402,7 @@ export default function BrowsePage() {
                                 the link is still unambiguous read on its own. */}
                             {state.host?.org && orgPageHref(state.host.org) && (
                                 <a
-                                    href={orgPageHref(state.host.org)}
+                                    href={orgPageHref(state.host.org) ?? undefined}
                                     aria-label={`${state.host.org.name} — the organiser's own page`}
                                     className="mt-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground sm:min-h-0"
                                 >
