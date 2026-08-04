@@ -27,7 +27,12 @@ import { TAP_LINK } from '@/pages/visitor/ui-scale';
 //      somebody a real evening. It is stated below, in the same words the
 //      marketing site uses, and it does not get softened.
 
-const SECTIONS = [
+interface DocsSection {
+    id: string;
+    label: string;
+}
+
+const SECTIONS: DocsSection[] = [
     { id: 'what', label: 'What it does' },
     { id: 'attendees', label: 'If you bought a ticket' },
     { id: 'organisers', label: 'If you are running the event' },
@@ -37,7 +42,13 @@ const SECTIONS = [
     { id: 'self-host', label: 'Running it yourself' },
 ];
 
-const Step = ({ n, title, children }) => (
+interface StepProps {
+    n: string;
+    title: string;
+    children: React.ReactNode;
+}
+
+const Step = ({ n, title, children }: StepProps) => (
     <li className="relative flex gap-4">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-black text-primary-foreground">
             {n}
@@ -49,7 +60,14 @@ const Step = ({ n, title, children }) => (
     </li>
 );
 
-const Section = ({ id, title, kicker, children }) => (
+interface SectionProps {
+    id: string;
+    title: string;
+    kicker?: string;
+    children: React.ReactNode;
+}
+
+const Section = ({ id, title, kicker, children }: SectionProps) => (
     <section id={id} className="scroll-mt-24">
         {kicker && <span className="text-xs font-bold uppercase tracking-[0.16em] text-primary-emphasis">{kicker}</span>}
         <h2 className="mt-2 font-display text-display-sm font-bold tracking-tight sm:text-display-md">{title}</h2>
