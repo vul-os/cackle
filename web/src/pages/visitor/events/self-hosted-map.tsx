@@ -32,7 +32,16 @@ const markerIcon = L.divIcon({
     popupAnchor: [0, -14],
 });
 
-export default function SelfHostedMap({ lat, lng, label, tileUrl, attribution, onFailed }) {
+export interface SelfHostedMapProps {
+    lat: number;
+    lng: number;
+    label?: string | null;
+    tileUrl: string;
+    attribution?: string;
+    onFailed?: () => void;
+}
+
+export default function SelfHostedMap({ lat, lng, label, tileUrl, attribution, onFailed }: SelfHostedMapProps) {
     if (!tileUrl) return null;
     return (
         <MapContainer center={[lat, lng]} zoom={15} className="h-full w-full" zoomControl={false} scrollWheelZoom={false}>
