@@ -14,6 +14,8 @@
 //   malformed or stripped-down response must still carry that caveat rather
 //   than silently rendering none.
 
+import type { AdmissionClaimView, AdmissionConflictView, AdmissionConflictsResponse } from '@/lib/api-types';
+
 /**
  * NEVER_PREVENTED_NOTE is the fallback caveat, used only if a response
  * somehow arrives without its own `caveat` (a legacy server, a proxy that
@@ -28,12 +30,17 @@ export const NEVER_PREVENTED_NOTE =
  * gateLabel returns what to show for a claim's origin: its gate_id, or a
  * short device-id fallback for the rare claim that was never given one.
  *
- * @param {{gate_id?: string, device_id: string}} claim
  */
-export function gateLabel(claim) {
+export function gateLabel(claim: Partial<Pick<AdmissionClaimView, 'gate_id' | 'device_id'>> | null | undefined): string {
     if (claim?.gate_id) return claim.gate_id;
     const device = claim?.device_id ? claim.device_id.slice(0, 8) : 'unknown';
     return `Unlabelled gate (device ${device})`;
+}
+
+/** A claim as returned by `orderClaims`, annotated for the reconciliation screen. */
+export interface AnnotatedClaim extends AdmissionClaimView {
+    extra: boolean;
+    downgraded: boolean;
 }
 
 /**
@@ -46,9 +53,8 @@ export function gateLabel(claim) {
  *     reported — i.e. this claim lost the reconciliation and was written up
  *     as 'duplicate' even though the device itself admitted.
  *
- * @param {{claims?: Array}} conflict
  */
-export function orderClaims(conflict) {
+export function orderClaims(conflict: Partial<Pick<AdmissionConflictView, 'claims'>> | null | undefined): AnnotatedClaim[] {
     const claims = [...(conflict?.claims ?? [])].sort(
         (a, b) => new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime(),
     );
@@ -70,11 +76,20 @@ export function orderClaims(conflict) {
  * one first. Ties break alphabetically so the order is stable across
  * re-fetches of the same data.
  *
- * @param {object} response the admission-conflicts JSON body
  */
-export function summarize(response) {
+export interface AdmissionSummary {
+    extraAdmissions: number;
+    ticketsAffected: number;
+    gates: { gate: string; count: number }[];
+    complete: boolean;
+    caveat: string;
+    algebra: string;
+    engine: string;
+}
+
+export function summarize(response: Partial<AdmissionConflictsResponse> | null | undefined): AdmissionSummary {
     const conflicts = Array.isArray(response?.conflicts) ? response.conflicts : [];
-    const gateCounts = new Map();
+    const gateCounts = new Map<string, number>();
 
     for (const conflict of conflicts) {
         for (const claim of orderClaims(conflict)) {
