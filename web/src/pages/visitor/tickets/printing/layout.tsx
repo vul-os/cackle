@@ -3,19 +3,47 @@ import { QRCodeSVG } from 'qrcode.react';
 import { MapPin, Ban, Armchair, User } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import type { Ticket } from '@/lib/api-types';
 import { formatDate, formatTime } from '../date-utils';
 
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
     void: 'Void — not valid for entry',
     refunded: 'Refunded — not valid for entry',
 };
+
+/**
+ * `seat` rides on the decoded capability token (see internal/tickets/capability.go),
+ * not on the Ticket row itself — see lib/capability.ts's own `seat?: string`.
+ * The one caller here does not currently decode it onto the ticket it passes
+ * in, so this stays optional rather than assumed present.
+ */
+export type TicketLayoutTicket = Ticket & { seat?: string };
+
+/** The event fields this card actually reads — a view-model subset, not the full CackleEvent. */
+export interface TicketLayoutEvent {
+    starts_at?: string;
+    title?: string;
+    venue_name?: string;
+    address?: string;
+}
+
+/** The ticket-type fields this card actually reads. */
+export interface TicketLayoutType {
+    name?: string;
+}
+
+export interface TicketLayoutProps {
+    ticket: TicketLayoutTicket;
+    event: TicketLayoutEvent;
+    type: TicketLayoutType;
+}
 
 /**
  * Wallet-style ticket card, used both on screen (tickets list) and on paper
  * (print/PDF). print-ticket / print-keep-color / print-qr are consumed by
  * ../printing/print-styles.tsx's @media print rules.
  */
-export default function TicketLayout({ ticket, event, type }) {
+export default function TicketLayout({ ticket, event, type }: TicketLayoutProps) {
     const status = ticket.status && ticket.status !== 'valid' ? ticket.status : null;
     const isVoid = Boolean(status);
 
@@ -39,7 +67,7 @@ export default function TicketLayout({ ticket, event, type }) {
                 {isVoid && (
                     <div className="print-keep-color flex items-center gap-2 bg-destructive px-6 py-2.5 text-sm font-bold uppercase tracking-wide text-destructive-foreground">
                         <Ban className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {STATUS_LABEL[status] ?? `${status} — not valid for entry`}
+                        {(status && STATUS_LABEL[status]) ?? `${status} — not valid for entry`}
                     </div>
                 )}
 
@@ -66,7 +94,7 @@ export default function TicketLayout({ ticket, event, type }) {
                         )}
                         {/* The tear-line before the ticket's own serial/legal footer —
                             a genuine ticket-stub division, not decoration. */}
-                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' }} className="mb-3" />
+                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' } as React.CSSProperties} className="mb-3" />
                         <div className="font-mono text-xs text-muted-foreground">#{ticket.serial}</div>
                     </div>
 
