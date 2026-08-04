@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -16,18 +16,35 @@ import { toast } from '@/components/ui/use-toast';
 import { Users, Mail, Clock, X, ShieldAlert, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { orgMembers as orgMembersApi } from '@/lib/api';
+import type { OrgMember, OrgInvite } from '@/lib/api-types';
 import { buildInviteUrl } from './invite-link';
 import InviteLinkCard from './invite-link-card';
 
-const ROLE_LABEL = { owner: 'Owner', admin: 'Admin', scanner: 'Scanner' };
-const INVITABLE_ROLES = ['admin', 'scanner'];
+type InvitableRole = 'admin' | 'scanner';
+
+const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', scanner: 'Scanner' };
+const INVITABLE_ROLES: InvitableRole[] = ['admin', 'scanner'];
 
 const inviteSchema = z.object({
     email: z.string().trim().email('Enter a valid email address.'),
     role: z.enum(['admin', 'scanner']),
 });
 
-function formatExpiry(iso) {
+interface TeamState {
+    members: OrgMember[];
+    invites: OrgInvite[];
+    loading: boolean;
+    error: string | null;
+}
+
+interface NewInvite {
+    url: string;
+    email: string;
+    role: InvitableRole;
+    expiresAt: string | null;
+}
+
+function formatExpiry(iso: string | null | undefined): string | null {
     if (!iso) return null;
     try {
         return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
@@ -40,7 +57,7 @@ const TeamPage = () => {
     const { activeOrg, user } = useAuth();
     const canManage = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
 
-    const [state, setState] = useState({ members: [], invites: [], loading: true, error: null });
+    const [state, setState] = useState<TeamState>({ members: [], invites: [], loading: true, error: null });
     const [inviting, setInviting] = useState(false);
     // The one plaintext copy of a freshly minted invite token, held in
     // component state and nowhere else — never in browser storage of any
@@ -48,11 +65,14 @@ const TeamPage = () => {
     // a shared venue laptop outlives the person who created it. A reload
     // loses it, which is the correct trade: revoke and re-invite is one
     // click. invite-link.test.ts asserts this file touches no storage API.
-    const [newInvite, setNewInvite] = useState(null);
-    const [revokingId, setRevokingId] = useState(null);
-    const [roleChangingId, setRoleChangingId] = useState(null);
+    const [newInvite, setNewInvite] = useState<NewInvite | null>(null);
+    const [revokingId, setRevokingId] = useState<string | null>(null);
+    const [roleChangingId, setRoleChangingId] = useState<string | null>(null);
 
-    const form = useForm({ resolver: zodResolver(inviteSchema), defaultValues: { email: '', role: 'scanner' } });
+    const form = useForm<{ email: string; role: InvitableRole }>({
+        resolver: zodResolver(inviteSchema),
+        defaultValues: { email: '', role: 'scanner' },
+    });
 
     const load = useCallback(async () => {
         if (!activeOrg?.id || !canManage) {
@@ -65,11 +85,11 @@ const TeamPage = () => {
                 orgMembersApi.list(activeOrg.id),
                 orgMembersApi.invites(activeOrg.id),
             ]);
-            const members = Array.isArray(membersData) ? membersData : (membersData?.members ?? []);
-            const invites = Array.isArray(invitesData) ? invitesData : (invitesData?.invites ?? []);
+            const members = membersData?.members ?? [];
+            const invites = invitesData?.invites ?? [];
             setState({ members, invites, loading: false, error: null });
         } catch (err) {
-            setState({ members: [], invites: [], loading: false, error: err.message || 'Could not load your team.' });
+            setState({ members: [], invites: [], loading: false, error: err instanceof Error ? err.message : 'Could not load your team.' });
         }
     }, [activeOrg?.id, canManage]);
 
@@ -83,10 +103,10 @@ const TeamPage = () => {
     // because Cackle contains no mail code at all, so the invite was
     // unredeemable and no org could ever add a scanner. Keep the token,
     // show the link, and describe what actually happened.
-    const handleInvite = async (data) => {
+    const handleInvite = async (data: { email: string; role: InvitableRole }) => {
         setInviting(true);
         try {
-            const created = await orgMembersApi.invite(activeOrg.id, data);
+            const created = await orgMembersApi.invite(activeOrg!.id, data);
             const token = created?.token;
             if (!token) {
                 // The server changed shape under us. Say so rather than
@@ -106,36 +126,36 @@ const TeamPage = () => {
             form.reset({ email: '', role: 'scanner' });
             load();
         } catch (err) {
-            toast({ title: 'Could not create invite', description: err.message, variant: 'destructive' });
+            toast({ title: 'Could not create invite', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {
             setInviting(false);
         }
     };
 
-    const handleRevoke = async (inviteId) => {
+    const handleRevoke = async (inviteId: string) => {
         setRevokingId(inviteId);
         try {
             await orgMembersApi.revokeInvite(inviteId);
-            setState((s) => ({ ...s, invites: s.invites.filter((i) => i.id !== inviteId && i.invite_id !== inviteId) }));
+            setState((s) => ({ ...s, invites: s.invites.filter((i) => i.invite_id !== inviteId) }));
             toast({ title: 'Invite revoked' });
         } catch (err) {
-            toast({ title: 'Could not revoke invite', description: err.message, variant: 'destructive' });
+            toast({ title: 'Could not revoke invite', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {
             setRevokingId(null);
         }
     };
 
-    const handleRoleChange = async (member, role) => {
+    const handleRoleChange = async (member: OrgMember, role: string) => {
         setRoleChangingId(member.user_id);
         try {
-            await orgMembersApi.updateRole(activeOrg.id, member.user_id, role);
+            await orgMembersApi.updateRole(activeOrg!.id, member.user_id, role);
             setState((s) => ({ ...s, members: s.members.map((m) => (m.user_id === member.user_id ? { ...m, role } : m)) }));
             toast({ title: 'Role updated', description: `${member.name || member.email} is now ${ROLE_LABEL[role]}.` });
         } catch (err) {
             // 409 conflict: demoting the org's last remaining owner is
             // refused server-side (see docs/API.md) — its message already
             // explains why; just surface it rather than a generic one.
-            toast({ title: 'Could not update role', description: err.message, variant: 'destructive' });
+            toast({ title: 'Could not update role', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {
             setRoleChangingId(null);
         }
@@ -269,7 +289,7 @@ const TeamPage = () => {
                                                     ) : (
                                                         <Select
                                                             value={m.role}
-                                                            onValueChange={(role) => handleRoleChange(m, role)}
+                                                            onValueChange={(role: string) => handleRoleChange(m, role)}
                                                             disabled={roleChangingId === m.user_id}
                                                         >
                                                             <SelectTrigger className="ml-auto w-32">
@@ -311,7 +331,7 @@ const TeamPage = () => {
                     ) : (
                         <ul className="divide-y divide-border">
                             {state.invites.map((inv) => {
-                                const inviteId = inv.id ?? inv.invite_id;
+                                const inviteId = inv.invite_id;
                                 return (
                                     <li key={inviteId} className="flex items-center justify-between gap-3 py-3">
                                         <div className="min-w-0">

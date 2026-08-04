@@ -116,7 +116,7 @@ test('an invite link opened signed-out survives the sign-in detour with its toke
 });
 
 test('the team page keeps the token it is given instead of discarding it', () => {
-    const team = read('pages/organizers/team/index.jsx');
+    const team = read('pages/organizers/team/index.tsx');
     assert.match(
         team,
         /const created = await orgMembersApi\.invite\(/,
@@ -131,7 +131,7 @@ test('nothing in the invite flow claims an email was sent', () => {
     // kind. Any copy implying delivery is a lie the user will act on by
     // waiting for something that never arrives.
     const files = {
-        'pages/organizers/team/index.jsx': read('pages/organizers/team/index.jsx'),
+        'pages/organizers/team/index.tsx': read('pages/organizers/team/index.tsx'),
         'pages/organizers/team/invite-link-card.tsx': read('pages/organizers/team/invite-link-card.tsx'),
         'pages/organizers/invite-accept.tsx': read('pages/organizers/invite-accept.tsx'),
     };
@@ -164,7 +164,7 @@ test('the team page states the expiry and the shown-once rule', () => {
 test('the invite token is never written to storage', () => {
     // A bearer credential persisted on a shared venue laptop outlives the
     // person who created it. Component state only.
-    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.tsx', 'pages/organizers/team/invite-link.ts']) {
+    for (const p of ['pages/organizers/team/index.tsx', 'pages/organizers/team/invite-link-card.tsx', 'pages/organizers/team/invite-link.ts']) {
         const source = read(p);
         assert.equal(/localStorage|sessionStorage|document\.cookie/.test(source), false, `${p} persists the invite token`);
     }
