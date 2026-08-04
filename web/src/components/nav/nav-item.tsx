@@ -1,9 +1,17 @@
-import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-export const NavItem = ({ to, icon: Icon, text, isExpanded, end = false }) => {
+interface NavItemProps {
+    to: string;
+    icon: LucideIcon;
+    text: string;
+    isExpanded: boolean;
+    end?: boolean;
+}
+
+export const NavItem = ({ to, icon: Icon, text, isExpanded, end = false }: NavItemProps) => {
     return (
         <li className="list-none px-2">
             <NavLink
