@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import { categories as categoriesApi } from '@/lib/api';
+import type { Category } from '@/lib/api-types';
+
+interface CategoriesState {
+    categories: Category[];
+    loading: boolean;
+    error: boolean;
+}
 
 /**
  * `GET /api/categories` -> [{slug,label,count}], with loading/error state.
@@ -7,7 +14,7 @@ import { categories as categoriesApi } from '@/lib/api';
  * should hide the tab row on error rather than blocking the page.
  */
 export function useCategories() {
-    const [state, setState] = useState({ categories: [], loading: true, error: false });
+    const [state, setState] = useState<CategoriesState>({ categories: [], loading: true, error: false });
 
     useEffect(() => {
         let cancelled = false;

@@ -398,7 +398,10 @@ export const images = {
  * tabs are a filter convenience, not critical path.
  */
 export const categories = {
-    list: () => get<{ categories: Category[] }>('/categories'),
+    // docs/API.md specifies a bare array; the type admits the
+    // `{ categories: [...] }` envelope too because `useCategories` tolerates
+    // it defensively (see src/pages/visitor/events/use-categories.ts).
+    list: () => get<Category[] | { categories: Category[] }>('/categories'),
 };
 
 /**
