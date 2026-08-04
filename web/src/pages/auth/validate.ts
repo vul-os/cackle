@@ -15,7 +15,7 @@
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Matches internal/auth/service.go's MinPasswordLength. If that changes,
- * this must change with it — see operator-reset.test.js for the pattern this
+ * this must change with it — see operator-reset.test.ts for the pattern this
  * repo uses to pin a UI number to the Go source it has to agree with. */
 export const MIN_PASSWORD_LENGTH = 8;
 

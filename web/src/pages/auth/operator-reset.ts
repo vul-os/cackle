@@ -27,7 +27,7 @@ const EMAIL_PLACEHOLDER = 'their@email.address';
  * either fails confusingly or, worse, runs something else. Wrap it in
  * single quotes and escape any single quote the POSIX way.
  */
-function shellQuote(value) {
+function shellQuote(value: string): string {
     return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
@@ -37,7 +37,7 @@ function shellQuote(value) {
  * A blank address yields a clearly-a-placeholder command rather than a
  * broken one, so the page reads sensibly before anything is typed.
  */
-export function resetCommandFor(email) {
+export function resetCommandFor(email: string | null | undefined): string {
     const address = typeof email === 'string' && email.trim() !== '' ? email.trim() : EMAIL_PLACEHOLDER;
     return `${RESET_SUBCOMMAND} -email ${shellQuote(address)}`;
 }

@@ -10,7 +10,7 @@
 // Two halves are checked. The pure list-shaping function is exercised
 // directly. The rendering rule — "no providers, no markup" — is checked
 // against the SOURCE of the component and its two callers, the same
-// technique operator-reset.test.js uses, because a claim about what a page
+// technique operator-reset.test.ts uses, because a claim about what a page
 // does not render is a claim about the file, not about one rendered state.
 
 import test from 'node:test';

@@ -13,11 +13,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { resetCommandFor, RESET_SUBCOMMAND } from './operator-reset.js';
+import { resetCommandFor, RESET_SUBCOMMAND } from './operator-reset.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..', '..');
-const read = (p) => readFileSync(join(repoRoot, p), 'utf8');
+const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
 test('resetCommandFor builds the command an operator actually runs', () => {
     assert.equal(resetCommandFor('venue@example.com'), "cackle reset-password -email 'venue@example.com'");
@@ -42,7 +42,7 @@ test('the command names a subcommand the binary really implements', () => {
     assert.match(cli, /"reset-password":\s*resetPasswordCmd/, 'cmd/cackle registers no reset-password subcommand');
 
     const impl = read('cmd/cackle/resetpassword.go');
-    const [, flagName] = RESET_SUBCOMMAND.match(/^cackle (\S+)$/);
+    const [, flagName] = RESET_SUBCOMMAND.match(/^cackle (\S+)$/)!;
     assert.equal(flagName, 'reset-password');
     assert.match(impl, /fs\.StringVar\(&email, "email"/, 'the subcommand does not take -email');
     assert.match(impl, /update-password\?token=/, 'the subcommand does not print an /update-password link');
@@ -60,7 +60,7 @@ test('nothing in the reset flow claims an email was sent', () => {
     const files = {
         'web/src/pages/auth/forgot-password.jsx': read('web/src/pages/auth/forgot-password.jsx'),
         'web/src/pages/auth/update-password.jsx': read('web/src/pages/auth/update-password.jsx'),
-        'web/src/pages/auth/operator-reset.js': read('web/src/pages/auth/operator-reset.js'),
+        'web/src/pages/auth/operator-reset.ts': read('web/src/pages/auth/operator-reset.ts'),
     };
     const forbidden = [
         /reset email sent/i,
