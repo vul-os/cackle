@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,12 +23,19 @@ import { toast } from '@/components/ui/use-toast';
 import DeleteEventDialog from './event/delete-dialog';
 import { categoryLabel } from './categories';
 import { slugify } from './slug';
+import type { CackleEvent, EventStats } from '@/lib/api-types';
 
-const statusVariant = {
+const statusVariant: Record<string, BadgeProps['variant']> = {
     draft: 'secondary',
     published: 'default',
     cancelled: 'destructive',
 };
+
+interface EventsPageState {
+    events: CackleEvent[];
+    loading: boolean;
+    error: string | null;
+}
 
 const EventsPage = () => {
     const navigate = useNavigate();
@@ -42,11 +49,11 @@ const EventsPage = () => {
     // of being shown and left to fail.
     const canManage = activeOrg?.role === 'owner' || activeOrg?.role === 'admin';
 
-    const [state, setState] = useState({ events: [], loading: true, error: null });
-    const [statsById, setStatsById] = useState({});
+    const [state, setState] = useState<EventsPageState>({ events: [], loading: true, error: null });
+    const [statsById, setStatsById] = useState<Record<string, EventStats>>({});
     const [searchQuery, setSearchQuery] = useState('');
-    const [duplicatingId, setDuplicatingId] = useState(null);
-    const [deleteTarget, setDeleteTarget] = useState(null); // the event being confirmed for delete
+    const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<CackleEvent | null>(null); // the event being confirmed for delete
     const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchEvents = useCallback(() => {
@@ -58,7 +65,7 @@ const EventsPage = () => {
         eventsApi
             .listForOrg(activeOrg.id)
             .then(async (data) => {
-                const list = Array.isArray(data) ? data : (data?.events ?? []);
+                const list = data.events ?? [];
                 setState({ events: list, loading: false, error: null });
 
                 // Best-effort per-event stats so the list can show sold/
@@ -66,47 +73,52 @@ const EventsPage = () => {
                 // leaves that card without a count rather than blanking the
                 // whole list.
                 const results = await Promise.allSettled(list.map((ev) => eventsApi.stats(ev.id)));
-                const next = {};
+                const next: Record<string, EventStats> = {};
                 results.forEach((r, i) => {
-                    if (r.status === 'fulfilled') next[list[i].id] = r.value?.stats ?? r.value;
+                    if (r.status === 'fulfilled') next[list[i].id] = r.value.stats;
                 });
                 setStatsById(next);
             })
-            .catch((err) => setState({ events: [], loading: false, error: err.message || 'Could not load events.' }));
+            .catch((err) => setState({ events: [], loading: false, error: err?.message || 'Could not load events.' }));
     }, [activeOrg?.id]);
 
     useEffect(() => {
         fetchEvents();
     }, [fetchEvents]);
 
-    const handleDuplicate = async (event) => {
+    const handleDuplicate = async (event: CackleEvent) => {
         setDuplicatingId(event.id);
         try {
             const ttData = await ticketTypesApi.list(event.id);
-            const sourceTicketTypes = Array.isArray(ttData) ? ttData : (ttData?.ticket_types ?? []);
+            const sourceTicketTypes = ttData.ticket_types ?? [];
 
             // Create requires starts_at/ends_at and a unique slug (see
             // internal/events.Service.Create) — a duplicate starts on the same
             // date/venue as the source event, which the organiser can then
             // change from the normal editor. Images aren't copied: stored image
-            // files belong to the source event.
+            // files belong to the source event. CreateEventInput's string
+            // fields are required (not optional, unlike UpdateEventInput) —
+            // sending the value (or '' for cover_image, deliberately not
+            // carried over) directly rather than coalescing falsy values to
+            // undefined; both produce the same zero value once Go decodes it.
             const created = await eventsApi.create({
-                org_id: activeOrg.id,
+                org_id: activeOrg!.id,
                 slug: slugify(event.title),
                 title: `${event.title || 'Untitled event'} (Copy)`,
-                summary: event.summary || undefined,
-                description: event.description || undefined,
-                venue_name: event.venue_name || undefined,
-                address: event.address || undefined,
+                summary: event.summary,
+                description: event.description,
+                venue_name: event.venue_name,
+                address: event.address,
                 lat: event.lat ?? undefined,
                 lng: event.lng ?? undefined,
                 starts_at: event.starts_at,
                 ends_at: event.ends_at,
-                timezone: event.timezone || undefined,
-                category: event.category || undefined,
-                currency: event.currency || undefined,
+                timezone: event.timezone,
+                cover_image: '',
+                category: event.category,
+                currency: event.currency,
             });
-            const newEvent = created?.event ?? created;
+            const newEvent = created.event;
 
             await Promise.all(
                 sourceTicketTypes.map((tt) =>
@@ -126,7 +138,8 @@ const EventsPage = () => {
             toast({ title: 'Duplicated', description: 'A new draft was created with the same details and ticket types.' });
             navigate(`/admin/events/${newEvent.id}`);
         } catch (err) {
-            toast({ title: 'Could not duplicate', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not duplicate', description: message, variant: 'destructive' });
         } finally {
             setDuplicatingId(null);
         }
@@ -144,7 +157,8 @@ const EventsPage = () => {
             // 409 conflict: the event has issued tickets — the server steers
             // toward cancelling instead (see docs/API.md). Its message
             // already says so; just surface it rather than a generic one.
-            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not delete', description: message, variant: 'destructive' });
         } finally {
             setIsDeleting(false);
         }
@@ -202,13 +216,12 @@ const EventsPage = () => {
                               : 'Ask an owner or admin to create one to get started.'
                     }
                     action={
-                        !searchQuery &&
-                        canManage && (
+                        !searchQuery && canManage ? (
                             <Button size="sm" className="min-h-11" onClick={() => navigate('/admin/events/new')}>
                                 <Plus className="mr-2 h-4 w-4" />
                                 Create Event
                             </Button>
-                        )
+                        ) : undefined
                     }
                 />
             )}
