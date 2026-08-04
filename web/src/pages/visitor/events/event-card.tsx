@@ -3,16 +3,35 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Calendar, MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { getCoverImageUrl } from './media';
+import { getCoverImageUrl, type EventMediaSource } from './media';
 import { Money } from '@/components/ui/money';
+import type { CackleEvent } from '@/lib/api-types';
+import type { HostOrgRef } from '@/lib/host';
 
-function formatDate(iso) {
+function formatDate(iso: string | null | undefined): string {
     if (!iso) return 'Date TBA';
     try {
         return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     } catch {
         return 'Date TBA';
     }
+}
+
+/** The fields this card reads off an event: the public DTO plus the legacy/joined media shape (see media.ts). */
+export type EventCardEvent = CackleEvent & Pick<EventMediaSource, 'gallery'>;
+
+/** Best-effort per-card pricing — see use-event-pricing.ts. */
+export interface EventCardPricing {
+    minPriceMinor: number | null;
+    soldOut: boolean;
+}
+
+export interface EventCardProps {
+    event: EventCardEvent;
+    org?: HostOrgRef | null;
+    pricing?: EventCardPricing | null;
+    index?: number;
+    featured?: boolean;
 }
 
 /**
@@ -34,11 +53,15 @@ function formatDate(iso) {
  * HTML. The link-through to an organisation's own listing lives beside the
  * page heading instead.
  */
-const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
+const EventCard = ({ event, org, pricing, index = 0, featured = false }: EventCardProps) => {
     const coverUrl = getCoverImageUrl(event);
     const price = pricing?.minPriceMinor;
     const showPrice = !pricing?.soldOut && price !== undefined && price !== null;
     const showCornerChrome = Boolean(event.category) || showPrice;
+    // `org.name` arrives over the wire as `unknown` (see HostOrgRef in
+    // @/lib/host) — narrowed here the same way the rest of that module
+    // narrows the host envelope, rather than assumed.
+    const orgName = typeof org?.name === 'string' ? org.name : null;
 
     return (
         <motion.div
@@ -103,7 +126,7 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
                                     'Free'
                                 ) : (
                                     <>
-                                        From <Money minor={price} currency={event.currency} />
+                                        From <Money minor={price as number} currency={event.currency} />
                                     </>
                                 )}
                             </div>
@@ -113,10 +136,10 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }) => {
                         <h3 className={`font-display font-bold leading-snug tracking-tight group-hover:text-primary-emphasis ${featured ? 'text-xl' : 'text-lg'}`}>
                             {event.title}
                         </h3>
-                        {org && (
+                        {orgName && (
                             <p className="text-sm text-muted-foreground">
                                 <span className="sr-only">Organised by </span>
-                                {org.name}
+                                {orgName}
                             </p>
                         )}
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
