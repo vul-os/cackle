@@ -3,7 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Printer, Eye, PrinterIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-export const PrintTicketButtons = ({ ticketId, onPrint, isPrinting }) => {
+export interface PrintTicketButtonsProps {
+    ticketId: string;
+    onPrint: () => void;
+    isPrinting: boolean;
+}
+
+export const PrintTicketButtons = ({ ticketId, onPrint, isPrinting }: PrintTicketButtonsProps) => {
     return (
         <div className="mt-4 flex flex-wrap gap-2 print:hidden">
             <Button onClick={onPrint} variant="outline" size="sm" disabled={isPrinting}>
@@ -20,7 +26,13 @@ export const PrintTicketButtons = ({ ticketId, onPrint, isPrinting }) => {
     );
 };
 
-export const PrintAllButton = ({ onPrintAll, isPrinting, ticketsCount }) => {
+export interface PrintAllButtonProps {
+    onPrintAll: () => void;
+    isPrinting: boolean;
+    ticketsCount: number;
+}
+
+export const PrintAllButton = ({ onPrintAll, isPrinting, ticketsCount }: PrintAllButtonProps) => {
     if (ticketsCount === 0) return null;
 
     return (

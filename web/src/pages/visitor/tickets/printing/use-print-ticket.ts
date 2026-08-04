@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/** `null` (nothing being printed), `'all'`, or a single ticket id. */
+export type PrintTarget = string | 'all' | null;
+
+export interface UsePrintTicketResult {
+    isPrinting: boolean;
+    printTarget: PrintTarget;
+    printSingleTicket: (ticketId: string) => void;
+    printAllTickets: () => void;
+}
+
 /**
  * Printing is done with the browser's native window.print() against the
  * SAME document — not a cloned popup rebuilding Tailwind's utility classes
@@ -15,8 +25,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * card that doesn't match `target` so only the intended ticket(s) end up on
  * paper.
  */
-export function usePrintTicket() {
-    const [target, setTarget] = useState(null);
+export function usePrintTicket(): UsePrintTicketResult {
+    const [target, setTarget] = useState<PrintTarget>(null);
     const pendingPrint = useRef(false);
 
     // Wait one frame after `target` changes so the print:hidden classes it
@@ -35,7 +45,7 @@ export function usePrintTicket() {
         return () => window.removeEventListener('afterprint', clear);
     }, []);
 
-    const printSingleTicket = useCallback((ticketId) => {
+    const printSingleTicket = useCallback((ticketId: string) => {
         pendingPrint.current = true;
         setTarget(ticketId);
     }, []);
