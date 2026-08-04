@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
@@ -14,7 +14,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
  * index.css cannot reach (that block only zeroes CSS transition/animation
  * durations), so it has to be handled explicitly here.
  */
-const PageTransition = ({ children, className }) => {
+const PageTransition = ({ children, className }: { children: ReactNode; className?: string }) => {
     const location = useLocation();
     const prefersReducedMotion = useReducedMotion();
 
