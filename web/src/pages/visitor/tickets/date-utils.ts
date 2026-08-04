@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 
-export function formatDate(dateString) {
+export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
   try {
     return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
@@ -9,7 +9,7 @@ export function formatDate(dateString) {
   }
 }
 
-export function formatTime(dateString) {
+export function formatTime(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
   try {
     return format(new Date(dateString), 'h:mm a');
