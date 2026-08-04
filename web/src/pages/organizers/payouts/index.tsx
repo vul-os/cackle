@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -14,14 +14,15 @@ import { ErrorState } from '@/components/ui/error-state';
 import { toast } from '@/components/ui/use-toast';
 import { Banknote, Landmark, ShieldCheck, Lock } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
-import { events as eventsApi, payoutsApi } from '@/lib/api';
+import { events as eventsApi, payoutsApi, ApiError } from '@/lib/api';
+import type { CackleEvent, PayoutSummary, BankAccountView } from '@/lib/api-types';
 import { formatMoney } from '@/lib/money';
 import BankSelect from './bank-list';
 
 // Payout status arrives as a backend enum (e.g. "no_sales", "unpaid",
 // "paid"). Render human prose, never the raw snake_case token — a
 // `capitalize` class alone leaves "No_sales" showing through.
-const PAYOUT_STATUS_LABELS = {
+const PAYOUT_STATUS_LABELS: Record<string, string> = {
     no_sales: 'No sales yet',
     unpaid: 'Unpaid',
     pending: 'Pending',
@@ -30,7 +31,7 @@ const PAYOUT_STATUS_LABELS = {
     failed: 'Failed',
 };
 
-function payoutStatusLabel(status) {
+function payoutStatusLabel(status: string | null | undefined): string {
     if (!status) return 'Pending';
     return PAYOUT_STATUS_LABELS[status] ?? status.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 }
@@ -45,9 +46,21 @@ const bankAccountSchema = z.object({
     account_name: z.string().trim().min(1, 'Enter the account holder name.'),
 });
 
+interface PayoutRow {
+    event: CackleEvent;
+    payout: PayoutSummary | null;
+    failed: boolean;
+}
+
+interface PayoutsOverviewState {
+    rows: PayoutRow[];
+    loading: boolean;
+    error: string | null;
+}
+
 const PayoutsOverview = () => {
     const { activeOrg } = useAuth();
-    const [state, setState] = useState({ rows: [], loading: true, error: null });
+    const [state, setState] = useState<PayoutsOverviewState>({ rows: [], loading: true, error: null });
 
     const load = useCallback(async () => {
         if (!activeOrg?.id) {
@@ -57,16 +70,16 @@ const PayoutsOverview = () => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const data = await eventsApi.listForOrg(activeOrg.id);
-            const eventList = Array.isArray(data) ? data : (data?.events ?? []);
+            const eventList = data?.events ?? [];
             const results = await Promise.allSettled(eventList.map((ev) => payoutsApi.forEvent(ev.id)));
-            const rows = eventList.map((ev, i) => {
+            const rows: PayoutRow[] = eventList.map((ev, i) => {
                 const r = results[i];
-                const payout = r.status === 'fulfilled' ? (r.value?.payouts ?? r.value) : null;
+                const payout = r.status === 'fulfilled' ? (r.value?.payouts ?? null) : null;
                 return { event: ev, payout, failed: r.status === 'rejected' };
             });
             setState({ rows, loading: false, error: null });
         } catch (err) {
-            setState({ rows: [], loading: false, error: err.message || 'Could not load payouts.' });
+            setState({ rows: [], loading: false, error: err instanceof Error ? err.message : 'Could not load payouts.' });
         }
     }, [activeOrg?.id]);
 
@@ -77,7 +90,7 @@ const PayoutsOverview = () => {
     // Events can be denominated in different currencies (Cackle has no
     // privileged currency) — group totals per currency rather than
     // blending them into one meaningless number.
-    const totalsByCurrency = state.rows.reduce((acc, r) => {
+    const totalsByCurrency = state.rows.reduce<Record<string, { gross: number; fees: number; net: number }>>((acc, r) => {
         if (!r.payout) return acc;
         const currency = r.event?.currency || r.payout.currency || '';
         const bucket = acc[currency] ?? { gross: 0, fees: 0, net: 0 };
@@ -169,14 +182,20 @@ const PayoutsOverview = () => {
     );
 };
 
+interface BankAccountState {
+    account: BankAccountView | null;
+    loading: boolean;
+    error: string | null;
+}
+
 const BankAccountCard = () => {
     const { activeOrg } = useAuth();
     const isOwner = activeOrg?.role === 'owner';
-    const [state, setState] = useState({ account: null, loading: true, error: null });
+    const [state, setState] = useState<BankAccountState>({ account: null, loading: true, error: null });
     const [saving, setSaving] = useState(false);
     const [editing, setEditing] = useState(false);
 
-    const form = useForm({
+    const form = useForm<{ bank_code: string; account_number: string; account_name: string }>({
         resolver: zodResolver(bankAccountSchema),
         defaultValues: { bank_code: '', account_number: '', account_name: '' },
     });
@@ -189,14 +208,14 @@ const BankAccountCard = () => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
             const data = await payoutsApi.bankAccount(activeOrg.id);
-            setState({ account: data?.bank_account ?? data, loading: false, error: null });
+            setState({ account: data?.bank_account ?? null, loading: false, error: null });
         } catch (err) {
             // A brand-new org with no bank account on file yet is a 404, not
             // an error worth alarming over — show the empty "set up" state.
-            if (err.status === 404) {
+            if (err instanceof ApiError && err.status === 404) {
                 setState({ account: null, loading: false, error: null });
             } else {
-                setState({ account: null, loading: false, error: err.message || 'Could not load payout bank details.' });
+                setState({ account: null, loading: false, error: err instanceof Error ? err.message : 'Could not load payout bank details.' });
             }
         }
     }, [activeOrg?.id, isOwner]);
@@ -205,16 +224,16 @@ const BankAccountCard = () => {
         load();
     }, [load]);
 
-    const handleSave = async (data) => {
+    const handleSave = async (data: { bank_code: string; account_number: string; account_name: string }) => {
         setSaving(true);
         try {
-            await payoutsApi.setBankAccount(activeOrg.id, data);
+            await payoutsApi.setBankAccount(activeOrg!.id, data);
             toast({ title: 'Bank details saved' });
             form.reset({ bank_code: '', account_number: '', account_name: '' });
             setEditing(false);
             load();
         } catch (err) {
-            toast({ title: 'Could not save bank details', description: err.message, variant: 'destructive' });
+            toast({ title: 'Could not save bank details', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {
             setSaving(false);
         }
