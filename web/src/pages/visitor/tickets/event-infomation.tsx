@@ -1,7 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-export default function EventInformation({ event }) {
+export interface EventInformationEvent {
+    title?: string;
+    summary?: string | null;
+    description?: string | null;
+}
+
+export default function EventInformation({ event }: { event: EventInformationEvent }) {
     if (!event.description && !event.summary) return null;
 
     return (
