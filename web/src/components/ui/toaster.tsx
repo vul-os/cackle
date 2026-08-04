@@ -1,3 +1,4 @@
+import * as React from "react"
 import { useToast } from "@/components/ui/use-toast"
 import {
   Toast,
@@ -6,10 +7,22 @@ import {
   ToastProvider,
   ToastTitle,
   ToastViewport,
+  type ToastActionElement,
+  type ToastProps,
 } from "@/components/ui/toast"
 
+// use-toast.js stays JS for now (out of scope for this checkpoint), so its
+// return type is only loosely inferred. This is the shape it actually
+// dispatches — see the ADD_TOAST payload in use-toast.js.
+interface ToasterToast extends Omit<ToastProps, "title"> {
+  id: string
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: ToastActionElement
+}
+
 export function Toaster() {
-  const { toasts } = useToast()
+  const { toasts } = useToast() as { toasts: ToasterToast[] }
 
   return (
     (<ToastProvider>
