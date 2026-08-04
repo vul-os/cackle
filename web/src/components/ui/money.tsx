@@ -1,6 +1,13 @@
-import React from 'react';
+import type { ElementType, HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { formatMoney } from '@/lib/money';
+
+interface MoneyProps extends HTMLAttributes<HTMLElement> {
+    minor: number;
+    currency: string | null | undefined;
+    locale?: string;
+    as?: ElementType;
+}
 
 // The one way money is rendered in this app.
 //
@@ -44,7 +51,7 @@ import { formatMoney } from '@/lib/money';
  * @param {string} [props.className]
  * @param {React.ElementType} [props.as] element to render, default `span`
  */
-export function Money({ minor, currency, locale, className, as: Tag = 'span', ...rest }) {
+export function Money({ minor, currency, locale, className, as: Tag = 'span', ...rest }: MoneyProps) {
     const formatted = formatMoney(minor, currency, locale ? { locale } : undefined);
     return (
         <Tag className={cn('tnum whitespace-nowrap', className)} {...rest}>
@@ -60,7 +67,7 @@ export function Money({ minor, currency, locale, className, as: Tag = 'span', ..
  *
  * Renders a `<td>` by default; pass `as="div"` inside a non-table layout.
  */
-export function MoneyCell({ minor, currency, locale, className, as: Tag = 'td', ...rest }) {
+export function MoneyCell({ minor, currency, locale, className, as: Tag = 'td', ...rest }: MoneyProps) {
     return (
         <Money
             as={Tag}
@@ -78,7 +85,7 @@ export function MoneyCell({ minor, currency, locale, className, as: Tag = 'td', 
  * a stats page, an order total at checkout. Same tabular guarantee, sized for
  * a number that is the point of the screen rather than a cell in a table.
  */
-export function MoneyHeading({ minor, currency, locale, className, ...rest }) {
+export function MoneyHeading({ minor, currency, locale, className, ...rest }: Omit<MoneyProps, 'as'>) {
     return (
         <Money
             minor={minor}
