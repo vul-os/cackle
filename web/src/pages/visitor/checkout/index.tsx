@@ -9,8 +9,8 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/components/ui/use-toast';
 import { orders as ordersApi, payments as paymentsApi } from '@/lib/api';
-import BillingForm from './billing-form';
-import OrderSummary from './order-summary';
+import BillingForm, { type BillingDetails, type BillingErrors } from './billing-form';
+import OrderSummary, { type OrderIssue } from './order-summary';
 import PaymentRedirectPage from './redirect';
 import CheckoutSteps from './steps';
 
@@ -18,7 +18,7 @@ import CheckoutSteps from './steps';
 // an empty box and a missing @, not an attempt to decide what a valid
 // address looks like. The server is the authority; this exists so the buyer
 // finds out before the round trip.
-const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 // Checkout runs against LIVE inventory (internal/orders.Service.Create):
 // quantity caps, sales windows and per-order limits are all real, and a
@@ -29,7 +29,7 @@ const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()
 // shapes to a state that says what happened and gives a real way forward —
 // everything else falls through to the generic toast below, unclassified
 // rather than guessed at.
-function classifyOrderError(message) {
+function classifyOrderError(message: string | null | undefined): OrderIssue | null {
     const m = (message || '').toLowerCase();
     if (m.includes('sold out')) {
         return {
@@ -55,7 +55,7 @@ function classifyOrderError(message) {
     return null;
 }
 
-const Shell = ({ children }) => (
+const Shell = ({ children }: { children: React.ReactNode }) => (
     <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main id="main" className="flex-1 pt-16">
@@ -65,26 +65,29 @@ const Shell = ({ children }) => (
     </div>
 );
 
+const BILLING_FIELDS = ['name', 'email'] as const;
+
 const CheckoutPage = () => {
     const navigate = useNavigate();
     const { eventId } = useParams();
     const { itemsByEvent, eventTotal, clearEvent } = useCart();
     const { user } = useAuth();
 
-    const items = itemsByEvent[eventId] || [];
+    const items = itemsByEvent[eventId ?? ''] || [];
     const event = items[0]?.event;
 
     const [isProcessing, setIsProcessing] = useState(false);
-    const [redirectUrl, setRedirectUrl] = useState(null);
-    const [billingDetails, setBillingDetails] = useState({ name: user?.name || '', email: user?.email || '' });
-    const [errors, setErrors] = useState({});
+    const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+    const [billingDetails, setBillingDetails] = useState<BillingDetails>({ name: user?.name || '', email: user?.email || '' });
+    const [errors, setErrors] = useState<BillingErrors>({});
     // A classified inventory failure (sold out / window closed / per-order
     // cap) rendered inline in the order summary — see classifyOrderError.
     // Anything unclassified stays a toast rather than a guessed-at state.
-    const [orderIssue, setOrderIssue] = useState(null);
+    const [orderIssue, setOrderIssue] = useState<OrderIssue | null>(null);
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const name = e.target.name as keyof BillingDetails;
+        const { value } = e.target;
         setBillingDetails((prev) => ({ ...prev, [name]: value }));
         // Clear the field's error as soon as it is touched — leaving it up
         // while someone is fixing it reads as "still wrong".
@@ -92,7 +95,7 @@ const CheckoutPage = () => {
     };
 
     const validate = () => {
-        const next = {};
+        const next: BillingErrors = {};
         if (!billingDetails.name.trim()) next.name = 'We need a name to put on the ticket.';
         if (!billingDetails.email.trim()) next.email = 'We need an email to send the ticket to.';
         else if (!looksLikeEmail(billingDetails.email)) next.email = "That doesn't look like an email address.";
@@ -104,22 +107,23 @@ const CheckoutPage = () => {
         if (!validate()) {
             // Move focus to the first bad field rather than only colouring
             // it: on a phone the summary and the form are far apart.
-            const firstBad = ['name', 'email'].find((k) => document.getElementById(k) && !billingDetails[k].trim().length) || 'name';
+            const firstBad = BILLING_FIELDS.find((k) => document.getElementById(k) && !billingDetails[k].trim().length) || 'name';
             document.getElementById(firstBad)?.focus();
             document.getElementById(firstBad)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
 
+        const id = eventId ?? '';
         setOrderIssue(null);
         setIsProcessing(true);
         try {
             const result = await ordersApi.create({
-                event_id: eventId,
+                event_id: id,
                 items: items.map((i) => ({ ticket_type_id: i.ticket_type_id, quantity: i.quantity })),
                 buyer: { name: billingDetails.name, email: billingDetails.email },
             });
 
-            clearEvent(eventId);
+            clearEvent(id);
 
             if (result?.payment?.redirect_url) {
                 setRedirectUrl(result.payment.redirect_url);
@@ -146,13 +150,14 @@ const CheckoutPage = () => {
                 navigate('/orders');
             }
         } catch (err) {
-            const known = classifyOrderError(err.message);
+            const message = err instanceof Error ? err.message : undefined;
+            const known = classifyOrderError(message);
             if (known) {
                 // A real, expected state — not a toast that vanishes before a
                 // phone screen has scrolled back up to see it.
                 setOrderIssue(known);
             } else {
-                toast({ title: 'Checkout failed', description: err.message || 'Please try again.', variant: 'destructive' });
+                toast({ title: 'Checkout failed', description: message || 'Please try again.', variant: 'destructive' });
             }
         } finally {
             setIsProcessing(false);
@@ -209,7 +214,7 @@ const CheckoutPage = () => {
                     <OrderSummary
                         event={event}
                         items={items}
-                        total={eventTotal(eventId)}
+                        total={eventTotal(eventId ?? '')}
                         isProcessing={isProcessing}
                         onCheckout={handleCheckout}
                         issue={orderIssue}
