@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { BookOpen, Github, Ticket, Building2, ArrowRight, ExternalLink } from 'lucide-react';
+import { BookOpen, Github, Ticket, Building2, ArrowRight, ExternalLink, type LucideIcon } from 'lucide-react';
 import Footer from '@/pages/visitor/landing/footer';
 import Header from '@/pages/visitor/header';
 
@@ -26,7 +26,14 @@ import Header from '@/pages/visitor/header';
 
 const REPO_ISSUES = 'https://github.com/vul-os/cackle/issues';
 
-const Route = ({ icon: Icon, title, children, action }) => (
+interface RouteProps {
+    icon: LucideIcon;
+    title: string;
+    children: React.ReactNode;
+    action?: React.ReactNode;
+}
+
+const Route = ({ icon: Icon, title, children, action }: RouteProps) => (
     <div className="flex gap-4 py-6">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
             <Icon className="h-5 w-5" aria-hidden="true" />
