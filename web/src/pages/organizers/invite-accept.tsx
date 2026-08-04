@@ -30,10 +30,11 @@ const AcceptInvitePage = () => {
     const token = searchParams.get('token');
     const navigate = useNavigate();
     const { refresh, user } = useAuth();
-    const [status, setStatus] = useState('idle'); // idle | accepting | done
-    const [error, setError] = useState(null);
+    const [status, setStatus] = useState<'idle' | 'accepting' | 'done'>('idle');
+    const [error, setError] = useState<string | null>(null);
 
     const handleAccept = async () => {
+        if (!token) return;
         setStatus('accepting');
         setError(null);
         try {
@@ -44,7 +45,7 @@ const AcceptInvitePage = () => {
             setTimeout(() => navigate('/admin'), 1200);
         } catch (err) {
             setStatus('idle');
-            setError(err.message || 'That invite link is invalid or has expired.');
+            setError(err instanceof Error ? err.message : 'That invite link is invalid or has expired.');
         }
     };
 
@@ -54,6 +55,8 @@ const AcceptInvitePage = () => {
                 <ErrorState
                     title="Missing invite link"
                     description="This link is missing its invite code — it was probably cut short when it was sent. Ask whoever invited you to send you the whole link again."
+                    onRetry={undefined}
+                    className={undefined}
                 />
             </div>
         );
