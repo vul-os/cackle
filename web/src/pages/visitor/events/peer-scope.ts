@@ -26,6 +26,8 @@ export interface PeerEventRow {
 
 export interface PeerEventsPayload {
     events?: unknown;
+    /** GET /api/peer-events's `caveat` (internal/httpapi/peer_feed.go's peerEventsResponse) — read by ./peer-events.tsx, not by any function in this file. */
+    caveat?: unknown;
 }
 
 /**

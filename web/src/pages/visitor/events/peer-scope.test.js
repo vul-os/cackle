@@ -2,7 +2,7 @@
 //
 // Part one is the pure logic in ./peer-scope.ts, exercised directly.
 //
-// Part two is a SOURCE-TEXT guard over ./peer-events.jsx, and it is deliberate.
+// Part two is a SOURCE-TEXT guard over ./peer-events.tsx, and it is deliberate.
 // The rule "a peer event must never look like it is sold by this host" is not
 // a value a unit test can read off a return: it is the absence of a whole
 // class of UI. A component that grew an "Add to cart" button, a price, a
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { peerOrgId, renderablePeerRows, usablePeerRows } from './peer-scope.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const componentSource = readFileSync(join(here, 'peer-events.jsx'), 'utf8');
+const componentSource = readFileSync(join(here, 'peer-events.tsx'), 'utf8');
 
 /**
  * The component with its comments removed.
@@ -182,7 +182,7 @@ test('the borrowed-listing component offers no way to buy anything', () => {
         /\bsoldOut\b/,
     ];
     for (const re of forbidden) {
-        assert.equal(re.test(component), false, `peer-events.jsx must not contain ${re}`);
+        assert.equal(re.test(component), false, `peer-events.tsx must not contain ${re}`);
     }
 });
 
@@ -211,7 +211,7 @@ test('nothing in the component claims discovery, a directory, or organisers near
         /find (?:more )?organisers/i,
     ];
     for (const re of forbidden) {
-        assert.equal(re.test(component), false, `peer-events.jsx must not contain ${re}`);
+        assert.equal(re.test(component), false, `peer-events.tsx must not contain ${re}`);
     }
 });
 
@@ -252,8 +252,8 @@ test('the section is rendered from the GATED rows, never from the raw ones', () 
     // themselves are perfectly good rows.
     assert.match(component, /const events = renderablePeerRows\(host, data\);/);
     assert.equal(/\busablePeerRows\b/.test(component), false,
-        'peer-events.jsx must not reach past the gate to the ungated rows');
+        'peer-events.tsx must not reach past the gate to the ungated rows');
     // And the envelope is read in @/lib/host, not picked apart here.
     assert.equal(/\bpeers_included\b/.test(component), false,
-        'peer-events.jsx must not parse the host envelope itself; lib/host.js is the one reader');
+        'peer-events.tsx must not parse the host envelope itself; lib/host.js is the one reader');
 });

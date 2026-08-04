@@ -49,9 +49,10 @@ import React, { useEffect, useState } from 'react';
 import { Calendar, ExternalLink, MapPin } from 'lucide-react';
 import { request } from '@/lib/api';
 import { Separator } from '@/components/ui/separator';
-import { peerOrgId, renderablePeerRows } from './peer-scope';
+import { peerOrgId, renderablePeerRows, type PeerEventRow, type PeerEventsPayload } from './peer-scope';
+import type { MaybeHost } from '@/lib/host';
 
-function formatDate(iso) {
+function formatDate(iso: string | null | undefined): string {
     if (!iso) return 'Date TBA';
     try {
         return new Date(iso).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -60,13 +61,18 @@ function formatDate(iso) {
     }
 }
 
-function formatChecked(iso) {
+function formatChecked(iso: string | null | undefined): string | null {
     if (!iso) return null;
     try {
         return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     } catch {
         return null;
     }
+}
+
+interface PeerEventsState {
+    data: PeerEventsPayload | null;
+    caveat: string;
 }
 
 /**
@@ -79,8 +85,8 @@ function formatChecked(iso) {
  * A failure here renders nothing at all. A borrowed listing is a courtesy, not
  * the page — an error fetching one must never take out this host's own events.
  */
-function usePeerEvents(orgId) {
-    const [state, setState] = useState({ data: null, caveat: '' });
+function usePeerEvents(orgId: string | null): PeerEventsState {
+    const [state, setState] = useState<PeerEventsState>({ data: null, caveat: '' });
 
     useEffect(() => {
         if (!orgId) {
@@ -88,10 +94,10 @@ function usePeerEvents(orgId) {
             return undefined;
         }
         let cancelled = false;
-        request('/peer-events', { method: 'GET', query: { org: orgId } })
+        request<PeerEventsPayload>('/peer-events', { method: 'GET', query: { org: orgId } })
             .then((data) => {
                 if (cancelled) return;
-                setState({ data, caveat: data?.caveat || '' });
+                setState({ data, caveat: (typeof data?.caveat === 'string' && data.caveat) || '' });
             })
             .catch(() => {
                 if (!cancelled) setState({ data: null, caveat: '' });
@@ -104,8 +110,32 @@ function usePeerEvents(orgId) {
     return state;
 }
 
+/**
+ * The wire shape guaranteed by internal/httpapi/peer_feed.go's peerEventView —
+ * `json.Marshal` never omits title/publisher/publisher_key/url/notice/
+ * starts_at/fetched_at (no `omitempty` tag on any of them; only summary/
+ * venue_name/address/timezone/category carry one). `PeerEventRow` in
+ * ./peer-scope.ts keeps every field `unknown` because ITS job is deciding
+ * whether a row may be shown at all, from a payload that — since it is
+ * ultimately sourced from another operator's box — could in principle be
+ * malformed or from a differently-versioned peer. This component's job
+ * starts only once that gate (`renderablePeerRows`) has already passed, so
+ * from here on it trusts the documented Go contract for the fields
+ * peer-scope.ts itself never inspects.
+ */
+interface PeerEventView extends PeerEventRow {
+    title: string;
+    publisher: string;
+    publisher_key: string;
+    url: string;
+    notice: string;
+    starts_at: string;
+    fetched_at: string;
+    venue_name?: string;
+}
+
 /** One borrowed listing. No image, no price, no cart — a dashed note with a way out. */
-function PeerEventCard({ event }) {
+function PeerEventCard({ event }: { event: PeerEventView }) {
     const checked = formatChecked(event.fetched_at);
     return (
         <article
@@ -166,6 +196,10 @@ function PeerEventCard({ event }) {
     );
 }
 
+export interface PeerEventsProps {
+    host: MaybeHost;
+}
+
 /**
  * The whole section. Renders nothing — not a heading, not an empty state —
  * unless this host both displays borrowed listings (the operator's
@@ -173,7 +207,7 @@ function PeerEventCard({ event }) {
  * one. `renderablePeerRows` answers both in one place; the component never
  * reads the envelope itself.
  */
-export default function PeerEvents({ host }) {
+export default function PeerEvents({ host }: PeerEventsProps) {
     const orgId = peerOrgId(host);
     const { data, caveat } = usePeerEvents(orgId);
     const events = renderablePeerRows(host, data);
@@ -184,7 +218,7 @@ export default function PeerEvents({ host }) {
         <section className="mt-16" data-surface="peer-events">
             {/* The tear line is the seam: everything above it is this host's,
                 everything below it is somebody else's. */}
-            <Separator variant="perforated" style={{ '--notch': 'var(--background)' }} />
+            <Separator variant="perforated" style={{ '--notch': 'var(--background)' } as React.CSSProperties} />
 
             <div className="pt-10">
                 <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
@@ -193,7 +227,7 @@ export default function PeerEvents({ host }) {
                 {caveat && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{caveat}</p>}
 
                 <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {events.map((event) => (
+                    {(events as PeerEventView[]).map((event) => (
                         <PeerEventCard key={`${event.publisher_key}:${event.url}`} event={event} />
                     ))}
                 </div>
