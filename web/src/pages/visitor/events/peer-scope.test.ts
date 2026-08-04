@@ -36,7 +36,7 @@ const componentSource = readFileSync(join(here, 'peer-events.tsx'), 'utf8');
  * this file, against a planted defect in each family, so a passing run is
  * evidence it actually looked rather than evidence it stripped everything.
  */
-function stripComments(src) {
+function stripComments(src: string): string {
     return src
         .replace(/\/\*[\s\S]*?\*\//g, ' ') // /* … */ and JSX {/* … */}
         .replace(/(^|[^:])\/\/[^\n]*/g, '$1'); // // … but not the // in a URL scheme
@@ -61,7 +61,7 @@ const row = (over = {}) => ({
 // operator saying "show borrowed listings on my page" — see the section after
 // next. Without it the answer is null whatever the organisations are, and
 // these cases would all pass for the wrong reason.
-const shown = (over) => ({ peers_included: true, ...over });
+const shown = (over: Record<string, unknown>) => ({ peers_included: true, ...over });
 
 test('a single-organisation box shows that organisation\'s borrowed listings', () => {
     assert.equal(peerOrgId(shown({ organisations: [{ id: 'org-1', name: 'The Bijou', slug: 'the-bijou' }], multi_org: false })), 'org-1');
@@ -220,7 +220,7 @@ test('the source guard would catch the defects it exists to catch', () => {
     // success. Plant one defect from each family into the real source and
     // require a hit; then confirm the same text sitting in a COMMENT is
     // forgiven, which is the whole reason stripComments exists.
-    const planted = [
+    const planted: Array<[string, RegExp]> = [
         ['<Button>Add to cart</Button>', /\bAdd to cart\b/i],
         ['<Link to="/checkout/1">Get tickets</Link>', /\bGet tickets?\b/i],
         ['<Money minor={event.price} />', /event\.(?:price|currency|ticket_type|ticket_types)\b/],
