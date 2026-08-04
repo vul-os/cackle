@@ -40,7 +40,7 @@
  * /o/{ref} accepts either. The slug is preferred because it is the readable
  * half of a link somebody might type or read aloud.
  */
-export function orgPageHref(org: { id?: unknown; slug?: unknown } | null | undefined) {
+export function orgPageHref(org: { id?: unknown; slug?: unknown; name?: unknown } | null | undefined) {
     const ref = org?.slug || org?.id;
     return ref ? `/o/${encodeURIComponent(String(ref))}` : null;
 }

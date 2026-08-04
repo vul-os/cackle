@@ -54,6 +54,7 @@ export interface HostEnvelope {
 export type MaybeHost = HostEnvelope | null | undefined;
 
 export interface EventOrgRef {
+    id?: unknown;
     org_id?: unknown;
 }
 
