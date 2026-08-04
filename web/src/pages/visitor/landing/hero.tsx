@@ -11,10 +11,15 @@ const SIGNALS = [
     { icon: ShieldCheck, label: 'Cackle never holds funds' },
 ];
 
-function Hero({ query, onSearch }) {
+export interface HeroProps {
+    query: string;
+    onSearch: (value: string) => void;
+}
+
+function Hero({ query, onSearch }: HeroProps) {
     const [value, setValue] = useState(query);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         onSearch(value);
     };
