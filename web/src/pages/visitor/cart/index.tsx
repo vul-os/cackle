@@ -13,7 +13,7 @@ import Footer from '@/pages/visitor/landing/footer';
 import CheckoutSteps from '@/pages/visitor/checkout/steps';
 import { REDIRECT_STORAGE_KEY } from '@/pages/auth/auth-redirect';
 
-function whenLabel(iso) {
+function whenLabel(iso: string | null | undefined): string | null {
     if (!iso) return null;
     try {
         return format(new Date(iso), 'EEE, d MMM yyyy · HH:mm');
@@ -22,7 +22,7 @@ function whenLabel(iso) {
     }
 }
 
-const Shell = ({ children }) => (
+const Shell = ({ children }: { children: React.ReactNode }) => (
     <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <main id="main" className="flex-1 pt-16">
@@ -39,7 +39,7 @@ const CartPage = () => {
 
     const groups = Object.entries(itemsByEvent);
 
-    const handleCheckout = (eventId) => {
+    const handleCheckout = (eventId: string) => {
         if (!user) {
             // ProtectedRoute (and the auth pages' post-login redirect) both
             // key off this localStorage entry, not router state — set it
@@ -103,7 +103,7 @@ const CartPage = () => {
                             <section
                                 key={eventId}
                                 className="ticket-stub overflow-hidden rounded-2xl border border-border bg-card shadow-soft"
-                                style={{ '--notch': 'var(--background)', '--notch-y': 'calc(100% - 5.5rem)' }}
+                                style={{ '--notch': 'var(--background)', '--notch-y': 'calc(100% - 5.5rem)' } as React.CSSProperties}
                                 aria-labelledby={`cart-event-${eventId}`}
                             >
                                 <header className="border-b border-border px-5 py-4 sm:px-6">
@@ -194,7 +194,7 @@ const CartPage = () => {
                                 </ul>
 
                                 <div className="px-5 sm:px-6">
-                                    <Separator variant="perforated" style={{ '--notch': 'var(--background)' }} />
+                                    <Separator variant="perforated" style={{ '--notch': 'var(--background)' } as React.CSSProperties} />
                                 </div>
 
                                 <div className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">

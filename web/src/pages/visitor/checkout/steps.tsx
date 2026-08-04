@@ -17,13 +17,16 @@ export const STEPS = [
     { key: 'details', label: 'Your details' },
     { key: 'pay', label: 'Pay' },
     { key: 'ticket', label: 'Ticket' },
-];
+] as const;
 
-/**
- * @param {object} props
- * @param {'cart'|'details'|'pay'|'ticket'} props.current
- */
-export default function CheckoutSteps({ current, className }) {
+export type CheckoutStepKey = (typeof STEPS)[number]['key'];
+
+export interface CheckoutStepsProps {
+    current: CheckoutStepKey;
+    className?: string;
+}
+
+export default function CheckoutSteps({ current, className }: CheckoutStepsProps) {
     const currentIndex = Math.max(0, STEPS.findIndex((s) => s.key === current));
 
     return (
