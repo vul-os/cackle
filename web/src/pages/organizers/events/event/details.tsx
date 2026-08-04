@@ -1,28 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { DateRange } from 'react-day-picker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Image as ImageIcon, Info, Trash2, Coins, Tag, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Image as ImageIcon, Info, Trash2, Coins, Tag, ArrowRight, type LucideIcon } from 'lucide-react';
 import DatePickerWithRange from '@/components/date-range-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MarkdownEditor } from './markdown-editor';
 import CategorySelect from './category-select';
 import { images as imagesApi, currencies as currenciesApi } from '@/lib/api';
+import type { Currency } from '@/lib/api-types';
+import type { EventFormState } from './event-form-hook';
+
+/** Just what this picker renders — the fallback list below doesn't carry a real ISO-4217 exponent. */
+type CurrencyOption = Pick<Currency, 'code' | 'name'>;
 
 // Fallback only: used if GET /api/currencies fails (offline, transient
 // error). The primary source is the full ISO-4217 table — Cackle has no
 // privileged currency, so this picker shouldn't hardcode one either.
-const FALLBACK_CURRENCIES = [
+const FALLBACK_CURRENCIES: CurrencyOption[] = [
     { code: 'USD', name: 'United States Dollar' },
     { code: 'EUR', name: 'Euro' },
     { code: 'GBP', name: 'British Pound Sterling' },
     { code: 'ZAR', name: 'South African Rand' },
 ];
 
-function useCurrencyOptions() {
-    const [options, setOptions] = useState(FALLBACK_CURRENCIES);
+function useCurrencyOptions(): CurrencyOption[] {
+    const [options, setOptions] = useState<CurrencyOption[]>(FALLBACK_CURRENCIES);
     useEffect(() => {
         let cancelled = false;
         currenciesApi
@@ -42,7 +48,7 @@ function useCurrencyOptions() {
     return options;
 }
 
-const Section = ({ icon: Icon, title, children }) => (
+const Section = ({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) => (
     <div className="space-y-4 border-t border-border pt-6 first:border-t-0 first:pt-0">
         <div className="flex items-center gap-2 text-primary-emphasis">
             <Icon className="h-4 w-4" />
@@ -52,14 +58,30 @@ const Section = ({ icon: Icon, title, children }) => (
     </div>
 );
 
-export const EventDetailsCard = ({ editForm, handleInputChange, isSubmitting = false, hasChanges, onSave, onDeleteRequest }) => {
+export interface EventDetailsCardProps {
+    editForm: EventFormState;
+    handleInputChange: <K extends keyof EventFormState>(field: K, value: EventFormState[K]) => void;
+    isSubmitting?: boolean;
+    hasChanges: boolean;
+    onSave: () => void;
+    onDeleteRequest: () => void;
+}
+
+export const EventDetailsCard = ({
+    editForm,
+    handleInputChange,
+    isSubmitting = false,
+    hasChanges,
+    onSave,
+    onDeleteRequest,
+}: EventDetailsCardProps) => {
     const navigate = useNavigate();
     const currencyOptions = useCurrencyOptions();
 
-    const dateRange =
+    const dateRange: DateRange | undefined =
         editForm.starts_at && editForm.ends_at ? { from: new Date(editForm.starts_at), to: new Date(editForm.ends_at) } : undefined;
 
-    const handleDateChange = (range) => {
+    const handleDateChange = (range: DateRange | undefined) => {
         if (range?.from) handleInputChange('starts_at', range.from.toISOString());
         if (range?.to) handleInputChange('ends_at', range.to.toISOString());
     };
