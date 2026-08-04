@@ -1,6 +1,15 @@
-import { AlertTriangle } from 'lucide-react';
+import type { ReactNode, HTMLAttributes } from 'react';
+import { AlertTriangle, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+
+interface ErrorStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+    icon?: LucideIcon;
+    title?: ReactNode;
+    description?: ReactNode;
+    onRetry?: () => void;
+    retryLabel?: ReactNode;
+}
 
 /**
  * Shared error state — for failed fetches, failed mutations, etc. Distinct
@@ -19,7 +28,7 @@ const ErrorState = ({
     retryLabel = 'Try again',
     className,
     ...props
-}) => (
+}: ErrorStateProps) => (
     <div
         role="alert"
         className={cn(
