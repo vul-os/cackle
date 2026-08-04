@@ -6,8 +6,10 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Separator } from '@/components/ui/separator';
 import { Money } from '@/components/ui/money';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import type { CartItem } from '@/context/use-cart';
+import type { CackleEvent } from '@/lib/api-types';
 
-function whenLabel(iso) {
+function whenLabel(iso: string | null | undefined) {
     if (!iso) return null;
     try {
         return format(new Date(iso), 'EEE, d MMM yyyy · HH:mm');
@@ -16,15 +18,27 @@ function whenLabel(iso) {
     }
 }
 
-/**
- * @param {object} props
- * @param {{title: string, description: string}|null} [props.issue] a
- *   classified live-inventory failure (sold out / window closed / per-order
- *   cap) from checkout/index.tsx's classifyOrderError. Rendered inline,
- *   right where the buyer is about to commit, rather than as a toast that
- *   is easy to miss on a phone.
- */
-const OrderSummary = ({ event, items, total, isProcessing, onCheckout, issue = null }) => {
+export interface OrderIssue {
+    title: string;
+    description: string;
+}
+
+export interface OrderSummaryProps {
+    event: CackleEvent;
+    items: CartItem[];
+    total: number;
+    isProcessing: boolean;
+    onCheckout: () => void;
+    /**
+     * A classified live-inventory failure (sold out / window closed /
+     * per-order cap) from checkout/index.tsx's classifyOrderError. Rendered
+     * inline, right where the buyer is about to commit, rather than as a
+     * toast that is easy to miss on a phone.
+     */
+    issue?: OrderIssue | null;
+}
+
+const OrderSummary = ({ event, items, total, isProcessing, onCheckout, issue = null }: OrderSummaryProps) => {
     const when = whenLabel(event.starts_at);
     const ticketCount = items.reduce((n, i) => n + i.quantity, 0);
 
@@ -70,7 +84,7 @@ const OrderSummary = ({ event, items, total, isProcessing, onCheckout, issue = n
             <CardFooter className="flex-col items-stretch gap-4">
                 {/* The tear line: above it is what you are buying, below it
                     is what it costs and the button that commits you. */}
-                <Separator variant="perforated" style={{ '--notch': 'var(--card)' }} />
+                <Separator variant="perforated" style={{ '--notch': 'var(--card)' } as React.CSSProperties} />
 
                 <div className="flex items-baseline justify-between">
                     <span className="text-base font-semibold">Total</span>

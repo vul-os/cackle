@@ -20,7 +20,11 @@ import { cn } from "@/lib/utils"
  * @param {'horizontal'|'vertical'} [props.orientation]
  * @param {'line'|'perforated'} [props.variant]
  */
-const Separator = React.forwardRef((
+export interface SeparatorProps extends React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root> {
+  variant?: "line" | "perforated";
+}
+
+const Separator = React.forwardRef<React.ElementRef<typeof SeparatorPrimitive.Root>, SeparatorProps>((
   { className, orientation = "horizontal", decorative = true, variant = "line", ...props },
   ref
 ) => (
