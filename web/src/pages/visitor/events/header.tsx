@@ -3,6 +3,12 @@ import { Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 
+export interface EventHeaderProps {
+    title?: string;
+    venueName?: string | null;
+    category?: string | null;
+}
+
 // This sits on top of an arbitrary cover PHOTO, not the app's own
 // background, so it uses the `media-ink` / `media-ground` tokens
 // (index.css `--on-media` / `--on-media-ground`) rather than
@@ -11,7 +17,7 @@ import { toast } from '@/components/ui/use-toast';
 // `text-foreground`/`bg-background` could land ink-on-photo in light mode.
 // Chrome that sits on the actual page (the venue badge, `bg-primary`) uses
 // the ordinary theme tokens; only the on-photo layer reaches for `media-*`.
-const EventHeader = ({ title, venueName, category }) => {
+const EventHeader = ({ title, venueName, category }: EventHeaderProps) => {
     const handleShare = async () => {
         const shareData = { title, url: window.location.href };
         try {
