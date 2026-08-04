@@ -15,12 +15,50 @@ import PrintStyles from './printing/print-styles';
 import { usePrintTicket } from './printing/use-print-ticket';
 import { PrintTicketButtons, PrintAllButton } from './printing/print-buttons';
 import { tickets as ticketsApi } from '@/lib/api';
+import type { Ticket as TicketRecord } from '@/lib/api-types';
 
-const DEFAULT_FILTERS = { event: 'all', ticketType: 'all', status: 'all', time: 'all', search: '' };
+interface TicketFiltersState {
+    event: string;
+    ticketType: string;
+    status: string;
+    time: string;
+    search: string;
+}
+
+const DEFAULT_FILTERS: TicketFiltersState = { event: 'all', ticketType: 'all', status: 'all', time: 'all', search: '' };
+
+interface TicketsState {
+    tickets: TicketRecord[];
+    loading: boolean;
+    error: string | null;
+}
+
+/** The view-model this page derives from GET /api/tickets' flat, decorated rows — see eventOf/typeOf below. */
+interface TicketEventViewModel {
+    id: string;
+    title: string;
+    venue_name?: string;
+    starts_at?: string;
+}
+
+interface TicketTypeViewModel {
+    id: string;
+    name: string;
+}
+
+interface GroupedByType {
+    type: TicketTypeViewModel;
+    tickets: TicketRecord[];
+}
+
+interface GroupedByEvent {
+    event: TicketEventViewModel;
+    ticketTypes: Record<string, GroupedByType>;
+}
 
 export default function TicketsListPage() {
-    const [state, setState] = useState({ tickets: [], loading: true, error: null });
-    const [filters, setFilters] = useState(DEFAULT_FILTERS);
+    const [state, setState] = useState<TicketsState>({ tickets: [], loading: true, error: null });
+    const [filters, setFilters] = useState<TicketFiltersState>(DEFAULT_FILTERS);
 
     const { isPrinting, printTarget, printSingleTicket, printAllTickets } = usePrintTicket();
 
@@ -34,12 +72,11 @@ export default function TicketsListPage() {
             .list()
             .then((data) => {
                 if (cancelled) return;
-                const list = Array.isArray(data) ? data : (data?.tickets ?? []);
-                setState({ tickets: list, loading: false, error: null });
+                setState({ tickets: data.tickets ?? [], loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ tickets: [], loading: false, error: err.message || 'Could not load your tickets.' });
+                setState({ tickets: [], loading: false, error: err?.message || 'Could not load your tickets.' });
             });
         return () => {
             cancelled = true;
@@ -53,17 +90,17 @@ export default function TicketsListPage() {
     // event_venue_name/event_starts_at and ticket_type_id/ticket_type_name
     // alongside the ticket's own fields. Build the small view-model objects
     // the printable-ticket components expect from those flat fields.
-    const eventOf = (t) => ({
+    const eventOf = (t: TicketRecord): TicketEventViewModel => ({
         id: t.event_id,
         title: t.event_title || 'Untitled event',
         venue_name: t.event_venue_name,
         starts_at: t.event_starts_at,
     });
-    const typeOf = (t) => ({ id: t.ticket_type_id, name: t.ticket_type_name || 'Ticket' });
+    const typeOf = (t: TicketRecord): TicketTypeViewModel => ({ id: t.ticket_type_id, name: t.ticket_type_name || 'Ticket' });
 
     const events = useMemo(
         () =>
-            tickets.reduce((acc, t) => {
+            tickets.reduce<TicketEventViewModel[]>((acc, t) => {
                 if (t.event_id && !acc.find((e) => e.id === t.event_id)) acc.push(eventOf(t));
                 return acc;
             }, []),
@@ -71,7 +108,7 @@ export default function TicketsListPage() {
     );
     const ticketTypes = useMemo(
         () =>
-            tickets.reduce((acc, t) => {
+            tickets.reduce<TicketTypeViewModel[]>((acc, t) => {
                 if (t.ticket_type_id && !acc.find((tt) => tt.id === t.ticket_type_id)) acc.push(typeOf(t));
                 return acc;
             }, []),
@@ -103,7 +140,7 @@ export default function TicketsListPage() {
 
     const groupedTickets = useMemo(
         () =>
-            filteredTickets.reduce((acc, ticket) => {
+            filteredTickets.reduce<Record<string, GroupedByEvent>>((acc, ticket) => {
                 const eventId = ticket.event_id ?? 'unknown';
                 const typeId = ticket.ticket_type_id ?? 'unknown';
                 acc[eventId] ||= { event: eventOf(ticket), ticketTypes: {} };
