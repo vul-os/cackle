@@ -14,11 +14,11 @@ const BARE_STATUS = /^(ticket|order|event|resource|page)?\s*not found\.?$/i;
 const NOT_AUTHORISED = /^(unauthori[sz]ed|forbidden|access denied)\.?$/i;
 
 /**
- * @param {string|null|undefined} raw the API's message
- * @param {string} fallback what to say when the API said nothing useful
- * @returns {string} a sentence
+ * @param raw the API's message
+ * @param fallback what to say when the API said nothing useful
+ * @returns a sentence
  */
-export function humanError(raw, fallback) {
+export function humanError(raw: string | null | undefined, fallback: string): string {
     const msg = (raw || '').trim();
     if (!msg) return fallback;
     if (BARE_STATUS.test(msg)) return fallback;
