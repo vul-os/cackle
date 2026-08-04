@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Ticket, Coins, ShieldCheck, BarChart3, Gauge } from 'lucide-react';
+import { ArrowLeft, Ticket, Coins, ShieldCheck, BarChart3, Gauge, type LucideIcon } from 'lucide-react';
 import { events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import { TicketTypeBreakdown, RatioMeter } from './stats-charts';
+import type { EventStats } from '@/lib/api-types';
 
 // Icon + label on one row, the value on the card's full inner width below it.
 //
@@ -18,7 +19,14 @@ import { TicketTypeBreakdown, RatioMeter } from './stats-charts';
 // figure, so the fix is to give the figure room (full card width, and a 3-up
 // row only once the content column is wide enough for one) rather than to let
 // it break.
-const StatTile = ({ icon: Icon, label, value, sub }) => (
+interface StatTileProps {
+    icon: LucideIcon;
+    label: string;
+    value: React.ReactNode;
+    sub?: React.ReactNode;
+}
+
+const StatTile = ({ icon: Icon, label, value, sub }: StatTileProps) => (
     <Card>
         <CardContent className="flex flex-col gap-3 p-6">
             <div className="flex items-center gap-3">
@@ -42,29 +50,36 @@ const StatTile = ({ icon: Icon, label, value, sub }) => (
     </Card>
 );
 
+interface EventStatsPageState {
+    stats: EventStats | null;
+    currency: string;
+    eventTitle: string;
+    loading: boolean;
+    error: string | null;
+}
+
 const EventStatsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ stats: null, currency: '', eventTitle: '', loading: true, error: null });
+    const [state, setState] = useState<EventStatsPageState>({ stats: null, currency: '', eventTitle: '', loading: true, error: null });
 
     const fetchStats = useCallback(() => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
-        Promise.all([eventsApi.stats(id), eventsApi.get(id)])
+        Promise.all([eventsApi.stats(id ?? ''), eventsApi.get(id ?? '')])
             .then(([statsData, eventData]) => {
                 if (cancelled) return;
-                const event = eventData?.event ?? eventData;
                 setState({
-                    stats: statsData?.stats ?? statsData,
-                    currency: event?.currency || '',
-                    eventTitle: event?.title || '',
+                    stats: statsData.stats,
+                    currency: eventData.event.currency || '',
+                    eventTitle: eventData.event.title || '',
                     loading: false,
                     error: null,
                 });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ stats: null, currency: '', eventTitle: '', loading: false, error: err.message || 'Could not load stats.' });
+                setState({ stats: null, currency: '', eventTitle: '', loading: false, error: err?.message || 'Could not load stats.' });
             });
         return () => {
             cancelled = true;
