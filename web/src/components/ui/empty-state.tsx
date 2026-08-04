@@ -1,4 +1,14 @@
+import type { ReactNode, HTMLAttributes } from 'react';
+import type { LucideIcon } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+
+interface EmptyStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
+    icon?: LucideIcon;
+    title?: ReactNode;
+    description?: ReactNode;
+    action?: ReactNode;
+}
 
 /**
  * Shared "nothing here" state — for empty lists, empty search results, empty
@@ -11,7 +21,7 @@ import { cn } from '@/lib/utils';
  *     action={<Button onClick={...}>Create event</Button>}
  *   />
  */
-const EmptyState = ({ icon: Icon, title, description, action, className, ...props }) => (
+const EmptyState = ({ icon: Icon, title, description, action, className, ...props }: EmptyStateProps) => (
     <div
         role="status"
         className={cn(
