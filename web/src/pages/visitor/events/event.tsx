@@ -8,6 +8,7 @@ import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer';
 import { events as eventsApi } from '@/lib/api';
 import { humanError } from '@/pages/visitor/errors';
+import type { CackleEvent, TicketType } from '@/lib/api-types';
 
 import EventGallery from './gallery';
 import EventHeader from './header';
@@ -16,7 +17,17 @@ import ProcessedText from './processed-text';
 import LocationSection from './location';
 import OrganiserAttribution from './organiser';
 import TicketSelection, { MobileStickyCta } from './ticket-selection';
-import { getEventImages } from './media';
+import { getEventImages, type EventMediaSource } from './media';
+
+/** The event as this page holds it: the public DTO plus the gallery folded in — see the load effect below. */
+type PageEvent = CackleEvent & Pick<EventMediaSource, 'gallery'>;
+
+interface EventPageState {
+    event: PageEvent | null;
+    ticketTypes: TicketType[];
+    loading: boolean;
+    error: string | null;
+}
 
 const LoadingView = () => (
     <div className="min-h-screen bg-background">
@@ -49,7 +60,7 @@ const LoadingView = () => (
     </div>
 );
 
-const NotFoundView = ({ message }) => (
+const NotFoundView = ({ message }: { message?: string | null }) => (
     <div className="min-h-screen bg-background">
         <Header />
         <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-4 pt-16 text-center">
@@ -65,27 +76,24 @@ const NotFoundView = ({ message }) => (
 
 const EventPage = () => {
     const { slug } = useParams();
-    const [state, setState] = useState({ event: null, ticketTypes: [], loading: true, error: null });
+    const [state, setState] = useState<EventPageState>({ event: null, ticketTypes: [], loading: true, error: null });
 
     useEffect(() => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
-            .get(slug)
+            .get(slug ?? '')
             .then((data) => {
                 if (cancelled) return;
-                const rawEvent = data?.event ?? data;
-                const ticketTypes = data?.ticket_types ?? rawEvent?.ticket_types ?? [];
                 // The gallery rides alongside `event` in this response, not
                 // nested inside it (see docs/API.md) — fold it in here so
                 // `getEventImages` has one consistent shape to read from.
-                const gallery = data?.gallery ?? rawEvent?.gallery ?? [];
-                const event = rawEvent ? { ...rawEvent, gallery } : rawEvent;
-                setState({ event, ticketTypes, loading: false, error: null });
+                const event: PageEvent = { ...data.event, gallery: data.gallery };
+                setState({ event, ticketTypes: data.ticket_types ?? [], loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ event: null, ticketTypes: [], loading: false, error: err.message || 'Event not found.' });
+                setState({ event: null, ticketTypes: [], loading: false, error: err?.message || 'Event not found.' });
             });
         return () => {
             cancelled = true;
