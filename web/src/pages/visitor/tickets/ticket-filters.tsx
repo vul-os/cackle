@@ -3,6 +3,33 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+/** The event options offered in the filter — derived from the visitor's own tickets, not the full event record. */
+export interface TicketFilterEvent {
+    id: string;
+    title: string;
+}
+
+/** The ticket-type options offered in the filter — likewise derived from the visitor's own tickets. */
+export interface TicketFilterTicketType {
+    id: string;
+    name: string;
+}
+
+export interface TicketFiltersProps {
+    search: string;
+    setSearch: (value: string) => void;
+    selectedEvent: string;
+    setSelectedEvent: (value: string) => void;
+    selectedTicketType: string;
+    setSelectedTicketType: (value: string) => void;
+    selectedStatus: string;
+    setSelectedStatus: (value: string) => void;
+    selectedTime: string;
+    setSelectedTime: (value: string) => void;
+    events: TicketFilterEvent[];
+    ticketTypes: TicketFilterTicketType[];
+}
+
 export default function TicketFilters({
     search,
     setSearch,
@@ -16,7 +43,7 @@ export default function TicketFilters({
     setSelectedTime,
     events,
     ticketTypes,
-}) {
+}: TicketFiltersProps) {
     return (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="relative sm:min-w-[220px] sm:flex-1">
