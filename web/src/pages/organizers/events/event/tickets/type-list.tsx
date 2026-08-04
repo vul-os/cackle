@@ -5,8 +5,9 @@ import { Progress } from '@/components/ui/progress';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Edit2, Trash2, Ticket } from 'lucide-react';
 import { Money } from '@/components/ui/money';
+import type { TicketType } from '@/lib/api-types';
 
-function saleWindowLabel(tt) {
+function saleWindowLabel(tt: TicketType): string | null {
     if (!tt.sales_start || !tt.sales_end) return null;
     const now = Date.now();
     const start = new Date(tt.sales_start).getTime();
@@ -16,7 +17,14 @@ function saleWindowLabel(tt) {
     return `Sales close ${new Date(tt.sales_end).toLocaleDateString()}`;
 }
 
-const TicketTypeItem = memo(({ ticketType, currency, onEdit, onDelete }) => {
+interface TicketTypeItemProps {
+    ticketType: TicketType;
+    currency: string;
+    onEdit: (ticketType: TicketType) => void;
+    onDelete: (id: string) => void;
+}
+
+const TicketTypeItem = memo(({ ticketType, currency, onEdit, onDelete }: TicketTypeItemProps) => {
     const handleEdit = useCallback(() => onEdit(ticketType), [ticketType, onEdit]);
     const handleDelete = useCallback(() => onDelete(ticketType.id), [ticketType.id, onDelete]);
 
@@ -74,7 +82,14 @@ const TicketTypeItem = memo(({ ticketType, currency, onEdit, onDelete }) => {
 });
 TicketTypeItem.displayName = 'TicketTypeItem';
 
-const TicketTypeList = memo(({ ticketTypes, currency, onEdit, onDelete }) => {
+export interface TicketTypeListProps {
+    ticketTypes: TicketType[];
+    currency: string;
+    onEdit: (ticketType: TicketType) => void;
+    onDelete: (id: string) => void;
+}
+
+const TicketTypeList = memo(({ ticketTypes, currency, onEdit, onDelete }: TicketTypeListProps) => {
     if (ticketTypes.length === 0) {
         return <EmptyState icon={Ticket} title="No ticket types yet" description="Create one to start selling." />;
     }
