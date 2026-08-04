@@ -2,18 +2,21 @@ import React, { useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import DatePickerWithRange from '@/components/date-range-picker';
 import { getExponent, decimalInputPattern, majorStringToMinor, minorToMajorString } from '@/lib/money';
+import type { TicketType } from '@/lib/api-types';
+import type { TicketTypeInput } from '@/lib/api';
 
 const wholeNumber = /^\d+$/;
 
 // Built per-currency (exponent-aware) rather than a single hardcoded
 // "up to 2 decimals" pattern — JPY allows none, KWD allows three.
-function priceSchemaFor(currency) {
+function priceSchemaFor(currency: string) {
     const exp = getExponent(currency);
     const pattern = exp === 0 ? /^\d+$/ : new RegExp(`^\\d+(\\.\\d{1,${exp}})?$`);
     const example = exp === 0 ? '150' : `150${'.' + '0'.repeat(exp)}`;
@@ -45,18 +48,27 @@ function priceSchemaFor(currency) {
         });
 }
 
-const TicketTypeForm = ({ initialData = null, currency, onSubmit, isSubmitting = false }) => {
-    const [dateRange, setDateRange] = useState(() => {
+type TicketTypeFormValues = z.infer<ReturnType<typeof priceSchemaFor>>;
+
+export interface TicketTypeFormProps {
+    initialData?: TicketType | null;
+    currency: string;
+    onSubmit: (data: TicketTypeInput) => void;
+    isSubmitting?: boolean;
+}
+
+const TicketTypeForm = ({ initialData = null, currency, onSubmit, isSubmitting = false }: TicketTypeFormProps) => {
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
         if (initialData?.sales_start && initialData?.sales_end) {
             return { from: new Date(initialData.sales_start), to: new Date(initialData.sales_end) };
         }
-        return null;
+        return undefined;
     });
-    const [dateError, setDateError] = useState(null);
+    const [dateError, setDateError] = useState<string | null>(null);
     const alreadySold = initialData?.quantity_sold ?? 0;
     const inputPattern = decimalInputPattern(currency);
 
-    const form = useForm({
+    const form = useForm<TicketTypeFormValues>({
         resolver: zodResolver(priceSchemaFor(currency)),
         defaultValues: {
             name: initialData?.name || '',
@@ -67,7 +79,7 @@ const TicketTypeForm = ({ initialData = null, currency, onSubmit, isSubmitting =
         },
     });
 
-    const handleSubmit = (formData) => {
+    const handleSubmit = (formData: TicketTypeFormValues) => {
         if (!dateRange?.from || !dateRange?.to) {
             setDateError('Pick a sales start and end date.');
             return;
