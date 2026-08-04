@@ -9,6 +9,13 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import { visibleTicketTypes, remainingFor, priceFromMinor } from './ticket-utils';
 import { Money } from '@/components/ui/money';
+import type { CackleEvent, TicketType } from '@/lib/api-types';
+
+export interface TicketSelectionProps {
+    event: CackleEvent;
+    ticketTypes?: TicketType[];
+    className?: string;
+}
 
 /**
  * The event page's primary conversion surface: an inline (not modal) ticket
@@ -16,14 +23,14 @@ import { Money } from '@/components/ui/money';
  * next to the event description on desktop and flow inline on mobile. See
  * `MobileStickyCta` below for the small-screen "jump to tickets" affordance.
  */
-const TicketSelection = ({ event, ticketTypes = [], className }) => {
+const TicketSelection = ({ event, ticketTypes = [], className }: TicketSelectionProps) => {
     const { addItem } = useCart();
     const navigate = useNavigate();
-    const [quantities, setQuantities] = useState({});
+    const [quantities, setQuantities] = useState<Record<string, number>>({});
 
     const available = visibleTicketTypes(ticketTypes);
 
-    const updateQuantity = (id, delta, max) => {
+    const updateQuantity = (id: string, delta: number, max: number) => {
         setQuantities((prev) => {
             const next = Math.max(0, Math.min(max, (prev[id] || 0) + delta));
             return { ...prev, [id]: next };
@@ -54,7 +61,7 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
             {/* Perforated tear-line under the header — this panel IS the ticket
                 stub the visitor is about to buy. --notch matches the card
                 surface so the punched circles read as cut through it. */}
-            <div className="ticket-perforation mx-6" style={{ '--notch': 'var(--card)' }} aria-hidden="true" />
+            <div className="ticket-perforation mx-6" style={{ '--notch': 'var(--card)' } as React.CSSProperties} aria-hidden="true" />
             <CardContent className="space-y-4 pt-6">
                 {available.length === 0 ? (
                     <EmptyState
@@ -136,12 +143,17 @@ const TicketSelection = ({ event, ticketTypes = [], className }) => {
     );
 };
 
+export interface MobileStickyCtaProps {
+    event?: Pick<CackleEvent, 'currency'> | null;
+    ticketTypes?: TicketType[];
+}
+
 /**
  * Small-screen-only sticky CTA bar fixed to the bottom of the viewport. It
  * doesn't duplicate the selector — tapping it just scrolls the real ticket
  * panel into view, so there's exactly one place quantities are chosen.
  */
-export const MobileStickyCta = ({ event, ticketTypes = [] }) => {
+export const MobileStickyCta = ({ event, ticketTypes = [] }: MobileStickyCtaProps) => {
     const available = visibleTicketTypes(ticketTypes);
     const price = priceFromMinor(ticketTypes);
     const soldOut = available.length > 0 && available.every((t) => remainingFor(t) <= 0);
