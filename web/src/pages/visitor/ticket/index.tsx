@@ -6,12 +6,13 @@ import Footer from '@/pages/visitor/landing/footer';
 import { Button } from '@/components/ui/button';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Calendar, MapPin, User, Armchair, Printer, Download, Ban, ChevronLeft, Sun, WifiOff } from 'lucide-react';
+import { Calendar, MapPin, User, Armchair, Printer, Download, Ban, ChevronLeft, Sun, WifiOff, type LucideIcon } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { tickets as ticketsApi } from '@/lib/api';
 import PrintStyles from '@/pages/visitor/tickets/printing/print-styles';
 import { Separator } from '@/components/ui/separator';
 import { humanError } from '@/pages/visitor/errors';
+import type { Ticket as TicketRecord } from '@/lib/api-types';
 
 // ── This page is read at a door ───────────────────────────────────────────
 //
@@ -30,12 +31,12 @@ import { humanError } from '@/pages/visitor/errors';
 //   - The details a steward calls out — type, name, seat, serial — are set
 //     large enough to read at arm's length rather than as form captions.
 
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<string, string> = {
     void: 'This ticket has been voided and cannot be used for entry.',
     refunded: 'This ticket has been refunded and cannot be used for entry.',
 };
 
-function formatDate(dateString) {
+function formatDate(dateString: string | null | undefined): string {
     if (!dateString) return 'Date TBA';
     try {
         return format(new Date(dateString), 'EEEE, d MMMM yyyy');
@@ -44,7 +45,7 @@ function formatDate(dateString) {
     }
 }
 
-function formatTime(dateString) {
+function formatTime(dateString: string | null | undefined): string {
     if (!dateString) return '';
     try {
         return format(new Date(dateString), 'HH:mm');
@@ -53,7 +54,7 @@ function formatTime(dateString) {
     }
 }
 
-const Shell = ({ children }) => (
+const Shell = ({ children }: { children: React.ReactNode }) => (
     <div className="flex min-h-screen flex-col bg-background">
         <Header />
         <PrintStyles />
@@ -85,23 +86,36 @@ function TicketSkeleton() {
     );
 }
 
+/**
+ * `seat` rides on the decoded capability token (internal/tickets/capability.go),
+ * not on the Ticket row itself — see printing/layout.tsx's TicketLayoutTicket
+ * for the same distinction.
+ */
+type PageTicket = TicketRecord & { seat?: string };
+
+interface TicketPageState {
+    ticket: PageTicket | null;
+    loading: boolean;
+    error: string | null;
+}
+
 export default function TicketPage() {
     const { id } = useParams();
-    const [state, setState] = useState({ ticket: null, loading: true, error: null });
+    const [state, setState] = useState<TicketPageState>({ ticket: null, loading: true, error: null });
     const [reloadToken, setReloadToken] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         ticketsApi
-            .get(id)
+            .get(id ?? '')
             .then((data) => {
                 if (cancelled) return;
-                setState({ ticket: data?.ticket ?? data, loading: false, error: null });
+                setState({ ticket: data.ticket, loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ ticket: null, loading: false, error: err.message || 'Ticket not found' });
+                setState({ ticket: null, loading: false, error: err?.message || 'Ticket not found' });
             });
         return () => {
             cancelled = true;
@@ -131,7 +145,7 @@ export default function TicketPage() {
 }
 
 /** A label/value pair sized to be read from a couple of feet away. */
-const GateFact = ({ icon: Icon, label, value }) => (
+const GateFact = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: React.ReactNode }) => (
     <div className="flex items-start gap-3">
         <Icon className="mt-1 h-5 w-5 shrink-0 text-primary-emphasis" aria-hidden="true" />
         <div className="min-w-0">
@@ -141,7 +155,7 @@ const GateFact = ({ icon: Icon, label, value }) => (
     </div>
 );
 
-function TicketCard({ ticket }) {
+function TicketCard({ ticket }: { ticket: PageTicket }) {
     // GET /api/tickets/{id} returns a flat, decorated ticket — event_title /
     // event_venue_name / event_starts_at / ticket_type_name alongside the
     // ticket's own fields, not nested `event`/`ticket_type` objects.
@@ -196,7 +210,7 @@ function TicketCard({ ticket }) {
                         className="print-keep-color relative z-20 flex items-center justify-center gap-2 bg-destructive px-6 py-3 text-center text-sm font-extrabold uppercase tracking-wide text-destructive-foreground sm:text-base"
                     >
                         <Ban className="h-5 w-5 shrink-0" aria-hidden="true" />
-                        {STATUS_LABEL[status] ?? `This ticket is ${status} and cannot be used for entry.`}
+                        {(status && STATUS_LABEL[status]) ?? `This ticket is ${status} and cannot be used for entry.`}
                     </div>
                 )}
 
@@ -271,7 +285,7 @@ function TicketCard({ ticket }) {
                         {/* The tear-line between "who this is for" and the ticket's own
                             serial/legal footer — the one division on this card that is
                             genuinely a ticket stub, not a generic rule. */}
-                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' }} />
+                        <Separator variant="perforated" style={{ '--notch': 'var(--card)' } as React.CSSProperties} />
                         <div className="pt-3">
                             <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Ticket number</p>
                             <p className="mt-0.5 select-all font-mono text-base font-semibold text-foreground">#{ticket.serial}</p>
