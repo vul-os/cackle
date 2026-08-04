@@ -107,7 +107,7 @@ test('an invite link opened signed-out survives the sign-in detour with its toke
     );
 
     // 3. ProtectedRoute's persisted copy must keep the search too.
-    const guard = read('components/auth/protected-route.jsx');
+    const guard = read('components/auth/protected-route.tsx');
     assert.match(guard, /location\.pathname \+ location\.search/, 'ProtectedRoute persists a tokenless path');
 
     // 4. /accept-invite must be a path the 401 handler recognises as

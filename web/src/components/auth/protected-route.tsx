@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/use-auth';
 import { Spinner } from '@/components/ui/spinner';
 
 const REDIRECT_STORAGE_KEY = 'auth_redirect_data';
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     const { user, loading } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
