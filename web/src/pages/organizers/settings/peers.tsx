@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -15,6 +15,75 @@ import { toast } from '@/components/ui/use-toast';
 import { Link2, KeyRound, RefreshCw, Trash2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { request } from '@/lib/api';
+
+// The federation ("other organisers") endpoints below (/sync/status,
+// /sync/peers*) are not part of lib/api-types.ts — that file mirrors the
+// documented DTOs in docs/API.md, and this feature predates/sits outside it.
+// These shapes are taken directly from the Go response structs they wire to
+// (internal/httpapi/sync_handlers.go's syncPeerView/syncStatusResponse,
+// internal/httpapi/peer_feed.go's feedPullResult/peerEventView), kept local
+// to this page rather than invented.
+
+interface SyncPeer {
+    id: string;
+    name?: string;
+    url?: string;
+    public_key: string;
+    enabled: boolean;
+    dialable: boolean;
+    pull_cursor: number;
+    push_cursor: number;
+    last_sync_at?: string;
+    last_status?: string;
+    created_at: string;
+    feed_publish: boolean;
+    feed_subscribe: boolean;
+    feed_pulled_at?: string;
+    feed_status?: string;
+}
+
+interface SyncStatusResponse {
+    node: string;
+    algebra: string;
+    engine?: string;
+    peers: SyncPeer[];
+    caveat: string;
+    standalone: boolean;
+}
+
+interface PeerEventView {
+    external: boolean;
+    publisher: string;
+    publisher_key: string;
+    url: string;
+    title: string;
+    summary?: string;
+    venue_name?: string;
+    address?: string;
+    starts_at: string;
+    ends_at: string;
+    timezone?: string;
+    category?: string;
+    fetched_at: string;
+    notice: string;
+}
+
+interface PeerEventsResponse {
+    events: PeerEventView[];
+    caveat: string;
+}
+
+interface FeedPullResult {
+    peer_id: string;
+    peer: string;
+    fetched: number;
+    stored: number;
+    refused?: string[];
+    pages: number;
+    complete: boolean;
+    error?: string;
+    caveat: string;
+}
 
 // Settings ▸ Other organisers.
 //
@@ -46,22 +115,27 @@ const enrolSchema = z.object({
         .refine((v) => /^[0-9a-fA-F]{64}$/.test(v), 'A key is 64 characters, digits and the letters a–f.'),
 });
 
-function shortKey(key) {
+function shortKey(key: string | null | undefined): string {
     if (!key) return '';
     return `${key.slice(0, 8)}…${key.slice(-4)}`;
 }
 
-function whenText(iso) {
+function whenText(iso: string | null | undefined): string {
     if (!iso) return 'never';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return 'never';
     return d.toLocaleString();
 }
 
+interface PeerRowProps {
+    peer: SyncPeer;
+    onChanged: () => Promise<void>;
+}
+
 /** One enrolled organiser: the two switches, a fetch button, and what it brought back. */
-function PeerRow({ peer, onChanged }) {
+function PeerRow({ peer, onChanged }: PeerRowProps) {
     const [busy, setBusy] = useState(false);
-    const [listings, setListings] = useState(null);
+    const [listings, setListings] = useState<PeerEventView[] | null>(null);
 
     const loadListings = useCallback(async () => {
         if (!peer.feed_subscribe) {
@@ -69,7 +143,7 @@ function PeerRow({ peer, onChanged }) {
             return;
         }
         try {
-            const data = await request(`/sync/peers/${peer.id}/feed`);
+            const data = await request<PeerEventsResponse>(`/sync/peers/${peer.id}/feed`);
             setListings(data?.events ?? []);
         } catch {
             setListings([]);
@@ -80,7 +154,7 @@ function PeerRow({ peer, onChanged }) {
         loadListings();
     }, [loadListings]);
 
-    const setSwitches = async (publish, subscribe) => {
+    const setSwitches = async (publish: boolean, subscribe: boolean) => {
         setBusy(true);
         try {
             await request(`/sync/peers/${peer.id}/feed`, {
@@ -89,7 +163,7 @@ function PeerRow({ peer, onChanged }) {
             });
             await onChanged();
         } catch (err) {
-            toast({ variant: 'destructive', title: 'That did not save', description: err.message });
+            toast({ variant: 'destructive', title: 'That did not save', description: err instanceof Error ? err.message : undefined });
         } finally {
             setBusy(false);
         }
@@ -98,7 +172,7 @@ function PeerRow({ peer, onChanged }) {
     const fetchNow = async () => {
         setBusy(true);
         try {
-            const out = await request(`/sync/peers/${peer.id}/feed`, { method: 'POST' });
+            const out = await request<FeedPullResult>(`/sync/peers/${peer.id}/feed`, { method: 'POST' });
             // A big programme arrives over several requests. The count is what an
             // operator cares about, but "we did not get all of it" is the thing
             // they must not have to infer from a number looking round — so it is
@@ -118,7 +192,7 @@ function PeerRow({ peer, onChanged }) {
         } catch (err) {
             // A refusal is the important case, so it is shown in full rather
             // than flattened into "something went wrong".
-            toast({ variant: 'destructive', title: 'Refused', description: err.message });
+            toast({ variant: 'destructive', title: 'Refused', description: err instanceof Error ? err.message : undefined });
         } finally {
             setBusy(false);
         }
@@ -131,7 +205,7 @@ function PeerRow({ peer, onChanged }) {
             toast({ title: 'Removed', description: 'Their events are no longer shown, and they can no longer see yours.' });
             await onChanged();
         } catch (err) {
-            toast({ variant: 'destructive', title: 'Could not remove', description: err.message });
+            toast({ variant: 'destructive', title: 'Could not remove', description: err instanceof Error ? err.message : undefined });
         } finally {
             setBusy(false);
         }
@@ -230,11 +304,18 @@ function PeerRow({ peer, onChanged }) {
     );
 }
 
+interface PeersState {
+    loading: boolean;
+    error: Error | null;
+    node: string;
+    peers: SyncPeer[];
+}
+
 const PeersPage = () => {
     const { activeOrg } = useAuth();
     const orgId = activeOrg?.id;
 
-    const [state, setState] = useState({ loading: true, error: null, node: '', peers: [] });
+    const [state, setState] = useState<PeersState>({ loading: true, error: null, node: '', peers: [] });
 
     const load = useCallback(async () => {
         if (!orgId) {
@@ -243,10 +324,10 @@ const PeersPage = () => {
         }
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const data = await request(`/sync/status?org=${encodeURIComponent(orgId)}`);
+            const data = await request<SyncStatusResponse>(`/sync/status?org=${encodeURIComponent(orgId)}`);
             setState({ loading: false, error: null, node: data?.node ?? '', peers: data?.peers ?? [] });
         } catch (err) {
-            setState({ loading: false, error: err, node: '', peers: [] });
+            setState({ loading: false, error: err instanceof Error ? err : new Error(String(err)), node: '', peers: [] });
         }
     }, [orgId]);
 
@@ -254,12 +335,12 @@ const PeersPage = () => {
         load();
     }, [load]);
 
-    const form = useForm({
+    const form = useForm<{ name?: string; url: string; public_key: string }>({
         resolver: zodResolver(enrolSchema),
         defaultValues: { name: '', url: '', public_key: '' },
     });
 
-    const enrol = async (values) => {
+    const enrol = async (values: { name?: string; url: string; public_key: string }) => {
         try {
             await request('/sync/peers', {
                 method: 'POST',
@@ -277,7 +358,7 @@ const PeersPage = () => {
             });
             await load();
         } catch (err) {
-            toast({ variant: 'destructive', title: 'Could not add them', description: err.message });
+            toast({ variant: 'destructive', title: 'Could not add them', description: err instanceof Error ? err.message : undefined });
         }
     };
 
