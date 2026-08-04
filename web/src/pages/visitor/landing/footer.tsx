@@ -4,20 +4,25 @@ import { BrandLockup } from '@/components/brand/wordmark';
 import { Separator } from '@/components/ui/separator';
 import { TAP_LINK } from '@/pages/visitor/ui-scale';
 
-const PLATFORM = [
+interface FooterLink {
+    to: string;
+    label: string;
+}
+
+const PLATFORM: FooterLink[] = [
     { to: '/events', label: "What's on" },
     { to: '/pricing', label: 'Sell tickets' },
     { to: '/docs', label: 'How it works' },
     { to: '/contact', label: 'Contact' },
 ];
 
-const ACCOUNT = [
+const ACCOUNT: FooterLink[] = [
     { to: '/login', label: 'Log in' },
     { to: '/orders', label: 'My orders' },
     { to: '/tickets', label: 'My tickets' },
 ];
 
-const FooterColumn = ({ title, links }) => (
+const FooterColumn = ({ title, links }: { title: string; links: FooterLink[] }) => (
     <div>
         <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted-foreground">{title}</h2>
         {/* Each entry is a standalone navigation target on a phone, not a
@@ -41,7 +46,7 @@ const Footer = () => (
             where the stub motif is literal rather than ornamental — the
             content above is the ticket, the footer below is the counterfoil.
             --notch punches through to the page ground the rule sits on. */}
-        <Separator variant="perforated" className="mx-auto max-w-[calc(100%-2rem)]" style={{ '--notch': 'var(--background)' }} />
+        <Separator variant="perforated" className="mx-auto max-w-[calc(100%-2rem)]" style={{ '--notch': 'var(--background)' } as React.CSSProperties} />
 
         <div className="container mx-auto px-4 py-12 sm:py-14">
             <div className="grid grid-cols-2 gap-x-8 gap-y-10 md:grid-cols-4">
