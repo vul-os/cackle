@@ -2,12 +2,29 @@ import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Bold, Italic, List, ListOrdered, Quote, Link as LinkIcon, Eye, Heading1, Heading2 } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Quote, Link as LinkIcon, Eye, Heading1, Heading2, type LucideIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // Shared write/preview Markdown field for event descriptions — used by both
 // the flat event editor (details.tsx) and the "basics" step of the create
 // wizard, so the two don't drift into two slightly-different editors.
+
+interface ToolbarItem {
+    icon: LucideIcon;
+    action: [string, string];
+    title: string;
+}
+
+const TOOLBAR_ITEMS: ToolbarItem[] = [
+    { icon: Heading1, action: ['# ', ''], title: 'Heading 1' },
+    { icon: Heading2, action: ['## ', ''], title: 'Heading 2' },
+    { icon: Bold, action: ['**', '**'], title: 'Bold' },
+    { icon: Italic, action: ['*', '*'], title: 'Italic' },
+    { icon: List, action: ['\n- ', ''], title: 'List' },
+    { icon: ListOrdered, action: ['\n1. ', ''], title: 'Numbered list' },
+    { icon: Quote, action: ['\n> ', ''], title: 'Quote' },
+    { icon: LinkIcon, action: ['[', '](url)'], title: 'Link' },
+];
 
 // Eight 44px buttons in a row do not fit a 390px phone (8 * 44px + 7 * 4px
 // gap = 380px against ~340px of usable card width) — rather than shrink
@@ -15,18 +32,9 @@ import ReactMarkdown from 'react-markdown';
 // from the textarea below, the row scrolls horizontally. `overflow-x-auto`
 // on a container whose content genuinely exceeds it is the one thing that
 // legitimately forgives an "overflowing" child.
-const MarkdownToolbar = ({ onAction }) => (
+const MarkdownToolbar = ({ onAction }: { onAction: (prefix: string, suffix: string) => void }) => (
     <div className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted/40 p-1">
-        {[
-            { icon: Heading1, action: ['# ', ''], title: 'Heading 1' },
-            { icon: Heading2, action: ['## ', ''], title: 'Heading 2' },
-            { icon: Bold, action: ['**', '**'], title: 'Bold' },
-            { icon: Italic, action: ['*', '*'], title: 'Italic' },
-            { icon: List, action: ['\n- ', ''], title: 'List' },
-            { icon: ListOrdered, action: ['\n1. ', ''], title: 'Numbered list' },
-            { icon: Quote, action: ['\n> ', ''], title: 'Quote' },
-            { icon: LinkIcon, action: ['[', '](url)'], title: 'Link' },
-        ].map(({ icon: Icon, action, title }) => (
+        {TOOLBAR_ITEMS.map(({ icon: Icon, action, title }) => (
             <Button key={title} type="button" variant="ghost" onClick={() => onAction(...action)} className="h-11 w-11 shrink-0 p-0" title={title}>
                 <Icon className="h-4 w-4" />
                 <span className="sr-only">{title}</span>
@@ -35,11 +43,20 @@ const MarkdownToolbar = ({ onAction }) => (
     </div>
 );
 
-export const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = '200px', disabled }) => {
+export interface MarkdownEditorProps {
+    value: string;
+    onChange: (value: string) => void;
+    name: string;
+    placeholder?: string;
+    minHeight?: string;
+    disabled?: boolean;
+}
+
+export const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = '200px', disabled }: MarkdownEditorProps) => {
     const [activeTab, setActiveTab] = useState('write');
 
-    const handleMarkdownAction = (prefix, suffix) => {
-        const textarea = document.querySelector(`textarea[name="${name}"]`);
+    const handleMarkdownAction = (prefix: string, suffix: string) => {
+        const textarea = document.querySelector<HTMLTextAreaElement>(`textarea[name="${name}"]`);
         if (!textarea) return;
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
