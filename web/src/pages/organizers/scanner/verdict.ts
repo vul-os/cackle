@@ -64,6 +64,12 @@ export const VERDICTS = {
     },
 };
 
+type VerdictKind = keyof typeof VERDICTS;
+
+function isVerdictKind(value: string): value is VerdictKind {
+    return value in VERDICTS;
+}
+
 /**
  * verdictFor returns the presentation for a result, falling back to the
  * refusal treatment for anything unrecognised.
@@ -72,11 +78,9 @@ export const VERDICTS = {
  * rest of the scan path: a result string this build does not know about is
  * shown as a refusal, never as an admission. A future server that adds a
  * verdict will make old gates refuse rather than wave people through.
- *
- * @param {string} result
  */
-export function verdictFor(result) {
-    return VERDICTS[result] ?? VERDICTS.invalid;
+export function verdictFor(result: string) {
+    return isVerdictKind(result) ? VERDICTS[result] : VERDICTS.invalid;
 }
 
 /**
@@ -87,9 +91,8 @@ export function verdictFor(result) {
  * because the natural reflex on a refusal is to scan again immediately — which
  * would bury the reason under a second identical flood.
  *
- * @param {string} result
  */
-export function verdictHoldMs(result) {
+export function verdictHoldMs(result: string) {
     return result === 'admitted' ? 1100 : 2400;
 }
 
@@ -103,10 +106,9 @@ export function verdictHoldMs(result) {
  * could not see each other and a person may already be inside — which is
  * detected here and, unavoidably, not prevented.
  *
- * @param {string|null} note
  * @returns {{ where: 'this-gate'|'other-gate'|'unknown', detail: string }}
  */
-export function describeDuplicate(note) {
+export function describeDuplicate(note: string | null) {
     if (typeof note === 'string' && /another gate/i.test(note)) {
         return {
             where: 'other-gate',
