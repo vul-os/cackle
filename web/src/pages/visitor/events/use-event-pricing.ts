@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react';
 import { events as eventsApi } from '@/lib/api';
 import { visibleTicketTypes, remainingFor } from './ticket-utils';
 
+/** A ref-shaped event this hook can price: a slug or an id, whichever a card has on hand. */
+export interface PricedEvent {
+    slug?: string | null;
+    id?: string | null;
+}
+
+/** One event's resolved pricing, or null when it failed to load. */
+export interface EventPricing {
+    minPriceMinor: number | null;
+    soldOut: boolean;
+}
+
 /**
  * Best-effort per-event pricing/availability, resolved against the public
  * `GET /api/events/{slug}` endpoint — the public list endpoint carries no
@@ -12,11 +24,11 @@ import { visibleTicketTypes, remainingFor } from './ticket-utils';
  * Returns a map keyed by the same ref passed in (slug, falling back to id):
  * { [ref]: { minPriceMinor, soldOut } | null }
  */
-export function useEventPricing(events) {
-    const [byId, setById] = useState({});
+export function useEventPricing(events: PricedEvent[]): Record<string, EventPricing | null> {
+    const [byId, setById] = useState<Record<string, EventPricing | null>>({});
 
     useEffect(() => {
-        const ids = events.map((e) => e.slug || e.id).filter((ref) => ref && !(ref in byId));
+        const ids = events.map((e) => e.slug || e.id).filter((ref): ref is string => !!ref && !(ref in byId));
         if (ids.length === 0) return;
         let cancelled = false;
         Promise.allSettled(ids.map((ref) => eventsApi.get(ref))).then((results) => {
@@ -36,7 +48,7 @@ export function useEventPricing(events) {
                     }
                     const soldOut = available.every((t) => remainingFor(t) <= 0);
                     const minPriceMinor = available.reduce(
-                        (min, t) => (min === null || t.price_minor < min ? t.price_minor : min),
+                        (min: number | null, t) => (min === null || t.price_minor < min ? t.price_minor : min),
                         null,
                     );
                     next[ids[i]] = { minPriceMinor, soldOut };

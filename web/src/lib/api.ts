@@ -328,7 +328,19 @@ export const events = {
      * drafts.
      */
     listForOrg: (orgId: string) => get<{ events: CackleEvent[] }>(`/orgs/${orgId}/events`),
-    get: (slug: string) => get<{ event: CackleEvent }>(`/events/${encodeURIComponent(slug)}`),
+    /**
+     * The response carries more than the event itself — see
+     * handleGetPublicEvent in internal/httpapi/event_handlers.go, which
+     * always attaches the event's ticket types, issuer keys and gallery
+     * in the same payload rather than requiring three round trips.
+     */
+    get: (slug: string) =>
+        get<{
+            event: CackleEvent;
+            ticket_types: TicketType[];
+            issuer_keys: { event_id: string; keys: Record<string, string> };
+            gallery: EventImage[];
+        }>(`/events/${encodeURIComponent(slug)}`),
     create: (data: CreateEventInput) => post<{ event: CackleEvent }>('/events', data),
     update: (id: string, data: UpdateEventInput) => patch<{ event: CackleEvent }>(`/events/${id}`, data),
     /**
