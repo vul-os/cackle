@@ -4,12 +4,13 @@ import { Progress } from '@/components/ui/progress';
 import { UploadCloud, X, Star, ChevronUp, ChevronDown, ImageOff, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { images as imagesApi, events as eventsApi } from '@/lib/api';
+import type { EventImage, UpdateEventInput } from '@/lib/api-types';
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB — mirrors the server-side cap
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const ACCEPTED_LABEL = 'PNG, JPEG or WebP, up to 8MB';
 
-function validateFile(file) {
+function validateFile(file: File): string | null {
     if (!ACCEPTED_TYPES.includes(file.type)) {
         return `"${file.name}" isn't a supported image type — ${ACCEPTED_LABEL}.`;
     }
@@ -17,6 +18,22 @@ function validateFile(file) {
         return `"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB) — max is 8MB.`;
     }
     return null;
+}
+
+interface UploadItem {
+    key: string;
+    name: string;
+    progress: number;
+    error: string | null;
+}
+
+export interface ImageUploaderProps {
+    eventId?: string;
+    images: EventImage[];
+    coverImageId?: string | null;
+    onImagesChange?: (updater: (current: EventImage[]) => EventImage[]) => void;
+    onCoverChange?: (imageId: string | null) => void;
+    disabled?: boolean;
 }
 
 /**
@@ -28,13 +45,13 @@ function validateFile(file) {
  * event editor's Images page, so upload/delete/reorder behaviour can't
  * drift between the two entry points.
  */
-const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverChange, disabled }) => {
-    const [uploads, setUploads] = useState([]); // [{key, name, progress, error}]
+const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverChange, disabled }: ImageUploaderProps) => {
+    const [uploads, setUploads] = useState<UploadItem[]>([]);
     const [dragOver, setDragOver] = useState(false);
-    const inputRef = useRef(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const uploadFiles = useCallback(
-        async (fileList) => {
+        async (fileList: FileList | null | undefined) => {
             const files = Array.from(fileList || []);
             if (files.length === 0 || !eventId) return;
 
@@ -49,36 +66,37 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                 setUploads((prev) => [...prev, { key, name: file.name, progress: 0, error: null }]);
 
                 try {
-                    const result = await imagesApi.upload(eventId, file, {
+                    const image = await imagesApi.upload(eventId, file, {
                         onProgress: (pct) => setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, progress: pct } : u))),
                     });
-                    const image = result?.image ?? result;
                     onImagesChange?.((current) => [...current, image]);
                     setUploads((prev) => prev.filter((u) => u.key !== key));
                 } catch (err) {
-                    setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, error: err.message || 'Upload failed' } : u)));
+                    const message = err instanceof Error ? err.message : 'Upload failed';
+                    setUploads((prev) => prev.map((u) => (u.key === key ? { ...u, error: message } : u)));
                 }
             }
         },
         [eventId, onImagesChange],
     );
 
-    const handleDrop = (e) => {
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
         setDragOver(false);
         if (disabled) return;
         uploadFiles(e.dataTransfer?.files);
     };
 
-    const dismissUpload = (key) => setUploads((prev) => prev.filter((u) => u.key !== key));
+    const dismissUpload = (key: string) => setUploads((prev) => prev.filter((u) => u.key !== key));
 
-    const handleDelete = async (imageId) => {
+    const handleDelete = async (imageId: string) => {
         try {
             await imagesApi.remove(imageId);
             onImagesChange?.((current) => current.filter((img) => img.id !== imageId));
             if (imageId === coverImageId) onCoverChange?.(null);
         } catch (err) {
-            setUploads((prev) => [...prev, { key: `delete-err-${imageId}-${Date.now()}`, name: 'Delete', progress: 0, error: err.message || 'Could not delete image.' }]);
+            const message = err instanceof Error ? err.message : 'Could not delete image.';
+            setUploads((prev) => [...prev, { key: `delete-err-${imageId}-${Date.now()}`, name: 'Delete', progress: 0, error: message }]);
         }
     };
 
@@ -87,15 +105,17 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
     // optimistically to local state immediately, and persisted best-effort
     // via a PATCH the server can ignore harmlessly if it doesn't recognise
     // the field yet. The visual order is always what this session sees,
-    // regardless of whether persistence lands.
-    const handleReorder = (index, direction) => {
+    // regardless of whether persistence lands. `gallery_order` isn't in
+    // UpdateEventInput (api-types.ts) for the same reason — it isn't a
+    // documented field — so the payload is asserted rather than typed.
+    const handleReorder = (index: number, direction: 1 | -1) => {
         onImagesChange?.((current) => {
             const next = [...current];
             const target = index + direction;
             if (target < 0 || target >= next.length) return current;
             [next[index], next[target]] = [next[target], next[index]];
             if (eventId) {
-                eventsApi.update(eventId, { gallery_order: next.map((img) => img.id) }).catch(() => {
+                eventsApi.update(eventId, { gallery_order: next.map((img) => img.id) } as UpdateEventInput).catch(() => {
                     // best-effort persistence only — see comment above
                 });
             }
@@ -178,7 +198,7 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                         return (
                             <div key={img.id} className="group relative overflow-hidden rounded-lg border border-border">
                                 <div className="aspect-[4/3] w-full bg-muted">
-                                    <img src={imagesApi.url(img.id)} alt="" className="h-full w-full object-cover" loading="lazy" />
+                                    <img src={imagesApi.url(img.id) ?? undefined} alt="" className="h-full w-full object-cover" loading="lazy" />
                                 </div>
                                 {isCover && (
                                     <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
