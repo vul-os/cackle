@@ -8,16 +8,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
 import { X } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
+import type { UpdateEventInput, CackleEvent, TicketType, EventImage } from '@/lib/api-types';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
-import WizardStepper from './stepper';
-import BasicsStep from './steps/basics';
-import ScheduleVenueStep from './steps/schedule-venue';
+import WizardStepper, { type WizardStep } from './stepper';
+import BasicsStep, { type BasicsFormValues } from './steps/basics';
+import ScheduleVenueStep, { type ScheduleSubmitData } from './steps/schedule-venue';
 import TicketsStep from './steps/tickets-step';
 import ImagesStep from './steps/images-step';
 import ReviewStep from './steps/review';
+import type { WizardEvent } from './wizard-types';
 
-const STEPS = [
+const STEPS: WizardStep[] = [
     { key: 'basics', label: 'Basics' },
     { key: 'schedule', label: 'Date & Venue' },
     { key: 'tickets', label: 'Tickets' },
@@ -25,7 +27,7 @@ const STEPS = [
     { key: 'review', label: 'Review' },
 ];
 
-const EMPTY_EVENT = {
+const EMPTY_EVENT: WizardEvent = {
     title: '',
     category: '',
     summary: '',
@@ -86,7 +88,7 @@ const WizardSkeleton = () => (
     </div>
 );
 
-function computeInitialStep(event, ticketTypes) {
+function computeInitialStep(event: Pick<CackleEvent, 'title' | 'starts_at' | 'venue_name'>, ticketTypes: TicketType[]): number {
     if (!event.title) return 0;
     if (!event.starts_at || !event.venue_name) return 1;
     if (ticketTypes.length === 0) return 2;
@@ -107,12 +109,12 @@ const CreateEventWizard = () => {
     const { activeOrg } = useAuth();
 
     const [loading, setLoading] = useState(!!routeId);
-    const [loadError, setLoadError] = useState(null);
-    const [eventId, setEventId] = useState(routeId || null);
-    const [event, setEvent] = useState(EMPTY_EVENT);
-    const [ticketTypes, setTicketTypes] = useState([]);
-    const [images, setImages] = useState([]);
-    const [coverImageId, setCoverImageId] = useState(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [eventId, setEventId] = useState<string | null>(routeId || null);
+    const [event, setEvent] = useState<WizardEvent>(EMPTY_EVENT);
+    const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
+    const [images, setImages] = useState<EventImage[]>([]);
+    const [coverImageId, setCoverImageId] = useState<string | null>(null);
 
     const [step, setStep] = useState(0);
     const [maxStepReached, setMaxStepReached] = useState(0);
@@ -122,7 +124,7 @@ const CreateEventWizard = () => {
     // it's read, and this is the one form in the product where losing the
     // reason a save failed means someone re-types a full event. Mirrors the
     // pattern in organizers/orgs/create.tsx.
-    const [stepError, setStepError] = useState(null);
+    const [stepError, setStepError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!routeId) return;
@@ -131,8 +133,8 @@ const CreateEventWizard = () => {
             try {
                 const [eventData, ttData] = await Promise.all([eventsApi.get(routeId), ticketTypesApi.list(routeId)]);
                 if (cancelled) return;
-                const ev = eventData?.event ?? eventData;
-                const tts = Array.isArray(ttData) ? ttData : (ttData?.ticket_types ?? []);
+                const ev = eventData.event;
+                const tts = ttData.ticket_types ?? [];
                 setEvent({
                     title: ev.title ?? '',
                     category: ev.category ?? '',
@@ -149,7 +151,7 @@ const CreateEventWizard = () => {
                 setTicketTypes(tts);
                 // `gallery` is a sibling of `event` in the GET /api/events/{id}
                 // response shape, not a field on the event object itself.
-                setImages(eventData?.gallery ?? []);
+                setImages(eventData.gallery ?? []);
                 setCoverImageId(ev.cover_image_id ?? null);
                 const initial = computeInitialStep(ev, tts);
                 setStep(initial);
@@ -157,7 +159,8 @@ const CreateEventWizard = () => {
                 setLoading(false);
             } catch (err) {
                 if (cancelled) return;
-                setLoadError(err.message || 'Could not load this draft.');
+                const message = err instanceof Error ? err.message : 'Could not load this draft.';
+                setLoadError(message);
                 setLoading(false);
             }
         })();
@@ -166,13 +169,13 @@ const CreateEventWizard = () => {
         };
     }, [routeId]);
 
-    const goToStep = (index) => {
+    const goToStep = (index: number) => {
         setStepError(null);
         setStep(index);
         setMaxStepReached((m) => Math.max(m, index));
     };
 
-    const handleBasicsSubmit = async (data) => {
+    const handleBasicsSubmit = async (data: BasicsFormValues) => {
         setSubmitting(true);
         setStepError(null);
         try {
@@ -180,7 +183,7 @@ const CreateEventWizard = () => {
                 // Nothing to persist yet — Create requires starts_at/ends_at too
                 // (see the note above EMPTY_EVENT). Just carry the fields forward
                 // in local state until the schedule step can supply the rest.
-                setEvent((e) => ({ ...e, ...data }));
+                setEvent((e) => ({ ...e, ...data, category: data.category ?? '', summary: data.summary ?? '', description: data.description ?? '' }));
             } else {
                 await eventsApi.update(eventId, {
                     title: data.title,
@@ -188,60 +191,72 @@ const CreateEventWizard = () => {
                     summary: data.summary || undefined,
                     description: data.description || undefined,
                 });
-                setEvent((e) => ({ ...e, ...data }));
+                setEvent((e) => ({ ...e, ...data, category: data.category ?? '', summary: data.summary ?? '', description: data.description ?? '' }));
             }
             goToStep(1);
         } catch (err) {
             // Input is never lost on a failed save — `data` only ever flows
             // into local state on success, and react-hook-form keeps
             // whatever the organiser typed in the form regardless.
-            setStepError(`${err.message || 'Could not save these details.'} Nothing you typed was lost — try again.`);
+            const message = err instanceof Error ? err.message : 'Could not save these details.';
+            setStepError(`${message} Nothing you typed was lost — try again.`);
         } finally {
             setSubmitting(false);
         }
     };
 
-    const handleScheduleSubmit = async (data) => {
+    const handleScheduleSubmit = async (data: ScheduleSubmitData) => {
         setSubmitting(true);
         setStepError(null);
         try {
             if (!eventId) {
                 const created = await eventsApi.create({
-                    org_id: activeOrg?.id,
+                    // Non-null: this wizard only renders inside the org-scoped
+                    // console, which always has an active org.
+                    org_id: activeOrg!.id,
                     slug: slugify(event.title),
                     title: event.title,
-                    category: event.category || undefined,
-                    summary: event.summary || undefined,
-                    description: event.description || undefined,
+                    // CreateEventInput's summary/description/category/address
+                    // are required (non-optional) strings, unlike
+                    // UpdateEventInput's — sent directly (falling back to '')
+                    // rather than coalesced to undefined; Go decodes an
+                    // absent key and an empty string to the same zero value.
+                    category: event.category || '',
+                    summary: event.summary || '',
+                    description: event.description || '',
                     venue_name: data.venue_name,
-                    address: data.address || undefined,
-                    lat: data.lat === '' ? undefined : Number(data.lat),
-                    lng: data.lng === '' ? undefined : Number(data.lng),
+                    address: data.address || '',
+                    lat: data.lat === '' || data.lat === undefined ? undefined : Number(data.lat),
+                    lng: data.lng === '' || data.lng === undefined ? undefined : Number(data.lng),
                     currency: data.currency,
                     starts_at: data.starts_at,
                     ends_at: data.ends_at,
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    // Images aren't part of this step — a duplicate/fresh
+                    // draft starts with no cover, set later in the images step.
+                    cover_image: '',
                 });
-                const createdEvent = created?.event ?? created;
+                const createdEvent = created.event;
                 setEventId(createdEvent.id);
             } else {
                 await eventsApi.update(eventId, {
                     venue_name: data.venue_name,
                     address: data.address || undefined,
-                    lat: data.lat === '' ? undefined : Number(data.lat),
-                    lng: data.lng === '' ? undefined : Number(data.lng),
+                    lat: data.lat === '' || data.lat === undefined ? undefined : Number(data.lat),
+                    lng: data.lng === '' || data.lng === undefined ? undefined : Number(data.lng),
                     currency: data.currency,
                     starts_at: data.starts_at,
                     ends_at: data.ends_at,
                 });
             }
-            setEvent((e) => ({ ...e, ...data }));
+            setEvent((e) => ({ ...e, ...data, address: data.address ?? '', lat: data.lat ?? '', lng: data.lng ?? '' }));
             goToStep(2);
         } catch (err) {
             // The date/venue/currency the organiser just entered stays right
             // where they left it — `data` is only merged into `event` state
             // on success, and the form below keeps its own values either way.
-            const reason = err.message || (eventId ? 'Could not save these details.' : 'Could not create your draft.');
+            const message = err instanceof Error ? err.message : undefined;
+            const reason = message || (eventId ? 'Could not save these details.' : 'Could not create your draft.');
             setStepError(`${reason} Nothing you entered was lost — try again.`);
         } finally {
             setSubmitting(false);
@@ -252,11 +267,12 @@ const CreateEventWizard = () => {
         setIsPublishing(true);
         setStepError(null);
         try {
-            await eventsApi.publish(eventId);
+            await eventsApi.publish(eventId ?? '');
             toast({ title: 'Published', description: 'Your event is now live.' });
             navigate(`/admin/events/${eventId}`);
         } catch (err) {
-            setStepError(err.message || 'Could not publish this event. Your draft is untouched — try again.');
+            const message = err instanceof Error ? err.message : 'Could not publish this event. Your draft is untouched — try again.';
+            setStepError(message);
         } finally {
             setIsPublishing(false);
         }
@@ -264,12 +280,17 @@ const CreateEventWizard = () => {
 
     const handleExit = () => navigate('/admin/events');
 
-    const handleCoverChange = async (imageId) => {
+    const handleCoverChange = async (imageId: string | null) => {
         setCoverImageId(imageId);
         try {
-            await eventsApi.update(eventId, { cover_image_id: imageId });
+            // See the same note in event/images/index.tsx: this sends a
+            // literal JSON null to clear the cover, but ApplyUpdate only
+            // clears CoverImageID on an empty string, not null. Preserved
+            // verbatim via the assertion below, not fixed here.
+            await eventsApi.update(eventId ?? '', { cover_image_id: imageId } as UpdateEventInput);
         } catch (err) {
-            toast({ title: 'Could not set cover image', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not set cover image', description: message, variant: 'destructive' });
         }
     };
 
@@ -338,7 +359,7 @@ const CreateEventWizard = () => {
                             eventId={eventId}
                             currency={event.currency}
                             ticketTypes={ticketTypes}
-                            onTicketTypesChange={(updater) => setTicketTypes((cur) => (typeof updater === 'function' ? updater(cur) : updater))}
+                            onTicketTypesChange={(updater) => setTicketTypes((cur) => updater(cur))}
                             onBack={() => goToStep(1)}
                             onSubmit={() => goToStep(3)}
                             submitting={submitting}
@@ -350,7 +371,7 @@ const CreateEventWizard = () => {
                             eventId={eventId}
                             images={images}
                             coverImageId={coverImageId}
-                            onImagesChange={(updater) => setImages((cur) => (typeof updater === 'function' ? updater(cur) : updater))}
+                            onImagesChange={(updater) => setImages((cur) => updater(cur))}
                             onCoverChange={handleCoverChange}
                             onBack={() => goToStep(2)}
                             onSubmit={() => goToStep(4)}
