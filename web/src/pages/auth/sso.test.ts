@@ -19,10 +19,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { signInProvidersFrom, ssoMessageFor, SSO_MESSAGES } from './sso.ts';
+import { signInProvidersFrom, ssoMessageFor, SSO_MESSAGES, type SsoProvidersPayload } from './sso.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const read = (name) => readFileSync(join(here, name), 'utf8');
+const read = (name: string) => readFileSync(join(here, name), 'utf8');
 
 // ── the list-shaping half ───────────────────────────────────────────────────
 
@@ -31,8 +31,9 @@ test('an unconfigured box yields no providers', () => {
 });
 
 test('every non-answer collapses to no providers', () => {
-    for (const payload of [null, undefined, {}, { providers: null }, { providers: 'google' }, { providers: {} }]) {
-        assert.deepEqual(signInProvidersFrom(payload), [], `payload ${JSON.stringify(payload)} produced buttons`);
+    const malformed: unknown[] = [null, undefined, {}, { providers: null }, { providers: 'google' }, { providers: {} }];
+    for (const payload of malformed) {
+        assert.deepEqual(signInProvidersFrom(payload as SsoProvidersPayload), [], `payload ${JSON.stringify(payload)} produced buttons`);
     }
 });
 
