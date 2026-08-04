@@ -3,7 +3,7 @@
 // client-side path that creates an event (the wizard, "duplicate") needs to
 // mint one. A short random suffix keeps collisions practically impossible
 // without a round-trip to check uniqueness first.
-export function slugify(title) {
+export function slugify(title: string | null | undefined): string {
     const base =
         (title || 'event')
             .toLowerCase()
