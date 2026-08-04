@@ -1,12 +1,23 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import QrScanner from 'qr-scanner';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Camera, ChevronLeft, Keyboard, ShieldCheck, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConnectionState, SyncState } from '@/components/ui/connection-state';
-import useScanEngine from './use-scan-engine';
+import useScanEngine, { type ScanResult } from './use-scan-engine';
 import { verdictFor, verdictHoldMs, describeDuplicate } from './verdict';
+import type { KeyRing } from '@/lib/capability';
+import type { AdmissionRecord } from '@/lib/scan-store';
+
+/** The minimal event shape this screen needs — `id` to key the scan engine
+ * and `title` for the header. `index.tsx` builds this from either a real
+ * `CackleEvent` or the reduced bundle-cached fallback; neither is assumed
+ * beyond these two fields. */
+export interface SessionEvent {
+    id: string;
+    title: string;
+}
 
 // The gate.
 //
@@ -66,7 +77,7 @@ const GATE_GHOST_BUTTON = 'text-gate-ink hover:bg-gate-accent hover:text-gate-in
  * both problems and keeps the promise that this surface never changes shade
  * for a reason nobody touched.
  */
-function TallyTile({ value, label }) {
+function TallyTile({ value, label }: { value: number; label: string }) {
     return (
         <div className="bg-transparent px-2 py-3 text-center">
             <div className="tnum text-3xl font-black leading-none text-gate-ink sm:text-4xl">{value}</div>
@@ -82,7 +93,13 @@ function TallyTile({ value, label }) {
  * interrupting a screen reader for, and because a gate may well be operated by
  * somebody using VoiceOver with the screen off in bright sun.
  */
-function VerdictFlood({ result, onDismiss, reduceMotion }) {
+interface VerdictFloodProps {
+    result: ScanResult;
+    onDismiss: () => void;
+    reduceMotion: boolean | null;
+}
+
+function VerdictFlood({ result, onDismiss, reduceMotion }: VerdictFloodProps) {
     const verdict = verdictFor(result.result);
     const Icon = verdict.icon;
     const duplicate = result.result === 'duplicate' ? describeDuplicate(result.note) : null;
@@ -126,10 +143,20 @@ function VerdictFlood({ result, onDismiss, reduceMotion }) {
     );
 }
 
-const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId, onExit }) => {
-    const videoRef = useRef(null);
-    const scannerRef = useRef(null);
-    const [cameraError, setCameraError] = useState(null);
+interface ScanViewProps {
+    event: SessionEvent;
+    keyRing: KeyRing;
+    ticketIndex: string[];
+    ticketIndexPresent: boolean;
+    admittedIndex: string[];
+    gateId: string;
+    onExit: () => void;
+}
+
+const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedIndex, gateId, onExit }: ScanViewProps) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const scannerRef = useRef<QrScanner | null>(null);
+    const [cameraError, setCameraError] = useState<string | null>(null);
     const [manualOpen, setManualOpen] = useState(false);
     const [manualValue, setManualValue] = useState('');
     const [flooding, setFlooding] = useState(false);
@@ -180,7 +207,7 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
                 await scannerRef.current.start();
                 if (cancelled) scannerRef.current.stop();
             } catch (err) {
-                if (!cancelled) setCameraError(err.message || 'Could not access the camera.');
+                if (!cancelled) setCameraError(err instanceof Error ? err.message : 'Could not access the camera.');
             }
         })();
 
@@ -203,7 +230,7 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
     }, [cameraError]);
 
     const handleManualSubmit = useCallback(
-        (e) => {
+        (e: FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             const value = manualValue.trim();
             if (!value) return;
@@ -285,7 +312,7 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
                             id="manual-token"
                             autoFocus
                             value={manualValue}
-                            onChange={(e) => setManualValue(e.target.value)}
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => setManualValue(e.target.value)}
                             placeholder="cackle.…"
                             autoCapitalize="none"
                             autoCorrect="off"

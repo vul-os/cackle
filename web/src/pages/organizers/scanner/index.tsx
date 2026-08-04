@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,19 +10,47 @@ import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
 import { QrCode, Download, RefreshCw, Wifi, WifiOff, CheckCircle2, Radio } from 'lucide-react';
 import { events as eventsApi, scan as scanApi } from '@/lib/api';
-import { saveBundle, getBundle, listCachedBundles } from '@/lib/scan-store';
-import { publicKeyToBytes } from '@/lib/capability';
+import { saveBundle, getBundle, listCachedBundles, type BundleRecord } from '@/lib/scan-store';
+import { publicKeyToBytes, type KeyRing } from '@/lib/capability';
 import { useOnline } from '@/lib/use-online';
 import { toast } from '@/components/ui/use-toast';
-import ScanView from './scan-view';
+import type { CackleEvent, ScanBundle, ScanEventMeta } from '@/lib/api-types';
+import ScanView, { type SessionEvent } from './scan-view';
+
+/** The events list is normally the org's real `CackleEvent`s, but a device
+ * that has never been online falls back to whatever reduced `scan.EventMeta`
+ * is embedded in its cached bundles (see the `.catch` below) — this is
+ * exactly what both branches can actually produce. */
+type ScannerListEvent = CackleEvent | (ScanEventMeta & { id: string });
 
 const GATE_ID_KEY = 'cackle_gate_id';
+
+/** What's actually in IndexedDB once `saveBundle` has stored a real
+ * `scan.bundle()` response: the record wrapper plus the full bundle shape.
+ * `BundleRecord` itself stays loose in lib/scan-store.ts because the store is
+ * a generic opaque cache — this narrowing is local knowledge of what this
+ * page puts into it. */
+type CachedBundle = BundleRecord & ScanBundle;
+
+interface ScanSession {
+    event: SessionEvent;
+    keyRing: KeyRing;
+    ticketIndex: string[];
+    ticketIndexPresent: boolean;
+    admittedIndex: string[];
+}
+
+interface ScannerState {
+    events: ScannerListEvent[];
+    loading: boolean;
+    error: string | null;
+}
 
 // The backend's scan-bundle wraps signing keys as
 // `issuer_keys: { event_id, keys: { <kid>: "<base64url pubkey>" } }`
 // (tickets.KeyRing's own JSON encoding) — a map keyed by kid, not an array.
-function buildKeyRing(issuerKeys) {
-    const ring = {};
+function buildKeyRing(issuerKeys: ScanBundle['issuer_keys'] | undefined): KeyRing {
+    const ring: KeyRing = {};
     const keys = issuerKeys?.keys ?? {};
     for (const [kid, encoded] of Object.entries(keys)) {
         try {
@@ -38,21 +66,25 @@ function buildKeyRing(issuerKeys) {
 // /starts_at/ends_at only), not the full Event — and it keys on `event_id`,
 // not `id`. Normalise against whatever richer event object we already have
 // (from the organizer's event list) so the rest of the UI can just use `.id`.
-function normaliseSessionEvent(bundleEvent, fallbackEvent) {
+function normaliseSessionEvent(
+    bundleEvent: ScanBundle['event'] | null | undefined,
+    fallbackEvent: ScannerListEvent | null | undefined,
+): SessionEvent {
     return {
         ...fallbackEvent,
         ...bundleEvent,
-        id: bundleEvent?.event_id ?? fallbackEvent?.id,
+        id: bundleEvent?.event_id ?? fallbackEvent?.id ?? '',
+        title: bundleEvent?.title ?? fallbackEvent?.title ?? '',
     };
 }
 
 const ScannerPage = () => {
     const online = useOnline();
     const navigate = useNavigate();
-    const [state, setState] = useState({ events: [], loading: true, error: null });
-    const [cachedIds, setCachedIds] = useState(new Set());
-    const [downloadingId, setDownloadingId] = useState(null);
-    const [session, setSession] = useState(null); // { event, keyRing }
+    const [state, setState] = useState<ScannerState>({ events: [], loading: true, error: null });
+    const [cachedIds, setCachedIds] = useState<Set<string>>(new Set());
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [session, setSession] = useState<ScanSession | null>(null);
     const [gateId, setGateId] = useState(() => localStorage.getItem(GATE_ID_KEY) || 'Gate 1');
 
     useEffect(() => {
@@ -71,7 +103,7 @@ const ScannerPage = () => {
     // same behaviour on retry, not a second code path that might disagree.
     // `cancelledRef` lets a retry started before an earlier call resolves
     // (or an unmount) avoid clobbering newer state.
-    const loadEvents = useCallback((cancelledRef) => {
+    const loadEvents = useCallback((cancelledRef?: { current: boolean }) => {
         setState((s) => ({ ...s, loading: true, error: null }));
         refreshCached();
         eventsApi
@@ -86,14 +118,15 @@ const ScannerPage = () => {
                 // Offline (or the network call otherwise failed) — fall back
                 // entirely to whatever bundles are already cached locally, so
                 // a gate device that's never coming back online can still work.
-                const bundles = await refreshCached();
+                const bundles = (await refreshCached()) as CachedBundle[];
                 if (cancelledRef?.current) return;
+                const fallbackEvents = bundles
+                    .map((b) => (b.event ? { ...b.event, id: b.event.event_id } : null))
+                    .filter((e): e is ScanEventMeta & { id: string } => e !== null);
                 setState({
-                    events: bundles
-                        .map((b) => (b.event ? { ...b.event, id: b.event.event_id } : null))
-                        .filter(Boolean),
+                    events: fallbackEvents,
                     loading: false,
-                    error: bundles.length === 0 ? err.message || 'Could not load events.' : null,
+                    error: bundles.length === 0 ? (err instanceof Error ? err.message : 'Could not load events.') : null,
                 });
             });
     }, []);
@@ -107,28 +140,28 @@ const ScannerPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleDownload = async (event) => {
+    const handleDownload = async (event: ScannerListEvent) => {
         setDownloadingId(event.id);
         try {
             const bundle = await scanApi.bundle(event.id);
-            await saveBundle(event.id, bundle);
+            await saveBundle(event.id, bundle as unknown as Record<string, unknown>);
             await refreshCached();
             toast({ title: 'Scan bundle ready', description: `${event.title} is cached for offline scanning.` });
         } catch (err) {
-            toast({ title: 'Download failed', description: err.message, variant: 'destructive' });
+            toast({ title: 'Download failed', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {
             setDownloadingId(null);
         }
     };
 
-    const handleEnterScanMode = async (event) => {
-        let bundle = await getBundle(event.id);
+    const handleEnterScanMode = async (event: ScannerListEvent) => {
+        let bundle: CachedBundle | ScanBundle | undefined = (await getBundle(event.id)) as CachedBundle | undefined;
         if (!bundle && online) {
             try {
                 bundle = await scanApi.bundle(event.id);
-                await saveBundle(event.id, bundle);
+                await saveBundle(event.id, bundle as unknown as Record<string, unknown>);
             } catch (err) {
-                toast({ title: 'Could not download scan bundle', description: err.message, variant: 'destructive' });
+                toast({ title: 'Could not download scan bundle', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                 return;
             }
         }

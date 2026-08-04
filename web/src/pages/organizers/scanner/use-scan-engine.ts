@@ -78,7 +78,7 @@ type ScanFailure = {
     at: number;
 };
 
-type ScanResult = (AdmissionRecord & { at: number }) | ScanFailure;
+export type ScanResult = (AdmissionRecord & { at: number }) | ScanFailure;
 
 interface UseScanEngineArgs {
     eventId: string | null | undefined;
