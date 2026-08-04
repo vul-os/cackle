@@ -6,13 +6,19 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout } from 'lucide-react';
+import { ChevronRight, Ticket, Clock, CheckCircle2, XCircle, Layout, type LucideIcon } from 'lucide-react';
 import { orders as ordersApi, events as eventsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
 import { humanError } from '@/pages/visitor/errors';
+import type { Order, CackleEvent } from '@/lib/api-types';
 
-const STATUS_STYLE = {
+interface StatusStyle {
+    className: string;
+    icon: LucideIcon;
+}
+
+const STATUS_STYLE: Record<string, StatusStyle> = {
     // `text-warning` (the base token), not `text-warning-foreground` — the
     // latter is white-on-solid-fill (badge.tsx) and is nearly invisible on
     // this 15%-tint wash in both themes. `bg-X/15 text-X` is the pattern
@@ -24,7 +30,7 @@ const STATUS_STYLE = {
     cancelled: { className: 'bg-muted text-muted-foreground', icon: XCircle },
 };
 
-function formatDate(iso) {
+function formatDate(iso: string | null | undefined): string {
     if (!iso) return '—';
     try {
         return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
@@ -33,14 +39,20 @@ function formatDate(iso) {
     }
 }
 
+interface OrdersState {
+    orders: Order[];
+    loading: boolean;
+    error: string | null;
+}
+
 export default function OrdersPage() {
     const navigate = useNavigate();
-    const [state, setState] = useState({ orders: [], loading: true, error: null });
+    const [state, setState] = useState<OrdersState>({ orders: [], loading: true, error: null });
     const [reloadToken, setReloadToken] = useState(0);
     // GET /api/orders returns bare orders (event_id, no nested event) — the
     // event title/date shown per row is resolved client-side against the
     // public event-detail endpoint, best-effort, keyed by event_id.
-    const [eventsById, setEventsById] = useState({});
+    const [eventsById, setEventsById] = useState<Record<string, CackleEvent | null>>({});
 
     useEffect(() => {
         let cancelled = false;
@@ -49,12 +61,11 @@ export default function OrdersPage() {
             .list()
             .then((data) => {
                 if (cancelled) return;
-                const list = Array.isArray(data) ? data : (data?.orders ?? []);
-                setState({ orders: list, loading: false, error: null });
+                setState({ orders: data.orders ?? [], loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ orders: [], loading: false, error: err.message || 'Could not load your orders.' });
+                setState({ orders: [], loading: false, error: err?.message || 'Could not load your orders.' });
             });
         return () => {
             cancelled = true;
@@ -71,7 +82,7 @@ export default function OrdersPage() {
             setEventsById((prev) => {
                 const next = { ...prev };
                 results.forEach((res, i) => {
-                    next[missing[i]] = res.status === 'fulfilled' ? (res.value?.event ?? res.value) : null;
+                    next[missing[i]] = res.status === 'fulfilled' ? res.value.event : null;
                 });
                 return next;
             });
