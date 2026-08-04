@@ -11,11 +11,11 @@ import {
     newPasswordError,
     confirmPasswordError,
     MIN_PASSWORD_LENGTH,
-} from './validate.js';
+} from './validate.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..', '..');
-const read = (p) => readFileSync(join(repoRoot, p), 'utf8');
+const read = (p: string) => readFileSync(join(repoRoot, p), 'utf8');
 
 test('MIN_PASSWORD_LENGTH matches the Go source it has to agree with', () => {
     // If internal/auth/service.go's floor ever moves, this pins the UI to
@@ -35,9 +35,9 @@ test('isEmailShaped accepts an ordinary address and rejects the obvious non-shap
 });
 
 test('emailError says something distinct for empty vs malformed vs fine', () => {
-    assert.match(emailError(''), /enter/i);
-    assert.match(emailError('   '), /enter/i);
-    assert.match(emailError('not-an-email'), /look like/i);
+    assert.match(emailError('')!, /enter/i);
+    assert.match(emailError('   ')!, /enter/i);
+    assert.match(emailError('not-an-email')!, /look like/i);
     assert.equal(emailError('venue@example.com'), null);
 });
 
@@ -48,13 +48,13 @@ test('requiredError names the field it is missing', () => {
 });
 
 test('newPasswordError enforces the same floor the server does', () => {
-    assert.match(newPasswordError(''), /enter a password/i);
-    assert.match(newPasswordError('short1'), /at least 8/i);
+    assert.match(newPasswordError('')!, /enter a password/i);
+    assert.match(newPasswordError('short1')!, /at least 8/i);
     assert.equal(newPasswordError('eightplus'), null);
 });
 
 test('confirmPasswordError distinguishes empty from mismatched', () => {
-    assert.match(confirmPasswordError('eightplus', ''), /again/i);
-    assert.match(confirmPasswordError('eightplus', 'different'), /match/i);
+    assert.match(confirmPasswordError('eightplus', '')!, /again/i);
+    assert.match(confirmPasswordError('eightplus', 'different')!, /match/i);
     assert.equal(confirmPasswordError('eightplus', 'eightplus'), null);
 });

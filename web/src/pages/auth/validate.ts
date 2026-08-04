@@ -19,28 +19,28 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * repo uses to pin a UI number to the Go source it has to agree with. */
 export const MIN_PASSWORD_LENGTH = 8;
 
-export function isEmailShaped(value) {
+export function isEmailShaped(value: string | null | undefined): boolean {
     return EMAIL_SHAPE.test(String(value || '').trim());
 }
 
-export function emailError(value) {
+export function emailError(value: string | null | undefined): string | null {
     const trimmed = String(value || '').trim();
     if (!trimmed) return 'Enter your email address.';
     if (!isEmailShaped(trimmed)) return "That doesn't look like a full email address.";
     return null;
 }
 
-export function requiredError(value, label) {
+export function requiredError(value: string | null | undefined, label: string): string | null {
     return String(value || '').trim() ? null : `Enter ${label}.`;
 }
 
-export function newPasswordError(value) {
+export function newPasswordError(value: string | null | undefined): string | null {
     if (!value) return 'Enter a password.';
     if (value.length < MIN_PASSWORD_LENGTH) return `Use at least ${MIN_PASSWORD_LENGTH} characters.`;
     return null;
 }
 
-export function confirmPasswordError(password, confirmation) {
+export function confirmPasswordError(password: string | null | undefined, confirmation: string | null | undefined): string | null {
     if (!confirmation) return 'Type your password again.';
     if (password !== confirmation) return "Passwords don't match.";
     return null;
