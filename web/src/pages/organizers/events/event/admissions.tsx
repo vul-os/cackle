@@ -9,9 +9,10 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { ArrowLeft, Split, Ticket, Radio, Info, DoorOpen } from 'lucide-react';
+import { ArrowLeft, Split, Ticket, Radio, Info, DoorOpen, type LucideIcon } from 'lucide-react';
 import { events as eventsApi } from '@/lib/api';
-import { summarize, orderClaims, gateLabel } from './admission-reconciliation';
+import { summarize, orderClaims, gateLabel, type AnnotatedClaim } from './admission-reconciliation';
+import type { AdmissionConflictsResponse } from '@/lib/api-types';
 
 // The report an organiser actually needs after an offline event: how many
 // extra people got in, and at which gates — because two gates that could not
@@ -24,7 +25,7 @@ import { summarize, orderClaims, gateLabel } from './admission-reconciliation';
 // once; every number under it is scoped by the same caveat the server itself
 // sends back on every response, including an empty one.
 
-function formatWhen(iso) {
+function formatWhen(iso: string): string {
     try {
         return format(new Date(iso), 'PP p');
     } catch {
@@ -32,7 +33,17 @@ function formatWhen(iso) {
     }
 }
 
-const StatTile = ({ icon: Icon, label, value, tone = 'primary' }) => (
+const StatTile = ({
+    icon: Icon,
+    label,
+    value,
+    tone = 'primary',
+}: {
+    icon: LucideIcon;
+    label: string;
+    value: React.ReactNode;
+    tone?: 'primary' | 'duplicate';
+}) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-5">
             <div
@@ -51,7 +62,7 @@ const StatTile = ({ icon: Icon, label, value, tone = 'primary' }) => (
 );
 
 /** One device's claim on one contested ticket. */
-function ClaimRow({ claim }) {
+function ClaimRow({ claim }: { claim: AnnotatedClaim }) {
     return (
         <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
@@ -76,18 +87,24 @@ function ClaimRow({ claim }) {
     );
 }
 
+interface AdmissionsState {
+    data: AdmissionConflictsResponse | null;
+    loading: boolean;
+    error: string | null;
+}
+
 const EventAdmissionsPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ data: null, loading: true, error: null });
+    const [state, setState] = useState<AdmissionsState>({ data: null, loading: true, error: null });
 
     const fetchConflicts = useCallback(() => {
         setState((s) => ({ ...s, loading: true, error: null }));
         eventsApi
-            .admissionConflicts(id)
+            .admissionConflicts(id ?? '')
             .then((data) => setState({ data, loading: false, error: null }))
             .catch((err) =>
-                setState({ data: null, loading: false, error: err.message || 'Could not load the admission reconciliation report.' }),
+                setState({ data: null, loading: false, error: err?.message || 'Could not load the admission reconciliation report.' }),
             );
     }, [id]);
 
