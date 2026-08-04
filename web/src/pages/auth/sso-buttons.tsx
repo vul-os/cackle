@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { LogIn } from 'lucide-react';
 import { request } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { signInProvidersFrom } from './sso';
+import { signInProvidersFrom, type SsoProvider, type SsoProvidersPayload } from './sso';
 
 // The sign-in provider row.
 //
@@ -20,15 +20,15 @@ import { signInProvidersFrom } from './sso';
 // The password form is never hidden, moved or de-emphasised for this. It is
 // the only sign-in that works when the internet does not, which on this
 // product is the normal case rather than the exception.
-const SsoButtons = ({ disabled = false }) => {
-    const [providers, setProviders] = useState([]);
+const SsoButtons = ({ disabled = false }: { disabled?: boolean }) => {
+    const [providers, setProviders] = useState<SsoProvider[]>([]);
 
     useEffect(() => {
         let live = true;
         // Called through the shared `request` wrapper rather than added to
         // the `auth` bundle in lib/api.js: this is the only caller, and one
         // import is a smaller surface than a new exported method.
-        request('/auth/providers', { skipAuthRedirect: true })
+        request<SsoProvidersPayload>('/auth/providers', { skipAuthRedirect: true })
             .then((data) => {
                 if (live) setProviders(signInProvidersFrom(data));
             })

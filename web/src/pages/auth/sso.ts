@@ -30,17 +30,39 @@ export const SSO_MESSAGES = {
     failed: 'Sign-in did not finish. Please try again, or sign in with your email and password.',
 };
 
+type SsoReason = keyof typeof SSO_MESSAGES;
+
+function isSsoReason(value: string): value is SsoReason {
+    return value in SSO_MESSAGES;
+}
+
 /**
  * Turn a `?sso=` value into something to show. Returns null for `ok` (a
  * success needs no notice) and for anything unrecognised — an unknown code is
  * not an excuse to invent a message.
- *
- * @param {string | null | undefined} reason
- * @returns {string | null}
  */
-export function ssoMessageFor(reason) {
+export function ssoMessageFor(reason: string | null | undefined): string | null {
     if (!reason || reason === 'ok') return null;
-    return SSO_MESSAGES[reason] ?? SSO_MESSAGES.failed;
+    return isSsoReason(reason) ? SSO_MESSAGES[reason] : SSO_MESSAGES.failed;
+}
+
+/** A single entry from the raw `{providers: [...]}` payload, before validation. */
+export interface SsoProviderPayloadEntry {
+    id?: string;
+    label?: string;
+    start_path?: string;
+}
+
+/** The raw `GET /api/auth/providers` response shape. */
+export interface SsoProvidersPayload {
+    providers?: SsoProviderPayloadEntry[];
+}
+
+/** A provider entry that has been validated and is safe to render a button for. */
+export interface SsoProvider {
+    id: string;
+    label: string;
+    startPath: string;
 }
 
 /**
@@ -51,14 +73,15 @@ export function ssoMessageFor(reason) {
  * Fails closed by construction — every non-answer (a network error the caller
  * turned into null, an unconfigured box's empty array, a half-formed entry)
  * ends in the same place: no buttons, password form untouched.
- *
- * @param {{providers?: Array<{id?: string, label?: string, start_path?: string}>} | null | undefined} payload
  */
-export function signInProvidersFrom(payload) {
+export function signInProvidersFrom(payload: SsoProvidersPayload | null | undefined): SsoProvider[] {
     const raw = payload?.providers;
     if (!Array.isArray(raw)) return [];
     return raw
-        .filter((p) => p && typeof p.id === 'string' && p.id && typeof p.start_path === 'string' && p.start_path.startsWith('/'))
+        .filter(
+            (p): p is SsoProviderPayloadEntry & { id: string; start_path: string } =>
+                !!p && typeof p.id === 'string' && !!p.id && typeof p.start_path === 'string' && p.start_path.startsWith('/'),
+        )
         .map((p) => ({
             id: p.id,
             label: typeof p.label === 'string' && p.label ? p.label : p.id,
