@@ -1,6 +1,6 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva } from "class-variance-authority";
+import { createSlot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -84,16 +84,27 @@ const buttonVariants = cva(
  * props onto it, so injecting a second element here would throw. A composed
  * trigger that needs a busy state should render <Button loading> directly.
  */
-const Button = React.forwardRef(({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+  loading?: boolean;
+}
+
+// Plain `Slot` is typed as `React.HTMLAttributes<HTMLElement>`, which has no
+// `disabled`/`form*` members, so spreading `ButtonHTMLAttributes` onto it
+// doesn't typecheck. `createSlot` is the same runtime primitive (the default
+// `Slot` export is just `createSlot("Slot")`) parameterised for a button.
+const ButtonSlot = createSlot<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>("Button")
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
   // Slot renders exactly one child and merges props onto it, so the loading
   // branch must not hand it a two-element array — not even `[false, child]`,
   // which is what `{busy && <Loader2/>}` produces when busy is false. The
   // asChild path therefore returns before any of that.
   if (asChild) {
     return (
-      <Slot className={cn(buttonVariants({ variant, size, className }))} ref={ref} disabled={disabled} {...props}>
+      <ButtonSlot className={cn(buttonVariants({ variant, size, className }))} ref={ref} disabled={disabled} {...props}>
         {children}
-      </Slot>
+      </ButtonSlot>
     );
   }
   return (
