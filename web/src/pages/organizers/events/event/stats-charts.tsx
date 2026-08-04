@@ -1,6 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Money } from '@/components/ui/money';
+import type { TicketTypeStats } from '@/lib/api-types';
 
 // Fixed-order categorical hues for ticket-type identity (see index.css for
 // the validated HSL values + the dataviz six-check notes). ORDER is the
@@ -8,7 +9,12 @@ import { Money } from '@/components/ui/money';
 // past the 8th ticket type folds into "Other" rather than generating a 9th
 // hue (a generated hue is indistinguishable from an existing one under CVD).
 const SERIES_SLOTS = 8;
-const seriesColor = (i) => `hsl(var(--chart-${(i % SERIES_SLOTS) + 1}))`;
+const seriesColor = (i: number) => `hsl(var(--chart-${(i % SERIES_SLOTS) + 1}))`;
+
+export interface TicketTypeBreakdownProps {
+    byType?: TicketTypeStats[];
+    currency: string;
+}
 
 /**
  * Per-ticket-type sales bars: each type is a bar sized to its own sold/
@@ -23,10 +29,10 @@ const seriesColor = (i) => `hsl(var(--chart-${(i % SERIES_SLOTS) + 1}))`;
  * sold, revenue_minor }] — every number here is real seeded/live data, never
  * invented; a type with 0 sold renders as a real, honest zero-width bar.
  */
-export function TicketTypeBreakdown({ byType = [], currency }) {
+export function TicketTypeBreakdown({ byType = [], currency }: TicketTypeBreakdownProps) {
     if (byType.length === 0) return null;
 
-    const capacityOf = (t) => Math.max(t.quantity_total ?? 0, t.sold ?? 0);
+    const capacityOf = (t: TicketTypeStats) => Math.max(t.quantity_total ?? 0, t.sold ?? 0);
     const maxCapacity = Math.max(1, ...byType.map(capacityOf));
 
     return (
@@ -90,13 +96,23 @@ export function TicketTypeBreakdown({ byType = [], currency }) {
     );
 }
 
+export interface RatioMeterProps {
+    label: string;
+    value: number;
+    of: number;
+    valueLabel?: string | number;
+    ofLabel?: string | number;
+    emptyLabel: string;
+    toneClassName?: string;
+}
+
 /**
  * A single-ratio meter (one value against a limit, same-ramp fill/track —
  * per dataviz's "Meter" form) — used for both "sold of capacity" and
  * "admitted of sold". Never invents a percentage: a zero denominator renders
  * the honest empty copy instead of a NaN or a misleading 0%.
  */
-export function RatioMeter({ label, value, of, valueLabel, ofLabel, emptyLabel, toneClassName }) {
+export function RatioMeter({ label, value, of, valueLabel, ofLabel, emptyLabel, toneClassName }: RatioMeterProps) {
     if (!of) {
         return (
             <div>
