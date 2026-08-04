@@ -1,6 +1,6 @@
 // The invariant behind borrowed listings, held two ways.
 //
-// Part one is the pure logic in ./peer-scope.js, exercised directly.
+// Part one is the pure logic in ./peer-scope.ts, exercised directly.
 //
 // Part two is a SOURCE-TEXT guard over ./peer-events.jsx, and it is deliberate.
 // The rule "a peer event must never look like it is sold by this host" is not
@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { peerOrgId, renderablePeerRows, usablePeerRows } from './peer-scope.js';
+import { peerOrgId, renderablePeerRows, usablePeerRows } from './peer-scope.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const componentSource = readFileSync(join(here, 'peer-events.jsx'), 'utf8');

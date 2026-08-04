@@ -11,7 +11,22 @@
 // and only a real specifier resolves under both. `lib/host.js` is the app's
 // one reader of the host envelope and stays that way — the envelope is not
 // parsed here or in the component.
-import { showsPeerEvents } from '../../../lib/host.ts';
+import { showsPeerEvents, type MaybeHost } from '../../../lib/host.ts';
+
+/**
+ * A row off `GET /api/peer-events`, kept as untrusted as the host envelope
+ * itself (see lib/host.ts's own banner) — every field is `unknown` and
+ * narrowed by hand at the point of use, never assumed from a declared type.
+ */
+export interface PeerEventRow {
+    external?: unknown;
+    url?: unknown;
+    [key: string]: unknown;
+}
+
+export interface PeerEventsPayload {
+    events?: unknown;
+}
 
 /**
  * The organisation whose borrowed listings this page shows, or null for
@@ -39,12 +54,12 @@ import { showsPeerEvents } from '../../../lib/host.ts';
  * Tolerates a missing or malformed host envelope by answering null: no
  * envelope, no borrowed listings, rather than a guess.
  */
-export function peerOrgId(host) {
+export function peerOrgId(host: MaybeHost): string | null {
     if (!showsPeerEvents(host)) return null;
     if (typeof host?.org?.id === 'string' && host.org.id) return host.org.id;
     const orgs = Array.isArray(host?.organisations) ? host.organisations : [];
     if (orgs.length !== 1) return null;
-    const id = orgs[0]?.id;
+    const id = (orgs[0] as { id?: unknown } | undefined)?.id;
     return typeof id === 'string' && id ? id : null;
 }
 
@@ -63,8 +78,8 @@ export function peerOrgId(host) {
  * way to reach its publisher is a dead end that looks like something this host
  * might sell.
  */
-export function usablePeerRows(data) {
-    const rows = Array.isArray(data?.events) ? data.events : [];
+export function usablePeerRows(data: PeerEventsPayload | null | undefined): PeerEventRow[] {
+    const rows = (Array.isArray(data?.events) ? data.events : []) as PeerEventRow[];
     return rows.filter((e) => e?.external === true && typeof e?.url === 'string' && e.url !== '');
 }
 
@@ -84,7 +99,10 @@ export function usablePeerRows(data) {
  * The component calls this and nothing else, so there is no path from a
  * fetched row to a screen that skips the operator's decision.
  */
-export function renderablePeerRows(host, data) {
+export function renderablePeerRows(
+    host: MaybeHost,
+    data: PeerEventsPayload | null | undefined,
+): PeerEventRow[] {
     if (!showsPeerEvents(host)) return [];
     return usablePeerRows(data);
 }
