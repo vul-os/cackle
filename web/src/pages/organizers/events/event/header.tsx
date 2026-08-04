@@ -3,8 +3,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Ticket, BarChart3, Globe, Loader2, Users, Image as ImageIcon, Copy, Receipt, Split } from 'lucide-react';
+import type { EventFormState } from './event-form-hook';
 
-export const EventPageHeader = ({ editForm, handleInputChange, navigate, isSubmitting, onPublish, isPublishing, onDuplicate, isDuplicating }) => {
+export interface EventPageHeaderProps {
+    editForm: EventFormState;
+    handleInputChange: (field: 'title', value: string) => void;
+    navigate: (path: string) => void;
+    isSubmitting?: boolean;
+    onPublish: () => void;
+    isPublishing?: boolean;
+    onDuplicate?: () => void;
+    isDuplicating?: boolean;
+}
+
+export const EventPageHeader = ({
+    editForm,
+    handleInputChange,
+    navigate,
+    isSubmitting,
+    onPublish,
+    isPublishing,
+    onDuplicate,
+    isDuplicating,
+}: EventPageHeaderProps) => {
     return (
         <div className="mb-8">
             <Button variant="ghost" onClick={() => navigate('/admin/events')} className="mb-4 h-11">
