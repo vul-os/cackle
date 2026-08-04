@@ -2,14 +2,25 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Category } from '@/lib/api-types';
 
-const chipClasses = (active) =>
+const chipClasses = (active: boolean) =>
     cn(
         'inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:min-h-0',
         active
             ? 'border-transparent bg-primary text-primary-foreground shadow'
             : 'border-border bg-card text-foreground/80 hover:bg-muted',
     );
+
+export interface CategoryTabsProps {
+    categories?: Category[];
+    value?: string;
+    loading?: boolean;
+    error?: boolean;
+    getHref?: (slug: string) => string;
+    onSelect?: (slug: string) => void;
+    className?: string;
+}
 
 /**
  * Horizontally-scrolling category chip row, backed by `GET /api/categories`.
@@ -19,7 +30,7 @@ const chipClasses = (active) =>
  * nothing once loaded if there are no categories, rather than an empty
  * bar — this is a bonus surface, never a load-bearing one.
  */
-const CategoryTabs = ({ categories = [], value = '', loading = false, error = false, getHref, onSelect, className }) => {
+const CategoryTabs = ({ categories = [], value = '', loading = false, error = false, getHref, onSelect, className }: CategoryTabsProps) => {
     if (error) return null;
 
     if (loading) {
@@ -34,7 +45,7 @@ const CategoryTabs = ({ categories = [], value = '', loading = false, error = fa
 
     if (categories.length === 0) return null;
 
-    const items = [{ slug: '', label: 'All' }, ...categories];
+    const items: Array<Pick<Category, 'slug' | 'label'> & Partial<Category>> = [{ slug: '', label: 'All' }, ...categories];
 
     return (
         <div
