@@ -7,8 +7,7 @@ import { ArrowLeft, ImageIcon } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 import { toast } from '@/components/ui/use-toast';
 import { events as eventsApi } from '@/lib/api';
-import type { UpdateEventInput } from '@/lib/api';
-import type { CackleEvent, EventImage } from '@/lib/api-types';
+import type { CackleEvent, EventImage, UpdateEventInput } from '@/lib/api-types';
 import ImageUploader from '../image-uploader';
 
 // Mirrors the real layout — dropzone, then a gallery grid — so loading

@@ -4,12 +4,13 @@ import { toast } from '@/components/ui/use-toast';
 import { EventPageHeader } from './header';
 import { EventDetailsCard } from './details';
 import DeleteEventDialog from './delete-dialog';
-import { useEventForm } from './event-form-hook';
+import { useEventForm, type EventFormState } from './event-form-hook';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { CalendarX } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
+import type { UpdateEventInput } from '@/lib/api-types';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
 
@@ -48,7 +49,7 @@ const EventEditorSkeleton = () => (
     </div>
 );
 
-function toApiPayload(form) {
+function toApiPayload(form: EventFormState): UpdateEventInput {
     return {
         title: form.title,
         summary: form.summary || undefined,
@@ -72,7 +73,7 @@ const EventPage = () => {
     const { activeOrg } = useAuth();
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
-    const [loadError, setLoadError] = useState(null);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isDuplicating, setIsDuplicating] = useState(false);
@@ -93,8 +94,7 @@ const EventPage = () => {
             .get(id)
             .then((data) => {
                 if (cancelled) return;
-                const event = data?.event ?? data;
-                initializeForm(event);
+                initializeForm(data.event);
                 setLoading(false);
             })
             .catch((err) => {
@@ -124,11 +124,12 @@ const EventPage = () => {
     const handleSave = async () => {
         setIsSubmitting(true);
         try {
-            await eventsApi.update(id, toApiPayload(editForm));
+            await eventsApi.update(id ?? '', toApiPayload(editForm));
             setHasChanges(false);
             toast({ title: 'Saved', description: 'Event updated successfully.' });
         } catch (err) {
-            toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not save', description: message, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -137,14 +138,15 @@ const EventPage = () => {
     const handleDelete = async () => {
         setIsDeleting(true);
         try {
-            await eventsApi.remove(id);
+            await eventsApi.remove(id ?? '');
             toast({ title: 'Deleted', description: 'The event has been removed.' });
             navigate('/admin/events');
         } catch (err) {
             // 409 conflict: the event has issued tickets — the server steers
             // toward cancelling instead (see docs/API.md). Its message
             // already says so; just surface it rather than a generic one.
-            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not delete', description: message, variant: 'destructive' });
         } finally {
             setIsDeleting(false);
             setShowDeleteDialog(false);
@@ -154,31 +156,39 @@ const EventPage = () => {
     const handleDuplicate = async () => {
         setIsDuplicating(true);
         try {
-            const [ttData] = await Promise.all([ticketTypesApi.list(id)]);
-            const sourceTicketTypes = Array.isArray(ttData) ? ttData : (ttData?.ticket_types ?? []);
+            const [ttData] = await Promise.all([ticketTypesApi.list(id ?? '')]);
+            const sourceTicketTypes = ttData.ticket_types ?? [];
 
             // Create requires starts_at/ends_at and a unique slug (see
             // internal/events.Service.Create) — a duplicate starts on the same
             // date/venue as the source event, which the organiser can then
             // change from the normal editor. Images aren't copied: stored image
-            // files belong to the source event.
+            // files belong to the source event. CreateEventInput's string
+            // fields are required (not optional, unlike UpdateEventInput) —
+            // sending '' instead of omitting the key is equivalent once JSON-
+            // encoded (both decode to Go's zero value), so the empty strings
+            // below are sent directly rather than coalesced to undefined.
             const created = await eventsApi.create({
-                org_id: activeOrg.id,
+                // Non-null: this page only renders inside the org-scoped
+                // console, which always has an active org — a null here would
+                // already have thrown the same way before this conversion.
+                org_id: activeOrg!.id,
                 slug: slugify(editForm.title),
                 title: `${editForm.title || 'Untitled event'} (Copy)`,
-                summary: editForm.summary || undefined,
-                description: editForm.description || undefined,
-                venue_name: editForm.venue_name || undefined,
-                address: editForm.address || undefined,
+                summary: editForm.summary,
+                description: editForm.description,
+                venue_name: editForm.venue_name,
+                address: editForm.address,
                 lat: editForm.lat === '' ? undefined : Number(editForm.lat),
                 lng: editForm.lng === '' ? undefined : Number(editForm.lng),
-                starts_at: editForm.starts_at || undefined,
-                ends_at: editForm.ends_at || undefined,
-                timezone: editForm.timezone || undefined,
-                category: editForm.category || undefined,
-                currency: editForm.currency || undefined,
+                starts_at: editForm.starts_at,
+                ends_at: editForm.ends_at,
+                timezone: editForm.timezone,
+                cover_image: '',
+                category: editForm.category,
+                currency: editForm.currency,
             });
-            const newEvent = created?.event ?? created;
+            const newEvent = created.event;
 
             await Promise.all(
                 sourceTicketTypes.map((tt) =>
@@ -198,7 +208,8 @@ const EventPage = () => {
             toast({ title: 'Duplicated', description: 'A new draft was created with the same details and ticket types.' });
             navigate(`/admin/events/${newEvent.id}`);
         } catch (err) {
-            toast({ title: 'Could not duplicate', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not duplicate', description: message, variant: 'destructive' });
         } finally {
             setIsDuplicating(false);
         }
@@ -207,11 +218,12 @@ const EventPage = () => {
     const handlePublish = async () => {
         setIsPublishing(true);
         try {
-            await eventsApi.publish(id);
+            await eventsApi.publish(id ?? '');
             handleInputChange('status', 'published');
             toast({ title: 'Published', description: 'Your event is now live.' });
         } catch (err) {
-            toast({ title: 'Could not publish', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not publish', description: message, variant: 'destructive' });
         } finally {
             setIsPublishing(false);
         }

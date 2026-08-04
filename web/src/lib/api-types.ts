@@ -182,8 +182,9 @@ export interface EventListResponse {
     host?: HostView;
 }
 
-/** Body of POST /api/events. */
+/** Body of POST /api/events — org_id plus internal/events.CreateEventInput's own fields (see handleCreateEvent in internal/httpapi/event_handlers.go, which decodes both from the same request body). */
 export interface CreateEventInput {
+    org_id: string;
     slug: string;
     title: string;
     summary: string;
