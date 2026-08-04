@@ -1,9 +1,24 @@
-import React from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, type LucideIcon } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { BrandLockup } from '@/components/brand/wordmark';
+
+interface AuthShellPoint {
+    icon: LucideIcon;
+    text: string;
+}
+
+interface AuthShellProps {
+    eyebrow?: ReactNode;
+    title: ReactNode;
+    description?: ReactNode;
+    points?: AuthShellPoint[];
+    formHeading?: ReactNode;
+    formSubheading?: ReactNode;
+    children?: ReactNode;
+}
 
 /**
  * The shared frame for sign-in, sign-up, forgot-password and update-password.
@@ -24,7 +39,7 @@ import { BrandLockup } from '@/components/brand/wordmark';
  * than one element switching orientation by media query, because the
  * primitive's orientation is a prop, not a CSS trick.
  */
-export function AuthShell({ eyebrow, title, description, points = [], formHeading, formSubheading, children }) {
+export function AuthShell({ eyebrow, title, description, points = [], formHeading, formSubheading, children }: AuthShellProps) {
     const prefersReducedMotion = useReducedMotion();
 
     return (
@@ -100,14 +115,14 @@ export function AuthShell({ eyebrow, title, description, points = [], formHeadin
                         <Separator
                             variant="perforated"
                             className="md:hidden"
-                            style={{ '--notch': 'var(--card)' }}
+                            style={{ '--notch': 'var(--card)' } as CSSProperties}
                             aria-hidden="true"
                         />
                         <Separator
                             variant="perforated"
                             orientation="vertical"
                             className="hidden md:block"
-                            style={{ '--notch': 'var(--card)' }}
+                            style={{ '--notch': 'var(--card)' } as CSSProperties}
                             aria-hidden="true"
                         />
 
@@ -139,7 +154,7 @@ export function AuthShell({ eyebrow, title, description, points = [], formHeadin
  * management on submit is the caller's job — see signin/signup/
  * update-password — this component only ever renders text).
  */
-export function FieldError({ id, children }) {
+export function FieldError({ id, children }: { id?: string; children?: ReactNode }) {
     if (!children) return null;
     return (
         <p id={id} role="alert" className="mt-1.5 flex items-start gap-1 text-xs font-medium text-destructive">

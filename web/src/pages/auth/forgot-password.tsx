@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type ChangeEvent, type FocusEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,7 +61,7 @@ const ForgotPassword = () => {
                         type="email"
                         value={email}
                         placeholder="you@example.com"
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                     />
                 </div>
 
@@ -72,7 +72,7 @@ const ForgotPassword = () => {
                             id="reset-command"
                             readOnly
                             value={command}
-                            onFocus={(e) => e.target.select()}
+                            onFocus={(e: FocusEvent<HTMLInputElement>) => e.target.select()}
                             className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground shadow-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                         />
                         <Button type="button" variant="outline" onClick={handleCopy} className="shrink-0 sm:w-28">

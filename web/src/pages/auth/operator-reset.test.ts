@@ -58,7 +58,7 @@ test('the reset link the CLI prints lands on a route the app declares', () => {
 
 test('nothing in the reset flow claims an email was sent', () => {
     const files = {
-        'web/src/pages/auth/forgot-password.jsx': read('web/src/pages/auth/forgot-password.jsx'),
+        'web/src/pages/auth/forgot-password.tsx': read('web/src/pages/auth/forgot-password.tsx'),
         'web/src/pages/auth/update-password.jsx': read('web/src/pages/auth/update-password.jsx'),
         'web/src/pages/auth/operator-reset.ts': read('web/src/pages/auth/operator-reset.ts'),
     };
@@ -78,7 +78,7 @@ test('nothing in the reset flow claims an email was sent', () => {
 });
 
 test('the forgot-password page states the truth and gives a real path', () => {
-    const page = read('web/src/pages/auth/forgot-password.jsx');
+    const page = read('web/src/pages/auth/forgot-password.tsx');
     assert.match(page, /does not send email/i, 'the page must say plainly that no email is coming');
     assert.match(page, /resetCommandFor\(email\)/, 'the page must show the operator command for the address typed');
     // And it must no longer fire the API call whose token nobody can read.
