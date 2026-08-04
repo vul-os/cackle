@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,13 +12,18 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/context/use-auth';
-import { currencies as currenciesApi } from '@/lib/api';
+import { currencies as currenciesApi, ApiError } from '@/lib/api';
+import type { Currency } from '@/lib/api-types';
 import { slugifyOrgName } from './slug';
+
+/** The fallback list carries no `exponent` — only the live server table
+ * (internal/money) does — so the picker only ever needs `code`/`name`. */
+type CurrencyOption = Pick<Currency, 'code' | 'name'>;
 
 // Fallback only, used if GET /api/currencies fails (offline, transient).
 // Cackle has no privileged currency, so the real list is the full ISO-4217
 // table from the server — see internal/money.
-const FALLBACK_CURRENCIES = [
+const FALLBACK_CURRENCIES: CurrencyOption[] = [
     { code: 'USD', name: 'United States Dollar' },
     { code: 'EUR', name: 'Euro' },
     { code: 'GBP', name: 'British Pound Sterling' },
@@ -34,9 +39,9 @@ const createOrgSchema = z.object({
 const CreateOrgPage = () => {
     const navigate = useNavigate();
     const { orgs, createOrg } = useAuth();
-    const [submitError, setSubmitError] = useState(null);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
-    const [currencyOptions, setCurrencyOptions] = useState(FALLBACK_CURRENCIES);
+    const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>(FALLBACK_CURRENCIES);
 
     const isFirstOrg = !orgs || orgs.length === 0;
 
@@ -57,7 +62,7 @@ const CreateOrgPage = () => {
         };
     }, []);
 
-    const form = useForm({
+    const form = useForm<{ name: string; slug?: string; default_currency?: string }>({
         resolver: zodResolver(createOrgSchema),
         defaultValues: { name: '', slug: '', default_currency: '' },
     });
@@ -71,7 +76,7 @@ const CreateOrgPage = () => {
     // otherwise") instead of two fields silently fighting each other.
     const effectiveSlug = useMemo(() => slugifyOrgName(slugValue) || slugifyOrgName(nameValue), [slugValue, nameValue]);
 
-    const onSubmit = async (values) => {
+    const onSubmit = async (values: { name: string; slug?: string; default_currency?: string }) => {
         setSubmitting(true);
         setSubmitError(null);
         try {
@@ -85,13 +90,13 @@ const CreateOrgPage = () => {
             // 409 against the org it just created.
             navigate('/admin', { replace: true });
         } catch (err) {
-            if (err?.code === 'conflict') {
+            if (err instanceof ApiError && err.code === 'conflict') {
                 form.setError('slug', {
                     type: 'server',
                     message: 'That web address is already taken. Try adding your city or year.',
                 });
             } else {
-                setSubmitError(err?.message || 'Could not create your organisation.');
+                setSubmitError(err instanceof Error ? err.message : 'Could not create your organisation.');
             }
             setSubmitting(false);
         }
@@ -187,7 +192,7 @@ const CreateOrgPage = () => {
                                 <Label htmlFor="org-default-currency">Currency you usually sell in</Label>
                                 <Select
                                     value={form.watch('default_currency')}
-                                    onValueChange={(value) => form.setValue('default_currency', value, { shouldDirty: true })}
+                                    onValueChange={(value: string) => form.setValue('default_currency', value, { shouldDirty: true })}
                                     disabled={submitting}
                                 >
                                     <SelectTrigger id="org-default-currency">
