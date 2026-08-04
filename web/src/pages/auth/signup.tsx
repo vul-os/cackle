@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,15 @@ const RAIL_POINTS = [
     { icon: ShieldCheck, text: 'Your box, your data. Nothing here phones home.' },
 ];
 
+interface SignUpFieldErrors {
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+}
+
+type SignUpField = keyof SignUpFieldErrors;
+
 const SignUp = () => {
     const { signUp } = useAuth();
     const handleSuccessfulAuth = useAuthRedirect();
@@ -26,27 +35,27 @@ const SignUp = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [fieldErrors, setFieldErrors] = useState({});
+    const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const nameRef = useRef(null);
-    const emailRef = useRef(null);
-    const passwordRef = useRef(null);
-    const confirmRef = useRef(null);
-    const alertRef = useRef(null);
-    const fieldRefs = { name: nameRef, email: emailRef, password: passwordRef, confirmPassword: confirmRef };
+    const nameRef = useRef<HTMLInputElement>(null);
+    const emailRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+    const confirmRef = useRef<HTMLInputElement>(null);
+    const alertRef = useRef<HTMLDivElement>(null);
+    const fieldRefs: Record<SignUpField, typeof nameRef> = { name: nameRef, email: emailRef, password: passwordRef, confirmPassword: confirmRef };
 
     useEffect(() => {
         if (error) alertRef.current?.focus();
     }, [error]);
 
-    const clearFieldError = (field) => {
+    const clearFieldError = (field: SignUpField) => {
         setFieldErrors((f) => (f[field] ? { ...f, [field]: undefined } : f));
     };
 
-    const validate = () => {
-        const next = {};
+    const validate = (): SignUpFieldErrors => {
+        const next: SignUpFieldErrors = {};
         const nameMsg = requiredError(name, 'your name');
         const emailMsg = checkEmail(email);
         const passwordMsg = newPasswordError(password);
@@ -65,21 +74,21 @@ const SignUp = () => {
     // trip, so it gets the same treatment as one caught locally — routed to
     // the field it is actually about, not flattened into one banner every
     // time.
-    const fieldForServerError = (message) => {
+    const fieldForServerError = (message: string): SignUpField | null => {
         if (/email/i.test(message)) return 'email';
         if (/password/i.test(message)) return 'password';
         return null;
     };
 
-    const handleSubmit = async (event) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError('');
 
         const errors = validate();
         if (Object.keys(errors).length > 0) {
             setFieldErrors(errors);
-            const firstInvalid = ['name', 'email', 'password', 'confirmPassword'].find((f) => errors[f]);
-            fieldRefs[firstInvalid]?.current?.focus();
+            const firstInvalid = (['name', 'email', 'password', 'confirmPassword'] as SignUpField[]).find((f) => errors[f]);
+            if (firstInvalid) fieldRefs[firstInvalid]?.current?.focus();
             return;
         }
         setFieldErrors({});
@@ -88,7 +97,7 @@ const SignUp = () => {
             await signUp(email, password, name);
             handleSuccessfulAuth();
         } catch (err) {
-            const message = err.message || 'Could not create your account.';
+            const message = err instanceof Error ? err.message : 'Could not create your account.';
             const field = fieldForServerError(message);
             if (field) {
                 setFieldErrors({ [field]: message });
@@ -126,7 +135,7 @@ const SignUp = () => {
                             ref={nameRef}
                             autoComplete="name"
                             value={name}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setName(e.target.value);
                                 clearFieldError('name');
                             }}
@@ -145,7 +154,7 @@ const SignUp = () => {
                             autoComplete="email"
                             placeholder="you@example.com"
                             value={email}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setEmail(e.target.value);
                                 clearFieldError('email');
                             }}
@@ -163,7 +172,7 @@ const SignUp = () => {
                             type="password"
                             autoComplete="new-password"
                             value={password}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setPassword(e.target.value);
                                 clearFieldError('password');
                             }}
@@ -187,7 +196,7 @@ const SignUp = () => {
                             type="password"
                             autoComplete="new-password"
                             value={confirmPassword}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setConfirmPassword(e.target.value);
                                 clearFieldError('confirmPassword');
                             }}

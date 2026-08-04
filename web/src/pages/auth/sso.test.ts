@@ -112,7 +112,7 @@ test('the button row returns nothing when there are no providers', () => {
 });
 
 test('the app holds no absolute URL to any sign-in provider', () => {
-    for (const name of ['sso.ts', 'sso-buttons.tsx', 'signin.jsx', 'signup.jsx']) {
+    for (const name of ['sso.ts', 'sso-buttons.tsx', 'signin.tsx', 'signup.tsx']) {
         const src = read(name);
         const absolute = [...src.matchAll(/https?:\/\/[^\s"'`)<>]+/g)].map((m) => m[0]);
         assert.deepEqual(absolute, [], `${name} names an absolute URL: ${absolute.join(', ')}`);
@@ -120,7 +120,7 @@ test('the app holds no absolute URL to any sign-in provider', () => {
 });
 
 test('both auth pages keep the password form and mount the row below it', () => {
-    for (const name of ['signin.jsx', 'signup.jsx']) {
+    for (const name of ['signin.tsx', 'signup.tsx']) {
         const src = read(name);
         assert.match(src, /<SsoButtons\b/, `${name} does not mount the provider row`);
         assert.match(src, /type="password"/, `${name} lost its password field`);

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/use-auth';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,11 @@ const RAIL_POINTS = [
     { icon: ShieldCheck, text: 'One binary, your box. Nothing here phones home.' },
 ];
 
+interface SignInFieldErrors {
+    email?: string;
+    password?: string;
+}
+
 const SignIn = () => {
     const { signIn, refresh } = useAuth();
     const handleSuccessfulAuth = useAuthRedirect();
@@ -29,13 +34,13 @@ const SignIn = () => {
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [fieldErrors, setFieldErrors] = useState({});
+    const [fieldErrors, setFieldErrors] = useState<SignInFieldErrors>({});
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const emailRef = useRef(null);
-    const passwordRef = useRef(null);
-    const alertRef = useRef(null);
+    const emailRef = useRef<HTMLInputElement>(null);
+    const passwordRef = useRef<HTMLInputElement>(null);
+    const alertRef = useRef<HTMLDivElement>(null);
 
     // A password just changed on /update-password lands here with a router
     // state flag rather than a toast — a toast fired the instant before a
@@ -87,8 +92,8 @@ const SignIn = () => {
         if (error) alertRef.current?.focus();
     }, [error]);
 
-    const validate = () => {
-        const next = {};
+    const validate = (): SignInFieldErrors => {
+        const next: SignInFieldErrors = {};
         const emailMsg = checkEmail(email);
         const passwordMsg = requiredError(password, 'your password');
         if (emailMsg) next.email = emailMsg;
@@ -96,7 +101,7 @@ const SignIn = () => {
         return next;
     };
 
-    const handleSubmit = async (event) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError('');
 
@@ -112,7 +117,7 @@ const SignIn = () => {
             await signIn(email, password);
             handleSuccessfulAuth();
         } catch (err) {
-            setError(err.message || 'Could not sign in.');
+            setError(err instanceof Error ? err.message : 'Could not sign in.');
             setIsLoading(false);
         }
     };
@@ -159,7 +164,7 @@ const SignIn = () => {
                             autoComplete="email"
                             placeholder="you@example.com"
                             value={email}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setEmail(e.target.value);
                                 if (fieldErrors.email) setFieldErrors((f) => ({ ...f, email: undefined }));
                             }}
@@ -178,7 +183,7 @@ const SignIn = () => {
                             autoComplete="current-password"
                             placeholder="••••••••"
                             value={password}
-                            onChange={(e) => {
+                            onChange={(e: ChangeEvent<HTMLInputElement>) => {
                                 setPassword(e.target.value);
                                 if (fieldErrors.password) setFieldErrors((f) => ({ ...f, password: undefined }));
                             }}
