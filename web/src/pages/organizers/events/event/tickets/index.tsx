@@ -20,25 +20,41 @@ import { ErrorState } from '@/components/ui/error-state';
 import TicketTypeForm from './type-form';
 import TicketTypeList from './type-list';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
+import type { TicketTypeInput } from '@/lib/api';
+import type { CackleEvent, TicketType } from '@/lib/api-types';
+
+interface EventTicketTypesState {
+    event: CackleEvent | null;
+    ticketTypes: TicketType[];
+    loading: boolean;
+    error: string | null;
+}
+
+interface DialogState {
+    open: boolean;
+    editing: TicketType | null;
+}
+
+/** Either a real ticket type, or the synthetic {id} placeholder used when the id being deleted somehow isn't in state.ticketTypes. */
+type DeleteTarget = Partial<TicketType> & { id: string };
 
 const EventTicketTypesPage = () => {
     const { id: eventId } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ event: null, ticketTypes: [], loading: true, error: null });
-    const [dialog, setDialog] = useState({ open: false, editing: null });
+    const [state, setState] = useState<EventTicketTypesState>({ event: null, ticketTypes: [], loading: true, error: null });
+    const [dialog, setDialog] = useState<DialogState>({ open: false, editing: null });
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchAll = useCallback(async () => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const [eventData, ticketTypesData] = await Promise.all([eventsApi.get(eventId), ticketTypesApi.list(eventId)]);
-            const event = eventData?.event ?? eventData;
-            const list = Array.isArray(ticketTypesData) ? ticketTypesData : (ticketTypesData?.ticket_types ?? []);
-            setState({ event, ticketTypes: list, loading: false, error: null });
+            const [eventData, ticketTypesData] = await Promise.all([eventsApi.get(eventId ?? ''), ticketTypesApi.list(eventId ?? '')]);
+            setState({ event: eventData.event, ticketTypes: ticketTypesData.ticket_types ?? [], loading: false, error: null });
         } catch (err) {
-            setState({ event: null, ticketTypes: [], loading: false, error: err.message || 'Could not load ticket types.' });
+            const message = err instanceof Error ? err.message : 'Could not load ticket types.';
+            setState({ event: null, ticketTypes: [], loading: false, error: message });
         }
     }, [eventId]);
 
@@ -46,7 +62,7 @@ const EventTicketTypesPage = () => {
         fetchAll();
     }, [fetchAll]);
 
-    const handleSubmit = async (data) => {
+    const handleSubmit = async (data: TicketTypeInput) => {
         setIsSubmitting(true);
         try {
             // Update is a full replace of every editable field (see
@@ -57,13 +73,14 @@ const EventTicketTypesPage = () => {
                 await ticketTypesApi.update(dialog.editing.id, { ...data, sort_order: dialog.editing.sort_order ?? 0 });
                 toast({ title: 'Updated', description: 'Ticket type updated.' });
             } else {
-                await ticketTypesApi.create(eventId, { ...data, sort_order: state.ticketTypes.length });
+                await ticketTypesApi.create(eventId ?? '', { ...data, sort_order: state.ticketTypes.length });
                 toast({ title: 'Created', description: 'Ticket type created.' });
             }
             setDialog({ open: false, editing: null });
             fetchAll();
         } catch (err) {
-            toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not save', description: message, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
@@ -78,7 +95,8 @@ const EventTicketTypesPage = () => {
             setDeleteTarget(null);
             fetchAll();
         } catch (err) {
-            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not delete', description: message, variant: 'destructive' });
         } finally {
             setIsDeleting(false);
         }
@@ -118,7 +136,7 @@ const EventTicketTypesPage = () => {
                 <CardContent>
                     <TicketTypeList
                         ticketTypes={state.ticketTypes}
-                        currency={state.event?.currency}
+                        currency={state.event?.currency ?? ''}
                         onEdit={(tt) => setDialog({ open: true, editing: tt })}
                         onDelete={(id) => setDeleteTarget(state.ticketTypes.find((t) => t.id === id) ?? { id })}
                     />
@@ -132,7 +150,7 @@ const EventTicketTypesPage = () => {
                     </DialogHeader>
                     <TicketTypeForm
                         initialData={dialog.editing}
-                        currency={state.event?.currency}
+                        currency={state.event?.currency ?? ''}
                         onSubmit={handleSubmit}
                         isSubmitting={isSubmitting}
                     />
@@ -144,7 +162,7 @@ const EventTicketTypesPage = () => {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete “{deleteTarget?.name || 'this ticket type'}”?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            {deleteTarget?.quantity_sold > 0
+                            {deleteTarget?.quantity_sold && deleteTarget.quantity_sold > 0
                                 ? `${deleteTarget.quantity_sold} of these have already been sold — those tickets remain valid, but no more can be issued.`
                                 : 'This cannot be undone.'}
                         </AlertDialogDescription>
