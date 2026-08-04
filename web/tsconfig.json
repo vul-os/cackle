@@ -24,7 +24,8 @@
             "@pages/*": ["./src/pages/*"]
         },
 
-        "allowJs": false,
+        "allowJs": true,
+        "checkJs": false,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "types": ["node"]

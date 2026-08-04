@@ -19,7 +19,11 @@ import { cn } from '@/lib/utils';
  * @param {object} props
  * @param {boolean} [props.interactive] the whole card is a control
  */
-const Card = React.forwardRef(({ className, interactive = false, ...props }, ref) => (
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+    interactive?: boolean;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, interactive = false, ...props }, ref) => (
     <div
         ref={ref}
         className={cn(
