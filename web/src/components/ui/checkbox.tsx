@@ -42,7 +42,10 @@ import { cn } from '@/lib/utils';
 // against a DIFFERENT kind of control; `m-1` guarantees spacing against
 // another checkbox, not against an arbitrary neighbour with no margin of
 // its own.
-const Checkbox = React.forwardRef(({ className, ...props }, ref) => (
+const Checkbox = React.forwardRef<
+    React.ElementRef<typeof CheckboxPrimitive.Root>,
+    React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
+>(({ className, ...props }, ref) => (
     <CheckboxPrimitive.Root
         ref={ref}
         className={cn(
