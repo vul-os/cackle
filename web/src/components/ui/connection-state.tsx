@@ -1,6 +1,21 @@
-import React from 'react';
 import { Wifi, WifiOff, CloudUpload, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface ConnectionStateProps {
+    online: boolean;
+    pendingCount?: number;
+    syncing?: boolean;
+    variant?: 'chip' | 'row';
+    surface?: 'light' | 'gate';
+    className?: string;
+}
+
+interface SyncStateProps {
+    pendingCount?: number;
+    syncing?: boolean;
+    surface?: 'light' | 'gate';
+    className?: string;
+}
 
 // How Cackle talks about the network.
 //
@@ -31,7 +46,7 @@ import { cn } from '@/lib/utils';
  * @param {'chip'|'row'} [props.variant] chip for a dense bar, row for a panel
  * @param {'light'|'gate'} [props.surface] which palette to render against
  */
-export function ConnectionState({ online, pendingCount = 0, syncing = false, variant = 'chip', surface = 'light', className }) {
+export function ConnectionState({ online, pendingCount = 0, syncing = false, variant = 'chip', surface = 'light', className }: ConnectionStateProps) {
     const label = online ? 'Online' : 'Offline — admitting normally';
     const Icon = online ? Wifi : WifiOff;
 
@@ -88,7 +103,7 @@ export function ConnectionState({ online, pendingCount = 0, syncing = false, var
  * scans are, not as a problem to solve — they are already recorded, and the
  * door has already been dealt with.
  */
-export function SyncState({ pendingCount = 0, syncing = false, surface = 'light', className }) {
+export function SyncState({ pendingCount = 0, syncing = false, surface = 'light', className }: SyncStateProps) {
     const muted = surface === 'gate' ? 'text-gate-ink-muted' : 'text-muted-foreground';
 
     if (syncing) {
