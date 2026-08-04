@@ -2,8 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { ResolvedImage } from './media';
 
 const SWIPE_THRESHOLD_PX = 40;
+
+export interface EventGalleryProps {
+    images?: ResolvedImage[];
+    title?: string;
+    className?: string;
+}
 
 /**
  * Event cover image + gallery. Degrades gracefully through three states:
@@ -23,16 +30,16 @@ const SWIPE_THRESHOLD_PX = 40;
  * placeholder icon) are the ordinary theme tokens, because those really are
  * app surfaces.
  */
-const EventGallery = ({ images = [], title = 'Event', className }) => {
+const EventGallery = ({ images = [], title = 'Event', className }: EventGalleryProps) => {
     const [index, setIndex] = useState(0);
     const [direction, setDirection] = useState(0);
-    const touchStartX = useRef(null);
-    const containerRef = useRef(null);
+    const touchStartX = useRef<number | null>(null);
+    const containerRef = useRef<HTMLDivElement | null>(null);
 
     const count = images.length;
 
     const goTo = useCallback(
-        (next) => {
+        (next: number) => {
             if (count === 0) return;
             const wrapped = ((next % count) + count) % count;
             setDirection(wrapped > index || (index === count - 1 && wrapped === 0) ? 1 : -1);
@@ -52,7 +59,7 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
     }, [images]);
 
     const handleKeyDown = useCallback(
-        (e) => {
+        (e: React.KeyboardEvent<HTMLDivElement>) => {
             if (count < 2) return;
             if (e.key === 'ArrowRight') {
                 e.preventDefault();
@@ -65,11 +72,11 @@ const EventGallery = ({ images = [], title = 'Event', className }) => {
         [count, goNext, goPrev],
     );
 
-    const handleTouchStart = (e) => {
+    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
         touchStartX.current = e.touches[0]?.clientX ?? null;
     };
 
-    const handleTouchEnd = (e) => {
+    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
         if (touchStartX.current === null) return;
         const endX = e.changedTouches[0]?.clientX ?? touchStartX.current;
         const delta = endX - touchStartX.current;
