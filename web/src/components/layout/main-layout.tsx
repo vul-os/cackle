@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from 'react-responsive';
 import { MotionConfig } from 'framer-motion';
@@ -20,11 +20,11 @@ const SIDEBAR_WIDTH_CLASS = 'w-60';
 const MainLayout = () => {
     const isMobile = useMediaQuery({ maxWidth: 640 });
     const [isExpanded, setIsExpanded] = useState(false);
-    const sidenavRef = useRef(null);
-    const toggleButtonRef = useRef(null);
+    const sidenavRef = useRef<HTMLElement>(null);
+    const toggleButtonRef = useRef<HTMLButtonElement>(null);
 
     const handleDrawerToggle = useCallback(
-        (event) => {
+        (event: ReactMouseEvent) => {
             if (isMobile) {
                 event.stopPropagation();
                 setIsExpanded((prev) => !prev);
@@ -34,10 +34,11 @@ const MainLayout = () => {
     );
 
     useEffect(() => {
-        const handleClick = (event) => {
+        const handleClick = (event: MouseEvent) => {
             if (!isMobile) return;
-            const clickedSidenav = sidenavRef.current?.contains(event.target);
-            const clickedToggle = toggleButtonRef.current?.contains(event.target);
+            const target = event.target as Node | null;
+            const clickedSidenav = sidenavRef.current?.contains(target);
+            const clickedToggle = toggleButtonRef.current?.contains(target);
             if (!clickedSidenav && !clickedToggle) setIsExpanded(false);
         };
         document.addEventListener('click', handleClick);

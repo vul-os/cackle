@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { MouseEvent, RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, User, ChevronDown, Building2, LogOut, Moon, Sun, Check } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
@@ -15,7 +15,7 @@ import {
 import { BrandLockup } from '@/components/brand/wordmark';
 
 interface TopBarProps {
-    onMenuClick: () => void;
+    onMenuClick: (event: MouseEvent<HTMLButtonElement>) => void;
     toggleButtonRef: RefObject<HTMLButtonElement>;
 }
 
