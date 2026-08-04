@@ -12,7 +12,7 @@ import { toast } from '@/components/ui/use-toast';
  * Lands here from the invite link an organiser sent by hand
  * (`/accept-invite?token=...`). Cackle sends no email: the owner copies
  * this link off their Team page and passes it on over WhatsApp, SMS or
- * whatever they already use — see `team/invite-link.js` for why.
+ * whatever they already use — see `team/invite-link.ts` for why.
  *
  * `ProtectedRoute` (see routes.tsx) already handles the "not signed in
  * yet" case by bouncing to /login, storing `pathname + search` so the

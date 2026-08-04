@@ -14,11 +14,11 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { buildInviteUrl, copyTextToClipboard, INVITE_ACCEPT_PATH, INVITE_TOKEN_PARAM } from './invite-link.js';
+import { buildInviteUrl, copyTextToClipboard, INVITE_ACCEPT_PATH, INVITE_TOKEN_PARAM } from './invite-link.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webSrc = join(here, '..', '..', '..');
-const read = (p) => readFileSync(join(webSrc, p), 'utf8');
+const read = (p: string) => readFileSync(join(webSrc, p), 'utf8');
 
 test('buildInviteUrl produces the URL an invited person opens', () => {
     assert.equal(
@@ -55,8 +55,8 @@ test('buildInviteUrl refuses to build a link with no token', () => {
     // looks identical to a working one to the sender. Fail loudly instead.
     assert.throws(() => buildInviteUrl('https://example.org', ''), TypeError);
     assert.throws(() => buildInviteUrl('https://example.org', '   '), TypeError);
-    assert.throws(() => buildInviteUrl('https://example.org', undefined), TypeError);
-    assert.throws(() => buildInviteUrl('https://example.org', null), TypeError);
+    assert.throws(() => buildInviteUrl('https://example.org', undefined as unknown as string), TypeError);
+    assert.throws(() => buildInviteUrl('https://example.org', null as unknown as string), TypeError);
     assert.throws(() => buildInviteUrl('', 'abc123'), TypeError);
 });
 
@@ -164,7 +164,7 @@ test('the team page states the expiry and the shown-once rule', () => {
 test('the invite token is never written to storage', () => {
     // A bearer credential persisted on a shared venue laptop outlives the
     // person who created it. Component state only.
-    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.jsx', 'pages/organizers/team/invite-link.js']) {
+    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.jsx', 'pages/organizers/team/invite-link.ts']) {
         const source = read(p);
         assert.equal(/localStorage|sessionStorage|document\.cookie/.test(source), false, `${p} persists the invite token`);
     }
@@ -174,30 +174,34 @@ test('copyTextToClipboard reports failure instead of lying about it', async () =
     // The async Clipboard API needs a secure context and a self-hosted
     // Cackle on a venue LAN is usually plain http. A false "Copied!" is
     // how someone ends up pasting nothing into WhatsApp.
-    assert.equal(await copyTextToClipboard('', {}, {}), false);
+    assert.equal(await copyTextToClipboard('', {} as Document, {} as Navigator), false);
     assert.equal(await copyTextToClipboard('link', undefined, undefined), false);
 
-    const rejecting = { clipboard: { writeText: () => Promise.reject(new Error('not allowed')) } };
+    const rejecting = { clipboard: { writeText: () => Promise.reject(new Error('not allowed')) } } as unknown as Navigator;
     assert.equal(await copyTextToClipboard('link', undefined, rejecting), false, 'a rejected write must not report success');
 
-    let written = null;
-    const working = { clipboard: { writeText: (t) => { written = t; return Promise.resolve(); } } };
+    let written: string | null = null;
+    const working = { clipboard: { writeText: (t: string) => { written = t; return Promise.resolve(); } } } as unknown as Navigator;
     assert.equal(await copyTextToClipboard('link', undefined, working), true);
     assert.equal(written, 'link');
 });
 
 test('copyTextToClipboard falls back to the legacy path when there is no Clipboard API', async () => {
-    const appended = [];
-    const el = { style: {}, setAttribute() {}, select() {} };
+    const appended: unknown[] = [];
+    const el: { style: Record<string, string>; value?: string; setAttribute: () => void; select: () => void } = {
+        style: {},
+        setAttribute() {},
+        select() {},
+    };
     const fakeDoc = {
         createElement: () => el,
-        body: { appendChild: (n) => appended.push(n), removeChild: () => {} },
+        body: { appendChild: (n: unknown) => appended.push(n), removeChild: () => {} },
         execCommand: () => true,
-    };
-    assert.equal(await copyTextToClipboard('link', fakeDoc, {}), true);
+    } as unknown as Document;
+    assert.equal(await copyTextToClipboard('link', fakeDoc, {} as Navigator), true);
     assert.equal(appended.length, 1);
     assert.equal(el.value, 'link');
 
-    const failingDoc = { ...fakeDoc, execCommand: () => false };
-    assert.equal(await copyTextToClipboard('link', failingDoc, {}), false);
+    const failingDoc = { ...fakeDoc, execCommand: () => false } as unknown as Document;
+    assert.equal(await copyTextToClipboard('link', failingDoc, {} as Navigator), false);
 });

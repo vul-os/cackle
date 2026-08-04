@@ -40,7 +40,7 @@ export const INVITE_TOKEN_PARAM = 'token';
  * owner has no way to tell that from a working one by looking at it — so
  * fail here, loudly, while someone is still watching.
  */
-export function buildInviteUrl(origin, token) {
+export function buildInviteUrl(origin: string, token: string): string {
     if (typeof token !== 'string' || token.trim() === '') {
         throw new TypeError('buildInviteUrl: refusing to build an invite link with no token');
     }
@@ -65,7 +65,11 @@ export function buildInviteUrl(origin, token) {
  * of claiming success. The link is always displayed and selectable, so a
  * failed copy is an inconvenience, never a dead end.
  */
-export async function copyTextToClipboard(text, doc = globalThis.document, nav = globalThis.navigator) {
+export async function copyTextToClipboard(
+    text: string,
+    doc: Document | undefined = globalThis.document,
+    nav: Navigator | undefined = globalThis.navigator,
+): Promise<boolean> {
     if (typeof text !== 'string' || text === '') return false;
 
     if (nav?.clipboard?.writeText) {

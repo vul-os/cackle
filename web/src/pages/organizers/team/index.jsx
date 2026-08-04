@@ -47,7 +47,7 @@ const TeamPage = () => {
     // kind. It is a bearer credential, and a credential written to disk on
     // a shared venue laptop outlives the person who created it. A reload
     // loses it, which is the correct trade: revoke and re-invite is one
-    // click. invite-link.test.js asserts this file touches no storage API.
+    // click. invite-link.test.ts asserts this file touches no storage API.
     const [newInvite, setNewInvite] = useState(null);
     const [revokingId, setRevokingId] = useState(null);
     const [roleChangingId, setRoleChangingId] = useState(null);
