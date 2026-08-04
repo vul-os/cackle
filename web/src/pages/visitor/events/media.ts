@@ -7,8 +7,38 @@
 // storefront never blanks out just because one shape didn't come back.
 import { images as imagesApi } from '@/lib/api';
 
+/** A single image reference in any of the shapes this module resolves
+ * defensively — see the file banner above. */
+export interface ImageRef {
+    id?: string;
+    url?: string;
+    width?: number;
+    height?: number;
+    alt?: string;
+}
+
+export type ImageReference = string | ImageRef | null | undefined;
+
+/** The subset of an event (or event-like object) this module reads from.
+ * `CackleEvent` itself has no `gallery` field — this is the legacy/joined
+ * shape described in the file banner, not part of the documented DTO. */
+export interface EventMediaSource {
+    title?: string;
+    cover_image?: ImageReference;
+    cover_image_id?: string;
+    gallery?: ImageReference[];
+}
+
+export interface ResolvedImage {
+    id: string;
+    url: string;
+    width?: number;
+    height?: number;
+    alt?: string;
+}
+
 /** Turns a single image reference (string URL, or {id,url,...}) into a URL. */
-export function resolveImageUrl(img) {
+export function resolveImageUrl(img: ImageReference): string | null {
     if (!img) return null;
     if (typeof img === 'string') return img.trim() || null;
     if (img.url) return img.url;
@@ -21,12 +51,12 @@ export function resolveImageUrl(img) {
  * first (if any), followed by any additional gallery images, de-duplicated
  * by resolved URL. Always returns an array (possibly empty) — never throws.
  */
-export function getEventImages(event) {
+export function getEventImages(event: EventMediaSource | null | undefined): ResolvedImage[] {
     if (!event) return [];
-    const seen = new Set();
-    const images = [];
+    const seen = new Set<string>();
+    const images: ResolvedImage[] = [];
 
-    const push = (ref, altFallback) => {
+    const push = (ref: ImageReference, altFallback: string | undefined) => {
         const url = resolveImageUrl(ref);
         if (!url || seen.has(url)) return;
         seen.add(url);
@@ -53,7 +83,7 @@ export function getEventImages(event) {
 }
 
 /** Best-effort single cover URL, for contexts that only ever show one image (cards, lists). */
-export function getCoverImageUrl(event) {
+export function getCoverImageUrl(event: EventMediaSource | null | undefined): string | null {
     const images = getEventImages(event);
     return images[0]?.url ?? null;
 }
