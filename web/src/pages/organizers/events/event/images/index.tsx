@@ -7,6 +7,8 @@ import { ArrowLeft, ImageIcon } from 'lucide-react';
 import { ErrorState } from '@/components/ui/error-state';
 import { toast } from '@/components/ui/use-toast';
 import { events as eventsApi } from '@/lib/api';
+import type { UpdateEventInput } from '@/lib/api';
+import type { CackleEvent, EventImage } from '@/lib/api-types';
 import ImageUploader from '../image-uploader';
 
 // Mirrors the real layout — dropzone, then a gallery grid — so loading
@@ -31,23 +33,29 @@ const ImagesSkeleton = () => (
     </div>
 );
 
+interface EventImagesState {
+    event: CackleEvent | null;
+    loading: boolean;
+    error: string | null;
+}
+
 const EventImagesPage = () => {
     const { id: eventId } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ event: null, loading: true, error: null });
-    const [images, setImages] = useState([]);
+    const [state, setState] = useState<EventImagesState>({ event: null, loading: true, error: null });
+    const [images, setImages] = useState<EventImage[]>([]);
 
     const load = useCallback(async () => {
         setState((s) => ({ ...s, loading: true, error: null }));
         try {
-            const data = await eventsApi.get(eventId);
-            const event = data?.event ?? data;
-            setState({ event, loading: false, error: null });
+            const data = await eventsApi.get(eventId ?? '');
+            setState({ event: data.event, loading: false, error: null });
             // `gallery` is a sibling of `event` in the GET /api/events/{id}
             // response shape, not a field on the event object itself.
-            setImages(data?.gallery ?? []);
+            setImages(data.gallery ?? []);
         } catch (err) {
-            setState({ event: null, loading: false, error: err.message || 'Could not load this event.' });
+            const message = err instanceof Error ? err.message : 'Could not load this event.';
+            setState({ event: null, loading: false, error: message });
         }
     }, [eventId]);
 
@@ -55,13 +63,22 @@ const EventImagesPage = () => {
         load();
     }, [load]);
 
-    const handleCoverChange = async (imageId) => {
-        setState((s) => (s.event ? { ...s, event: { ...s.event, cover_image_id: imageId } } : s));
+    const handleCoverChange = async (imageId: string | null) => {
+        setState((s) => (s.event ? { ...s, event: { ...s.event, cover_image_id: imageId ?? undefined } } : s));
         try {
-            await eventsApi.update(eventId, { cover_image_id: imageId });
+            // UpdateEventInput's cover_image_id is typed as `string` (no
+            // `null`) because that's the documented shape — but this really
+            // does send a literal JSON null when clearing the cover (see
+            // ImageUploader's onCoverChange), and internal/events/events.go's
+            // ApplyUpdate only clears CoverImageID on an EMPTY STRING, not on
+            // null (a null pointer field is indistinguishable from an absent
+            // one once decoded). That mismatch predates this conversion and
+            // isn't fixed here — preserved verbatim via the assertion below.
+            await eventsApi.update(eventId ?? '', { cover_image_id: imageId } as UpdateEventInput);
             toast({ title: 'Cover image updated' });
         } catch (err) {
-            toast({ title: 'Could not set cover image', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not set cover image', description: message, variant: 'destructive' });
         }
     };
 
@@ -98,7 +115,7 @@ const EventImagesPage = () => {
                         eventId={eventId}
                         images={images}
                         coverImageId={state.event?.cover_image_id}
-                        onImagesChange={(updater) => setImages((current) => (typeof updater === 'function' ? updater(current) : updater))}
+                        onImagesChange={(updater) => setImages((current) => updater(current))}
                         onCoverChange={handleCoverChange}
                     />
                 </CardContent>
