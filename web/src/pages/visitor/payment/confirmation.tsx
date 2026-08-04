@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/use-toast';
 import { payments as paymentsApi } from '@/lib/api';
-import PaymentStatusPage from './status';
+import PaymentStatusPage, { type PaymentTheme } from './status';
 import { Ticket, Receipt, RotateCcw } from 'lucide-react';
 
 /**
@@ -16,7 +16,7 @@ import { Ticket, Receipt, RotateCcw } from 'lucide-react';
 export default function PaymentConfirmationPage() {
     const [searchParams] = useSearchParams();
     const reference = searchParams.get('reference');
-    const [status, setStatus] = useState(reference ? 'processing' : 'failed');
+    const [status, setStatus] = useState<PaymentTheme>(reference ? 'processing' : 'failed');
     const [attempt, setAttempt] = useState(0);
 
     const retry = useCallback(() => {

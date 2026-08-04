@@ -59,7 +59,7 @@ export const THEMES: Record<'processing' | 'success' | 'failed' | 'redirecting',
     },
 };
 
-type PaymentTheme = keyof typeof THEMES;
+export type PaymentTheme = keyof typeof THEMES;
 
 interface PaymentStatusPageProps {
     theme?: PaymentTheme;
