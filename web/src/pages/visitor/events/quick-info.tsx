@@ -1,9 +1,20 @@
 import React from 'react';
-import { Calendar, Clock, MapPin, Tag, Ticket } from 'lucide-react';
+import { Calendar, Clock, MapPin, Tag, Ticket, type LucideIcon } from 'lucide-react';
 import { availabilitySummary, priceFromMinor } from './ticket-utils';
 import { Money } from '@/components/ui/money';
+import type { CackleEvent, TicketType } from '@/lib/api-types';
 
-const QuickFact = ({ icon: Icon, label, value, tone, first }) => (
+type Tone = 'default' | 'warning' | 'destructive';
+
+interface QuickFactProps {
+    icon: LucideIcon;
+    label: string;
+    value: React.ReactNode;
+    tone?: Tone;
+    first?: boolean;
+}
+
+const QuickFact = ({ icon: Icon, label, value, tone, first }: QuickFactProps) => (
     <div
         className={
             'relative flex items-center gap-3 ' +
@@ -41,17 +52,17 @@ const QuickFact = ({ icon: Icon, label, value, tone, first }) => (
     </div>
 );
 
-const formatDate = (date) =>
+const formatDate = (date: string | null | undefined): string =>
     date ? new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date TBA';
 
-const formatTimeRange = (start, end) => {
-    const opts = { hour: 'numeric', minute: '2-digit' };
+const formatTimeRange = (start: string | null | undefined, end: string | null | undefined): string => {
+    const opts: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
     const startStr = start ? new Date(start).toLocaleTimeString(undefined, opts) : '';
     const endStr = end ? new Date(end).toLocaleTimeString(undefined, opts) : '';
     return [startStr, endStr].filter(Boolean).join(' – ') || 'Time TBA';
 };
 
-function availabilityFact(ticketTypes) {
+function availabilityFact(ticketTypes: TicketType[]): { value: string; tone: Tone } {
     const summary = availabilitySummary(ticketTypes);
     switch (summary.state) {
         case 'unpublished':
@@ -65,13 +76,25 @@ function availabilityFact(ticketTypes) {
     }
 }
 
+export interface EventQuickInfoEvent {
+    starts_at?: CackleEvent['starts_at'];
+    ends_at?: CackleEvent['ends_at'];
+    venue_name?: CackleEvent['venue_name'];
+    currency?: CackleEvent['currency'];
+}
+
+export interface EventQuickInfoProps {
+    event: EventQuickInfoEvent;
+    ticketTypes?: TicketType[];
+}
+
 /**
  * Quick-facts bar: date, time, venue, price-from, and availability at a
  * glance — pure information, no call-to-action (that lives in the sticky
  * ticket panel). Renders on a single row on desktop and wraps to a 2-column
  * grid on narrow screens so it never crowds out the page below the hero.
  */
-const EventQuickInfo = ({ event, ticketTypes = [] }) => {
+const EventQuickInfo = ({ event, ticketTypes = [] }: EventQuickInfoProps) => {
     const price = priceFromMinor(ticketTypes);
     const availability = availabilityFact(ticketTypes);
 
