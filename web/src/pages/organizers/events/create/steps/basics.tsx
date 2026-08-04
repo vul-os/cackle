@@ -10,6 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { ArrowRight } from 'lucide-react';
 import CategorySelect from '@/pages/organizers/events/event/category-select';
 import { MarkdownEditor } from '@/pages/organizers/events/event/markdown-editor';
+import type { WizardEvent } from '../wizard-types';
 
 export const basicsSchema = z.object({
     title: z.string().trim().min(3, 'Give your event a title (at least 3 characters).').max(140),
@@ -18,8 +19,16 @@ export const basicsSchema = z.object({
     description: z.string().optional(),
 });
 
-const BasicsStep = ({ defaultValues, onSubmit, submitting }) => {
-    const form = useForm({
+export type BasicsFormValues = z.infer<typeof basicsSchema>;
+
+export interface BasicsStepProps {
+    defaultValues?: Partial<WizardEvent>;
+    onSubmit: (data: BasicsFormValues) => void;
+    submitting?: boolean;
+}
+
+const BasicsStep = ({ defaultValues, onSubmit, submitting }: BasicsStepProps) => {
+    const form = useForm<BasicsFormValues>({
         resolver: zodResolver(basicsSchema),
         defaultValues: {
             title: defaultValues?.title || '',
@@ -81,7 +90,7 @@ const BasicsStep = ({ defaultValues, onSubmit, submitting }) => {
                             <FormControl>
                                 <MarkdownEditor
                                     name="description"
-                                    value={field.value}
+                                    value={field.value ?? ''}
                                     onChange={(value) => form.setValue('description', value, { shouldDirty: true })}
                                     placeholder="Write a compelling description using Markdown..."
                                     minHeight="220px"

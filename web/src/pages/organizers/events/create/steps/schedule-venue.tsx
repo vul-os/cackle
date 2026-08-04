@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,11 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import DatePickerWithRange from '@/components/date-range-picker';
 import { currencies as currenciesApi } from '@/lib/api';
+import type { Currency } from '@/lib/api-types';
+import type { WizardEvent } from '../wizard-types';
+
+/** Just what this picker renders — the fallback list below doesn't carry a real ISO-4217 exponent. */
+type CurrencyOption = Pick<Currency, 'code' | 'name'>;
 
 // Fallback only: used if GET /api/currencies fails (offline, transient
 // error). The primary source is the full ISO-4217 table below — Cackle
 // has no privileged currency, so the picker shouldn't hardcode one either.
-const FALLBACK_CURRENCIES = [
+const FALLBACK_CURRENCIES: CurrencyOption[] = [
     { code: 'USD', name: 'United States Dollar' },
     { code: 'EUR', name: 'Euro' },
     { code: 'GBP', name: 'British Pound Sterling' },
@@ -22,8 +28,8 @@ const FALLBACK_CURRENCIES = [
 ];
 
 /** Hook: the full currency list from the backend, with a small offline fallback. */
-function useCurrencyOptions() {
-    const [options, setOptions] = useState(FALLBACK_CURRENCIES);
+function useCurrencyOptions(): CurrencyOption[] {
+    const [options, setOptions] = useState<CurrencyOption[]>(FALLBACK_CURRENCIES);
     useEffect(() => {
         let cancelled = false;
         currenciesApi
@@ -61,16 +67,28 @@ const scheduleSchema = z
         path: ['lng'],
     });
 
-const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }) => {
+type ScheduleFormValues = z.infer<typeof scheduleSchema>;
+
+/** What onSubmit actually receives: the form fields plus the date range resolved to ISO strings. */
+export type ScheduleSubmitData = ScheduleFormValues & { starts_at: string; ends_at: string };
+
+export interface ScheduleVenueStepProps {
+    defaultValues?: Partial<WizardEvent>;
+    onSubmit: (data: ScheduleSubmitData) => void;
+    onBack: () => void;
+    submitting?: boolean;
+}
+
+const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }: ScheduleVenueStepProps) => {
     const currencyOptions = useCurrencyOptions();
-    const [dateRange, setDateRange] = useState(() =>
+    const [dateRange, setDateRange] = useState<DateRange | undefined>(() =>
         defaultValues?.starts_at && defaultValues?.ends_at
             ? { from: new Date(defaultValues.starts_at), to: new Date(defaultValues.ends_at) }
             : undefined,
     );
-    const [dateError, setDateError] = useState(null);
+    const [dateError, setDateError] = useState<string | null>(null);
 
-    const form = useForm({
+    const form = useForm<ScheduleFormValues>({
         resolver: zodResolver(scheduleSchema),
         defaultValues: {
             venue_name: defaultValues?.venue_name || '',
@@ -83,7 +101,7 @@ const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }) => {
         },
     });
 
-    const handleValidSubmit = (data) => {
+    const handleValidSubmit = (data: ScheduleFormValues) => {
         if (!dateRange?.from || !dateRange?.to) {
             setDateError('Pick a start and end date/time.');
             return;

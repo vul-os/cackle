@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Globe, Loader2, MapPin, Calendar, Tag, Ticket, Coins, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Globe, Loader2, MapPin, Calendar, Tag, Ticket, Coins, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { images as imagesApi } from '@/lib/api';
 import { categoryLabel } from '@/pages/organizers/events/categories';
 import { Money } from '@/components/ui/money';
+import type { TicketType } from '@/lib/api-types';
+import type { WizardEvent } from '../wizard-types';
 
-const Row = ({ icon: Icon, children }) => (
+const Row = ({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) => (
     <div className="flex items-start gap-2 text-sm">
         <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
         <span>{children}</span>
@@ -19,7 +21,7 @@ const Row = ({ icon: Icon, children }) => (
 /** "Sales open in 3 days" / "Sales close 12 Aug" / "Sales closed" — the same
  * plain-language framing as the organiser's ticket-type list, so a ticket's
  * window reads the same way here as it will everywhere else it's shown. */
-function saleWindowLabel(tt) {
+function saleWindowLabel(tt: TicketType): string | null {
     if (!tt.sales_start || !tt.sales_end) return null;
     const now = Date.now();
     const start = new Date(tt.sales_start).getTime();
@@ -29,7 +31,17 @@ function saleWindowLabel(tt) {
     return `Sales close ${format(new Date(tt.sales_end), 'd MMM')}`;
 }
 
-const ReviewStep = ({ event, ticketTypes, coverImageId, onBack, onPublish, onSaveDraft, isPublishing }) => {
+export interface ReviewStepProps {
+    event: WizardEvent;
+    ticketTypes: TicketType[];
+    coverImageId?: string | null;
+    onBack: () => void;
+    onPublish: () => void;
+    onSaveDraft: () => void;
+    isPublishing?: boolean;
+}
+
+const ReviewStep = ({ event, ticketTypes, coverImageId, onBack, onPublish, onSaveDraft, isPublishing }: ReviewStepProps) => {
     const coverUrl = coverImageId ? imagesApi.url(coverImageId) : null;
     const canPublish = ticketTypes.length > 0;
 
@@ -88,7 +100,7 @@ const ReviewStep = ({ event, ticketTypes, coverImageId, onBack, onPublish, onSav
                         is set to the surrounding card surface, not the page,
                         per the component's own doc comment (it defaults to
                         `--background`, which is wrong nested inside a card). */}
-                    <div style={{ '--notch': 'var(--card)' }}>
+                    <div style={{ '--notch': 'var(--card)' } as React.CSSProperties}>
                         <Separator variant="perforated" />
                     </div>
 

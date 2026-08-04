@@ -2,8 +2,20 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import ImageUploader from '@/pages/organizers/events/event/image-uploader';
+import type { EventImage } from '@/lib/api-types';
 
-const ImagesStep = ({ eventId, images, coverImageId, onImagesChange, onCoverChange, onBack, onSubmit, submitting }) => {
+export interface ImagesStepProps {
+    eventId?: string | null;
+    images: EventImage[];
+    coverImageId?: string | null;
+    onImagesChange: (updater: (current: EventImage[]) => EventImage[]) => void;
+    onCoverChange: (imageId: string | null) => void;
+    onBack: () => void;
+    onSubmit: () => void;
+    submitting?: boolean;
+}
+
+const ImagesStep = ({ eventId, images, coverImageId, onImagesChange, onCoverChange, onBack, onSubmit, submitting }: ImagesStepProps) => {
     return (
         <div className="space-y-6">
             <p className="text-sm text-muted-foreground">
@@ -11,7 +23,7 @@ const ImagesStep = ({ eventId, images, coverImageId, onImagesChange, onCoverChan
             </p>
 
             <ImageUploader
-                eventId={eventId}
+                eventId={eventId ?? undefined}
                 images={images}
                 coverImageId={coverImageId}
                 onImagesChange={onImagesChange}

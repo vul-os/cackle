@@ -5,14 +5,31 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, ArrowRight, Plus, AlertTriangle } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { ticketTypes as ticketTypesApi } from '@/lib/api';
+import type { TicketTypeInput } from '@/lib/api';
+import type { TicketType } from '@/lib/api-types';
 import TicketTypeForm from '@/pages/organizers/events/event/tickets/type-form';
 import TicketTypeList from '@/pages/organizers/events/event/tickets/type-list';
 
-const TicketsStep = ({ eventId, currency, ticketTypes, onTicketTypesChange, onBack, onSubmit, submitting }) => {
-    const [dialog, setDialog] = useState({ open: false, editing: null });
+interface TicketDialogState {
+    open: boolean;
+    editing: TicketType | null;
+}
+
+export interface TicketsStepProps {
+    eventId?: string | null;
+    currency: string;
+    ticketTypes: TicketType[];
+    onTicketTypesChange: (updater: (current: TicketType[]) => TicketType[]) => void;
+    onBack: () => void;
+    onSubmit: () => void;
+    submitting?: boolean;
+}
+
+const TicketsStep = ({ eventId, currency, ticketTypes, onTicketTypesChange, onBack, onSubmit, submitting }: TicketsStepProps) => {
+    const [dialog, setDialog] = useState<TicketDialogState>({ open: false, editing: null });
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleCreateOrUpdate = async (data) => {
+    const handleCreateOrUpdate = async (data: TicketTypeInput) => {
         setIsSaving(true);
         try {
             // Update is a full replace of every editable field (see
@@ -21,30 +38,32 @@ const TicketsStep = ({ eventId, currency, ticketTypes, onTicketTypesChange, onBa
             // every edit would silently reset display order to 0.
             if (dialog.editing?.id) {
                 const updated = await ticketTypesApi.update(dialog.editing.id, { ...data, sort_order: dialog.editing.sort_order ?? 0 });
-                const tt = updated?.ticket_type ?? updated;
+                const tt = updated.ticket_type;
                 onTicketTypesChange((current) => current.map((t) => (t.id === tt.id ? tt : t)));
                 toast({ title: 'Updated', description: 'Ticket type updated.' });
             } else {
-                const created = await ticketTypesApi.create(eventId, { ...data, sort_order: ticketTypes.length });
-                const tt = created?.ticket_type ?? created;
+                const created = await ticketTypesApi.create(eventId ?? '', { ...data, sort_order: ticketTypes.length });
+                const tt = created.ticket_type;
                 onTicketTypesChange((current) => [...current, tt]);
                 toast({ title: 'Added', description: 'Ticket type added.' });
             }
             setDialog({ open: false, editing: null });
         } catch (err) {
-            toast({ title: 'Could not save', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not save', description: message, variant: 'destructive' });
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDelete = async (ticketTypeId) => {
+    const handleDelete = async (ticketTypeId: string) => {
         try {
             await ticketTypesApi.remove(ticketTypeId);
             onTicketTypesChange((current) => current.filter((t) => t.id !== ticketTypeId));
             toast({ title: 'Deleted', description: 'Ticket type removed.' });
         } catch (err) {
-            toast({ title: 'Could not delete', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not delete', description: message, variant: 'destructive' });
         }
     };
 
