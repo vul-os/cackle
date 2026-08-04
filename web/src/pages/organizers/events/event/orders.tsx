@@ -23,9 +23,10 @@ import { events as eventsApi, orders as ordersApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import { toast } from '@/components/ui/use-toast';
 import { Money } from '@/components/ui/money';
+import type { CackleEvent, Order } from '@/lib/api-types';
 
 // Every status orders.Order.Status can be (see internal/orders/orders.go).
-function statusBadge(status) {
+function statusBadge(status: string) {
     switch (status) {
         case 'paid':
             return <Badge>Paid</Badge>;
@@ -42,13 +43,25 @@ function statusBadge(status) {
     }
 }
 
+type MarkAction = 'paid' | 'failed';
+
+interface MarkOrderDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    action?: MarkAction;
+    order?: Order | null;
+    currency: string;
+    isSubmitting: boolean;
+    onConfirm: () => void;
+}
+
 /**
  * Confirmation dialog shared by the mark-paid and mark-failed actions —
  * both are one-way settlement decisions (mark-paid issues real tickets;
  * mark-failed releases reserved inventory back to sale), so neither should
  * ever fire from a bare click.
  */
-const MarkOrderDialog = ({ open, onOpenChange, action, order, currency, isSubmitting, onConfirm }) => {
+const MarkOrderDialog = ({ open, onOpenChange, action, order, currency, isSubmitting, onConfirm }: MarkOrderDialogProps) => {
     const isPaid = action === 'paid';
     return (
         <AlertDialog open={open} onOpenChange={(next) => !isSubmitting && onOpenChange(next)}>
@@ -90,24 +103,35 @@ const MarkOrderDialog = ({ open, onOpenChange, action, order, currency, isSubmit
     );
 };
 
+interface OrdersPageState {
+    orders: Order[];
+    loading: boolean;
+    error: string | null;
+}
+
+interface MarkDialogState {
+    action: MarkAction;
+    order: Order;
+}
+
 const EventOrdersPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    const [event, setEvent] = useState(null);
-    const [state, setState] = useState({ orders: [], loading: true, error: null });
-    const [dialog, setDialog] = useState(null); // { action: 'paid'|'failed', order }
+    const [event, setEvent] = useState<CackleEvent | null>(null);
+    const [state, setState] = useState<OrdersPageState>({ orders: [], loading: true, error: null });
+    const [dialog, setDialog] = useState<MarkDialogState | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchOrders = useCallback(() => {
         setState((s) => ({ ...s, loading: true, error: null }));
-        Promise.all([eventsApi.get(id), eventsApi.orders(id)])
+        Promise.all([eventsApi.get(id ?? ''), eventsApi.orders(id ?? '')])
             .then(([eventData, ordersData]) => {
-                setEvent(eventData?.event ?? eventData);
-                setState({ orders: ordersData?.orders ?? [], loading: false, error: null });
+                setEvent(eventData.event);
+                setState({ orders: ordersData.orders ?? [], loading: false, error: null });
             })
             .catch((err) => {
-                setState({ orders: [], loading: false, error: err.message || 'Could not load orders.' });
+                setState({ orders: [], loading: false, error: err?.message || 'Could not load orders.' });
             });
     }, [id]);
 
@@ -131,7 +155,8 @@ const EventOrdersPage = () => {
             setDialog(null);
             fetchOrders();
         } catch (err) {
-            toast({ title: 'Could not update order', description: err.message, variant: 'destructive' });
+            const message = err instanceof Error ? err.message : undefined;
+            toast({ title: 'Could not update order', description: message, variant: 'destructive' });
         } finally {
             setIsSubmitting(false);
         }
