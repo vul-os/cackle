@@ -11,13 +11,21 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 
+export interface DeleteEventDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    eventTitle?: string;
+    onConfirm: () => void;
+    isDeleting?: boolean;
+}
+
 /**
  * Confirmation dialog for deleting an event. Shared between the event
  * editor (single-event delete) and the events list (quick delete from a
  * card), so the copy and the "type to confirm" guard never drift between
  * the two entry points.
  */
-const DeleteEventDialog = ({ open, onOpenChange, eventTitle, onConfirm, isDeleting }) => {
+const DeleteEventDialog = ({ open, onOpenChange, eventTitle, onConfirm, isDeleting }: DeleteEventDialogProps) => {
     return (
         <AlertDialog open={open} onOpenChange={(next) => !isDeleting && onOpenChange(next)}>
             <AlertDialogContent>
