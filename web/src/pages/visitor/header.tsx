@@ -13,7 +13,11 @@ import { BrandLockup } from '@/components/brand/wordmark';
 // scale's own 36px once there is a pointer to aim with.
 const TAP = 'h-11 w-11 sm:h-9 sm:w-9';
 
-const Header = ({ className = '' }) => {
+export interface HeaderProps {
+    className?: string;
+}
+
+const Header = ({ className = '' }: HeaderProps) => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { theme, setTheme } = useTheme();
     const { user, loading, signOut } = useAuth();
@@ -33,12 +37,12 @@ const Header = ({ className = '' }) => {
         navigate('/');
     };
 
-    const handleNavigation = (path) => {
+    const handleNavigation = (path: string) => {
         navigate(path);
         setIsMobileMenuOpen(false);
     };
 
-    const AuthButtons = ({ isMobile = false }) => {
+    const AuthButtons = ({ isMobile = false }: { isMobile?: boolean }) => {
         // While the session is still resolving, render nothing rather than a
         // flash of "Sign up" that turns into "Sign out" a moment later.
         if (loading) return null;
