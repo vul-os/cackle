@@ -1,15 +1,26 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, CheckCircle2, XCircle, ExternalLink, Ticket } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ExternalLink, Ticket, type LucideIcon } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import Footer from '@/pages/visitor/landing/footer';
 import CheckoutSteps from '@/pages/visitor/checkout/steps';
 
+interface PaymentThemeConfig {
+    icon: LucideIcon;
+    iconClass: string;
+    ringClass: string;
+    title: string;
+    description: string;
+    step: 'cart' | 'details' | 'pay' | 'ticket';
+    busy?: boolean;
+    showExternalLink?: boolean;
+}
+
 // One presentational surface for every terminal state of a payment. Each
 // state says what happened, what it means, and — the part that was missing —
 // what the buyer can DO next, including when it failed.
-export const THEMES = {
+export const THEMES: Record<'processing' | 'success' | 'failed' | 'redirecting', PaymentThemeConfig> = {
     processing: {
         icon: Loader2,
         iconClass: 'text-primary-emphasis motion-safe:animate-spin',
@@ -48,25 +59,29 @@ export const THEMES = {
     },
 };
 
-/**
- * @param {object} props
- * @param {'processing'|'success'|'failed'|'redirecting'} [props.theme]
- * @param {React.ReactNode} [props.actions] the way forward from this state
- */
-export default function PaymentStatusPage({ theme = 'processing', actions = null }) {
+type PaymentTheme = keyof typeof THEMES;
+
+interface PaymentStatusPageProps {
+    theme?: PaymentTheme;
+    /** the way forward from this state */
+    actions?: React.ReactNode;
+}
+
+export default function PaymentStatusPage({ theme = 'processing', actions = null }: PaymentStatusPageProps) {
     const config = THEMES[theme] ?? THEMES.processing;
     const Icon = config.icon;
+    const stepsProps = { current: config.step, className: 'mb-10' };
 
     return (
         <div className="flex min-h-screen flex-col bg-background">
             <Header />
             <main id="main" className="flex-1 pt-16">
                 <div className="mx-auto max-w-lg px-4 py-10 sm:py-16">
-                    <CheckoutSteps current={config.step} className="mb-10" />
+                    <CheckoutSteps {...stepsProps} />
 
                     <Card
                         className="ticket-stub overflow-hidden"
-                        style={{ '--notch': 'var(--background)', '--notch-y': '72%' }}
+                        style={{ '--notch': 'var(--background)', '--notch-y': '72%' } as React.CSSProperties}
                     >
                         <CardContent
                             className="px-6 pb-8 pt-10 text-center sm:px-8"
@@ -95,7 +110,7 @@ export default function PaymentStatusPage({ theme = 'processing', actions = null
                                     <Separator
                                         variant="perforated"
                                         className="my-7"
-                                        style={{ '--notch': 'var(--background)' }}
+                                        style={{ '--notch': 'var(--background)' } as React.CSSProperties}
                                     />
                                     <div className="flex flex-col gap-3">{actions}</div>
                                 </>
