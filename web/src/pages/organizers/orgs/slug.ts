@@ -10,7 +10,7 @@
 // That makes divergence from the Go rule a real (if quiet) bug: the
 // preview would promise one address and the server would mint another. So
 // this mirrors internal/orgs.slugify deliberately and exactly, and
-// slug.test.js pins the shared cases.
+// slug.test.ts pins the shared cases.
 //
 // The rule, in both places:
 //   - lowercase, trimmed
@@ -23,7 +23,7 @@
 export const MAX_ORG_SLUG_LENGTH = 60;
 export const MIN_ORG_SLUG_LENGTH = 2;
 
-export function slugifyOrgName(value) {
+export function slugifyOrgName(value: string | null | undefined): string {
     return (value || '')
         .toLowerCase()
         .trim()

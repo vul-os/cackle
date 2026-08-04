@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { slugifyOrgName, MAX_ORG_SLUG_LENGTH } from './slug.js';
+import { slugifyOrgName, MAX_ORG_SLUG_LENGTH } from './slug.ts';
 
 // SHARED_CASES is the contract. Keep it in sync with the Go table.
 export const SHARED_CASES = [
