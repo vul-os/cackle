@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
+import type { CackleEvent, TicketType } from '@/lib/api-types';
 
 // The new API has no server-side cart (no /api/carts endpoint) — an order is
 // created directly from a client-held list of {ticket_type_id, quantity} for
@@ -14,17 +15,35 @@ const ACTIONS = {
     REMOVE_ITEM: 'REMOVE_ITEM',
     CLEAR_EVENT: 'CLEAR_EVENT',
     CLEAR_CART: 'CLEAR_CART',
-};
+} as const;
 
 const MAX_PER_TYPE = 10;
 
-function loadInitialState() {
+export interface CartItem {
+    ticket_type_id: string;
+    ticket_type: TicketType;
+    event: CackleEvent;
+    quantity: number;
+}
+
+interface CartState {
+    items: CartItem[];
+}
+
+type CartAction =
+    | { type: typeof ACTIONS.ADD_ITEM; payload: { ticketType: TicketType; event: CackleEvent; quantity: number } }
+    | { type: typeof ACTIONS.UPDATE_QUANTITY; payload: { ticketTypeId: string; quantity: number } }
+    | { type: typeof ACTIONS.REMOVE_ITEM; payload: { ticketTypeId: string } }
+    | { type: typeof ACTIONS.CLEAR_EVENT; payload: { eventId: string } }
+    | { type: typeof ACTIONS.CLEAR_CART };
+
+function loadInitialState(): CartState {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) return { items: [] };
         const parsed = JSON.parse(saved);
         if (!Array.isArray(parsed)) return { items: [] };
-        const valid = parsed.filter(
+        const valid: CartItem[] = parsed.filter(
             (item) => item?.ticket_type_id && item?.event?.id && item?.ticket_type && item.quantity > 0 && item.quantity <= MAX_PER_TYPE,
         );
         return { items: valid };
@@ -33,7 +52,7 @@ function loadInitialState() {
     }
 }
 
-function cartReducer(state, action) {
+function cartReducer(state: CartState, action: CartAction): CartState {
     switch (action.type) {
         case ACTIONS.ADD_ITEM: {
             const { ticketType, event, quantity } = action.payload;
@@ -75,29 +94,42 @@ function cartReducer(state, action) {
     }
 }
 
-const CartContext = createContext(null);
+export interface CartContextValue {
+    items: CartItem[];
+    itemsByEvent: Record<string, CartItem[]>;
+    itemCount: number;
+    totalsByCurrency: Record<string, number>;
+    addItem: (ticketType: TicketType, event: CackleEvent, quantity?: number) => void;
+    updateQuantity: (ticketTypeId: string, quantity: number) => void;
+    removeItem: (ticketTypeId: string) => void;
+    clearEvent: (eventId: string) => void;
+    clearCart: () => void;
+    eventTotal: (eventId: string) => number;
+}
 
-export function CartProvider({ children }) {
+const CartContext = createContext<CartContextValue | null>(null);
+
+export function CartProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(cartReducer, undefined, loadInitialState);
 
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
     }, [state.items]);
 
-    const addItem = useCallback((ticketType, event, quantity = 1) => {
+    const addItem = useCallback((ticketType: TicketType, event: CackleEvent, quantity = 1) => {
         if (!ticketType?.id || !event?.id) throw new Error('Invalid ticket type or event');
         dispatch({ type: ACTIONS.ADD_ITEM, payload: { ticketType, event, quantity: Math.max(1, quantity) } });
     }, []);
 
-    const updateQuantity = useCallback((ticketTypeId, quantity) => {
+    const updateQuantity = useCallback((ticketTypeId: string, quantity: number) => {
         dispatch({ type: ACTIONS.UPDATE_QUANTITY, payload: { ticketTypeId, quantity } });
     }, []);
 
-    const removeItem = useCallback((ticketTypeId) => {
+    const removeItem = useCallback((ticketTypeId: string) => {
         dispatch({ type: ACTIONS.REMOVE_ITEM, payload: { ticketTypeId } });
     }, []);
 
-    const clearEvent = useCallback((eventId) => {
+    const clearEvent = useCallback((eventId: string) => {
         dispatch({ type: ACTIONS.CLEAR_EVENT, payload: { eventId } });
     }, []);
 
@@ -106,7 +138,7 @@ export function CartProvider({ children }) {
     }, []);
 
     const derived = useMemo(() => {
-        const itemsByEvent = state.items.reduce((groups, item) => {
+        const itemsByEvent = state.items.reduce<Record<string, CartItem[]>>((groups, item) => {
             const id = item.event.id;
             (groups[id] ||= []).push(item);
             return groups;
@@ -119,7 +151,7 @@ export function CartProvider({ children }) {
         // currency's minor-unit sum separate; consumers render one line
         // per currency (in the common single-event cart, that's exactly
         // one line, same as before).
-        const totalsByCurrency = state.items.reduce((acc, i) => {
+        const totalsByCurrency = state.items.reduce<Record<string, number>>((acc, i) => {
             const currency = i.event?.currency || '';
             acc[currency] = (acc[currency] || 0) + i.quantity * i.ticket_type.price_minor;
             return acc;
@@ -128,7 +160,7 @@ export function CartProvider({ children }) {
     }, [state.items]);
 
     const eventTotal = useCallback(
-        (eventId) => (derived.itemsByEvent[eventId] || []).reduce((sum, i) => sum + i.quantity * i.ticket_type.price_minor, 0),
+        (eventId: string) => (derived.itemsByEvent[eventId] || []).reduce((sum, i) => sum + i.quantity * i.ticket_type.price_minor, 0),
         [derived.itemsByEvent],
     );
 

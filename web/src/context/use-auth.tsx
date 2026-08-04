@@ -1,32 +1,65 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth as authApi, orgs as orgsApi, setToken, onUnauthorized } from '@/lib/api';
+import { auth as authApi, orgs as orgsApi, setToken, onUnauthorized, type CreateOrgInput } from '@/lib/api';
+import type { AuthMeResponse, Org, OrgMembership, User } from '@/lib/api-types';
 
-export const AuthContext = createContext({
+/** Either shape `applySession` is fed: the full /auth/me envelope (carries
+ * `orgs`), or the signup/login response (carries `token` but no `orgs` —
+ * that gap is real, existing behaviour: orgs is reset to `[]` until the
+ * next `refresh()`). */
+interface SessionData {
+    user: User;
+    orgs?: OrgMembership[];
+    token?: string;
+}
+
+export interface AuthContextValue {
+    loading: boolean;
+    user: User | null;
+    orgs: OrgMembership[];
+    activeOrg: OrgMembership | null;
+    signUp: (email: string, password: string, name: string) => Promise<User>;
+    signIn: (email: string, password: string) => Promise<User>;
+    signOut: () => Promise<void>;
+    requestPasswordReset: (email: string) => Promise<void>;
+    updatePassword: (token: string, password: string) => Promise<void>;
+    switchOrg: (orgId: string) => void;
+    createOrg: (input: CreateOrgInput) => Promise<Org | undefined>;
+    refresh: () => Promise<AuthMeResponse | null>;
+}
+
+// The stub methods below are never exercised in practice — app.tsx always
+// wraps the tree in a real AuthProvider — but they are typed loosely (not
+// as AuthContextValue) rather than coerced to it, so this default cannot
+// silently drift from what `createContext` was actually given: it stays
+// exactly the no-op shape the untyped original had.
+const authContextDefault = {
     loading: true,
-    user: null,
-    orgs: [],
-    activeOrg: null,
-    signUp: async () => {},
-    signIn: async () => {},
+    user: null as User | null,
+    orgs: [] as OrgMembership[],
+    activeOrg: null as OrgMembership | null,
+    signUp: async () => undefined as unknown as User,
+    signIn: async () => undefined as unknown as User,
     signOut: async () => {},
     requestPasswordReset: async () => {},
     updatePassword: async () => {},
     switchOrg: () => {},
-    createOrg: async () => {},
-    refresh: async () => {},
-});
+    createOrg: async () => undefined as Org | undefined,
+    refresh: async () => null as AuthMeResponse | null,
+};
+
+export const AuthContext = createContext<AuthContextValue>(authContextDefault);
 
 const PROTECTED_PREFIXES = ['/admin', '/checkout', '/orders', '/order/', '/tickets', '/ticket/', '/payment', '/accept-invite'];
 
-export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [orgs, setOrgs] = useState([]);
-    const [activeOrgId, setActiveOrgId] = useState(null);
+export function AuthProvider({ children }: { children: ReactNode }) {
+    const [user, setUser] = useState<User | null>(null);
+    const [orgs, setOrgs] = useState<OrgMembership[]>([]);
+    const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
-    const applySession = useCallback((data) => {
+    const applySession = useCallback((data: SessionData | null | undefined) => {
         setUser(data?.user ?? null);
         const nextOrgs = data?.orgs ?? [];
         setOrgs(nextOrgs);
@@ -80,7 +113,7 @@ export function AuthProvider({ children }) {
     );
 
     const signUp = useCallback(
-        async (email, password, name) => {
+        async (email: string, password: string, name: string) => {
             const data = await authApi.signup({ email, password, name });
             setToken(data.token);
             applySession(data);
@@ -90,7 +123,7 @@ export function AuthProvider({ children }) {
     );
 
     const signIn = useCallback(
-        async (email, password) => {
+        async (email: string, password: string) => {
             const data = await authApi.login({ email, password });
             setToken(data.token);
             applySession(data);
@@ -111,16 +144,16 @@ export function AuthProvider({ children }) {
         setActiveOrgId(null);
     }, []);
 
-    const requestPasswordReset = useCallback(async (email) => {
+    const requestPasswordReset = useCallback(async (email: string) => {
         await authApi.passwordReset(email);
     }, []);
 
-    const updatePassword = useCallback(async (token, password) => {
+    const updatePassword = useCallback(async (token: string, password: string) => {
         await authApi.passwordUpdate(token, password);
     }, []);
 
     const switchOrg = useCallback(
-        (orgId) => {
+        (orgId: string) => {
             if (orgs.some((o) => o.id === orgId)) setActiveOrgId(orgId);
         },
         [orgs],
@@ -138,7 +171,7 @@ export function AuthProvider({ children }) {
     // isn't bounced straight back to "you have no organisation" having
     // just successfully made one; the next refresh reconciles it.
     const createOrg = useCallback(
-        async (input) => {
+        async (input: CreateOrgInput) => {
             const data = await orgsApi.create(input);
             const org = data?.org;
 
@@ -146,7 +179,7 @@ export function AuthProvider({ children }) {
             if (session) {
                 applySession(session);
             } else if (org?.id) {
-                setOrgs((prev) => (prev.some((o) => o.id === org.id) ? prev : [...prev, org]));
+                setOrgs((prev) => (prev.some((o) => o.id === org.id) ? prev : [...prev, org as OrgMembership]));
             }
             // Set last so it wins over applySession's own choice: the org
             // you just created is the one you want to be looking at.
