@@ -11,7 +11,7 @@ import {
     newPasswordError,
     confirmPasswordError,
     MIN_PASSWORD_LENGTH,
-} from './validate.ts';
+} from './validate.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..', '..');

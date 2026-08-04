@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { buildInviteUrl, copyTextToClipboard, INVITE_ACCEPT_PATH, INVITE_TOKEN_PARAM } from './invite-link.ts';
+import { buildInviteUrl, copyTextToClipboard, INVITE_ACCEPT_PATH, INVITE_TOKEN_PARAM } from './invite-link.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const webSrc = join(here, '..', '..', '..');
@@ -107,7 +107,7 @@ test('an invite link opened signed-out survives the sign-in detour with its toke
     );
 
     // 3. ProtectedRoute's persisted copy must keep the search too.
-    const guard = read('components/auth/protected-route.tsx');
+    const guard = read('components/auth/protected-route.jsx');
     assert.match(guard, /location\.pathname \+ location\.search/, 'ProtectedRoute persists a tokenless path');
 
     // 4. /accept-invite must be a path the 401 handler recognises as
@@ -116,7 +116,7 @@ test('an invite link opened signed-out survives the sign-in detour with its toke
 });
 
 test('the team page keeps the token it is given instead of discarding it', () => {
-    const team = read('pages/organizers/team/index.tsx');
+    const team = read('pages/organizers/team/index.jsx');
     assert.match(
         team,
         /const created = await orgMembersApi\.invite\(/,
@@ -131,8 +131,8 @@ test('nothing in the invite flow claims an email was sent', () => {
     // kind. Any copy implying delivery is a lie the user will act on by
     // waiting for something that never arrives.
     const files = {
-        'pages/organizers/team/index.tsx': read('pages/organizers/team/index.tsx'),
-        'pages/organizers/team/invite-link-card.tsx': read('pages/organizers/team/invite-link-card.tsx'),
+        'pages/organizers/team/index.jsx': read('pages/organizers/team/index.jsx'),
+        'pages/organizers/team/invite-link-card.jsx': read('pages/organizers/team/invite-link-card.jsx'),
         'pages/organizers/invite-accept.tsx': read('pages/organizers/invite-accept.tsx'),
     };
     const forbidden = [
@@ -155,7 +155,7 @@ test('nothing in the invite flow claims an email was sent', () => {
 });
 
 test('the team page states the expiry and the shown-once rule', () => {
-    const card = read('pages/organizers/team/invite-link-card.tsx');
+    const card = read('pages/organizers/team/invite-link-card.jsx');
     assert.match(card, /stops working on/i, 'the expiry must be stated plainly');
     assert.match(card, /only time the link is shown/i, 'the shown-once rule must be stated');
     assert.match(card, /revoke the invite/i, 'the recovery path for a lost link must be stated');
@@ -164,7 +164,7 @@ test('the team page states the expiry and the shown-once rule', () => {
 test('the invite token is never written to storage', () => {
     // A bearer credential persisted on a shared venue laptop outlives the
     // person who created it. Component state only.
-    for (const p of ['pages/organizers/team/index.tsx', 'pages/organizers/team/invite-link-card.tsx', 'pages/organizers/team/invite-link.ts']) {
+    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.jsx', 'pages/organizers/team/invite-link.js']) {
         const source = read(p);
         assert.equal(/localStorage|sessionStorage|document\.cookie/.test(source), false, `${p} persists the invite token`);
     }

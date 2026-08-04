@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { resetCommandFor, RESET_SUBCOMMAND } from './operator-reset.ts';
+import { resetCommandFor, RESET_SUBCOMMAND } from './operator-reset.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..', '..');
@@ -52,15 +52,15 @@ test('the reset link the CLI prints lands on a route the app declares', () => {
     const routes = read('web/src/routes.tsx');
     assert.match(routes, /path="\/update-password"/, 'no /update-password route — every printed reset link is dead');
 
-    const page = read('web/src/pages/auth/update-password.tsx');
+    const page = read('web/src/pages/auth/update-password.jsx');
     assert.match(page, /searchParams\.get\('token'\)/, 'the update-password page does not read the token from the URL');
 });
 
 test('nothing in the reset flow claims an email was sent', () => {
     const files = {
-        'web/src/pages/auth/forgot-password.tsx': read('web/src/pages/auth/forgot-password.tsx'),
-        'web/src/pages/auth/update-password.tsx': read('web/src/pages/auth/update-password.tsx'),
-        'web/src/pages/auth/operator-reset.ts': read('web/src/pages/auth/operator-reset.ts'),
+        'web/src/pages/auth/forgot-password.jsx': read('web/src/pages/auth/forgot-password.jsx'),
+        'web/src/pages/auth/update-password.jsx': read('web/src/pages/auth/update-password.jsx'),
+        'web/src/pages/auth/operator-reset.js': read('web/src/pages/auth/operator-reset.js'),
     };
     const forbidden = [
         /reset email sent/i,
@@ -78,7 +78,7 @@ test('nothing in the reset flow claims an email was sent', () => {
 });
 
 test('the forgot-password page states the truth and gives a real path', () => {
-    const page = read('web/src/pages/auth/forgot-password.tsx');
+    const page = read('web/src/pages/auth/forgot-password.jsx');
     assert.match(page, /does not send email/i, 'the page must say plainly that no email is coming');
     assert.match(page, /resetCommandFor\(email\)/, 'the page must show the operator command for the address typed');
     // And it must no longer fire the API call whose token nobody can read.

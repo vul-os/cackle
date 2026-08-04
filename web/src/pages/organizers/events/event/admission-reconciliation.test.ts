@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { summarize, orderClaims, gateLabel, NEVER_PREVENTED_NOTE } from './admission-reconciliation.js';
+import { summarize, orderClaims, gateLabel, NEVER_PREVENTED_NOTE } from './admission-reconciliation.ts';
 
 // Fixture mirroring the server's own end-to-end test
 // (TestAdmissionConflicts_TwoPartitionedGatesSurfacedAfterSync): gate North's
