@@ -2,8 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Wallet, ShieldCheck, Landmark, FlaskConical } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import Footer from '@/pages/visitor/landing/footer.tsx';
-import Header from '@/pages/visitor/header.tsx';
+import Footer from '@/pages/visitor/landing/footer.jsx';
+import Header from '@/pages/visitor/header.jsx';
 import { BUILD_STATUS_LABEL, NO_FEE_STATEMENT } from '@/components/honesty/claims';
 
 /**
