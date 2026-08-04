@@ -1,12 +1,26 @@
 import React, { useMemo } from 'react';
 import { ShoppingCart, Clock, MapPin, ArrowRight } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuContent as DropdownMenuContentUntyped,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useCart } from '@/context/use-cart';
 import { format } from 'date-fns';
 import { Money } from '@/components/ui/money';
 import { Separator } from '@/components/ui/separator';
+
+// `dropdown-menu.jsx` is still JS (a later migration phase), so its
+// `forwardRef` wrappers don't carry a usable prop type. Re-typed here at the
+// one call site rather than converting the whole file, via the same
+// ComponentPropsWithoutRef/ElementRef pattern the already-converted Radix
+// wrappers use.
+const DropdownMenuContent = DropdownMenuContentUntyped as unknown as React.ForwardRefExoticComponent<
+    React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> & React.RefAttributes<React.ElementRef<typeof DropdownMenuPrimitive.Content>>
+>;
 
 // No `isMobile` prop any more: the trigger used to shrink to `size="sm"`
 // (32px) on exactly the screens where it needed to be BIGGER. It is one
@@ -97,7 +111,7 @@ const CartDropdown = () => {
                             })}
                         </div>
 
-                        <Separator variant="perforated" className="my-4" style={{ '--notch': 'var(--popover)' }} />
+                        <Separator variant="perforated" className="my-4" style={{ '--notch': 'var(--popover)' } as React.CSSProperties} />
 
                         {/* One line per currency: a cart spanning events in
                             different currencies has no single meaningful grand
