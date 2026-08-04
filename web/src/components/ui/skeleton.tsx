@@ -1,3 +1,5 @@
+import type { HTMLAttributes } from 'react';
+
 import { cn } from '@/lib/utils';
 
 /**
@@ -7,7 +9,7 @@ import { cn } from '@/lib/utils';
  * sheen is `motion-safe:` only, so reduced-motion users get the plain muted
  * block with no moving parts at all rather than a near-instant flicker.
  */
-function Skeleton({ className, ...props }) {
+function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
     return (
         <div className={cn('relative overflow-hidden rounded-md bg-muted animate-pulse', className)} {...props}>
             <span
@@ -22,7 +24,7 @@ function Skeleton({ className, ...props }) {
  * Drop-in replacement for the ad-hoc event/listing card skeletons duplicated
  * across visitor pages (image + title + meta lines).
  */
-function SkeletonCard({ className }) {
+function SkeletonCard({ className }: { className?: string }) {
     return (
         <div className={cn('overflow-hidden rounded-xl border border-border', className)}>
             <Skeleton className="aspect-[16/9] w-full rounded-none" />
@@ -39,11 +41,11 @@ function SkeletonCard({ className }) {
  * Drop-in replacement for the ad-hoc "3 pulsing rows" skeleton used for
  * list/table-like loading states (e.g. orders, events lists).
  */
-function SkeletonListRow({ className }) {
+function SkeletonListRow({ className }: { className?: string }) {
     return <Skeleton className={cn('h-20 w-full rounded-lg', className)} />;
 }
 
-function SkeletonList({ rows = 3, className }) {
+function SkeletonList({ rows = 3, className }: { rows?: number; className?: string }) {
     return (
         <div className={cn('space-y-3', className)} role="status" aria-label="Loading">
             {Array.from({ length: rows }).map((_, i) => (
@@ -53,7 +55,7 @@ function SkeletonList({ rows = 3, className }) {
     );
 }
 
-function SkeletonCardGrid({ count = 6, className }) {
+function SkeletonCardGrid({ count = 6, className }: { count?: number; className?: string }) {
     return (
         <div className={cn('grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3', className)} role="status" aria-label="Loading">
             {Array.from({ length: count }).map((_, i) => (
