@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNowStrict } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -8,15 +8,22 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton, SkeletonCardGrid } from '@/components/ui/skeleton';
 import { Money } from '@/components/ui/money';
-import { Calendar, Plus, QrCode, Ticket, Coins, ShieldCheck, MapPin, ArrowRight } from 'lucide-react';
+import { Calendar, Plus, QrCode, Ticket, Coins, ShieldCheck, MapPin, ArrowRight, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
 import { events as eventsApi } from '@/lib/api';
+import type { CackleEvent, EventStats } from '@/lib/api-types';
 
-const statusVariant = {
+const statusVariant: Record<string, 'secondary' | 'default' | 'destructive'> = {
     draft: 'secondary',
     published: 'default',
     cancelled: 'destructive',
 };
+
+interface HomeState {
+    events: CackleEvent[];
+    loading: boolean;
+    error: string | null;
+}
 
 // The icon and the label ride one row; the VALUE gets the card's full inner
 // width on the row below.
@@ -35,7 +42,14 @@ const statusVariant = {
 // a 4-up row is far narrower than a full-width one on a phone. Measured against
 // the widest real demo figure ("KWD 1,437.000", 180px at 24px / 150px at 20px)
 // every band keeps at least 27px of slack, so a figure never has to break.
-const StatTile = ({ icon: Icon, label, value, loading }) => (
+interface StatTileProps {
+    icon: LucideIcon;
+    label: string;
+    value: ReactNode;
+    loading: boolean;
+}
+
+const StatTile = ({ icon: Icon, label, value, loading }: StatTileProps) => (
     <Card>
         <CardContent className="flex flex-col gap-3 p-5">
             <div className="flex items-center gap-3">
@@ -57,7 +71,7 @@ const StatTile = ({ icon: Icon, label, value, loading }) => (
 // than a hand-formatted string, so every figure gets the shared tabular
 // treatment. Cackle has no privileged currency, so an org's events can span
 // several — there is no single meaningful "total" to blend them into.
-const RevenueValue = ({ revenueByCurrency }) => {
+const RevenueValue = ({ revenueByCurrency }: { revenueByCurrency: Record<string, number> }) => {
     const entries = Object.entries(revenueByCurrency);
     if (entries.length === 0) return <>—</>;
     // Only surface currencies that actually earned something. An org whose
@@ -69,7 +83,7 @@ const RevenueValue = ({ revenueByCurrency }) => {
     return (
         <>
             {shown.map(([currency, minor], i) => (
-                <React.Fragment key={currency || i}>
+                <Fragment key={currency || i}>
                     {i > 0 ? ' ' : null}
                     {/* Each figure is one unbreakable unit, and the separator
                         is bound to the END of the figure it follows — like a
@@ -81,7 +95,7 @@ const RevenueValue = ({ revenueByCurrency }) => {
                         <Money minor={minor} currency={currency} />
                         {i < shown.length - 1 ? ' ·' : null}
                     </span>
-                </React.Fragment>
+                </Fragment>
             ))}
         </>
     );
@@ -90,8 +104,8 @@ const RevenueValue = ({ revenueByCurrency }) => {
 const HomePage = () => {
     const navigate = useNavigate();
     const { activeOrg, orgs } = useAuth();
-    const [state, setState] = useState({ events: [], loading: true, error: null });
-    const [statsById, setStatsById] = useState({});
+    const [state, setState] = useState<HomeState>({ events: [], loading: true, error: null });
+    const [statsById, setStatsById] = useState<Record<string, EventStats>>({});
 
     // Owner/admin can create, edit, duplicate and delete events; a scanner
     // can see everything on this page (it's the same read bar as stats/
@@ -109,7 +123,7 @@ const HomePage = () => {
             .listForOrg(activeOrg.id)
             .then(async (data) => {
                 if (cancelled) return;
-                const list = Array.isArray(data) ? data : (data?.events ?? []);
+                const list = data?.events ?? [];
                 setState({ events: list, loading: false, error: null });
 
                 // Best-effort per-event stats for the dashboard totals. A single
@@ -117,17 +131,17 @@ const HomePage = () => {
                 // dashboard — it just doesn't contribute to the totals.
                 const results = await Promise.allSettled(list.map((ev) => eventsApi.stats(ev.id)));
                 if (cancelled) return;
-                const next = {};
+                const next: Record<string, EventStats> = {};
                 results.forEach((r, i) => {
-                    if (r.status === 'fulfilled') {
-                        next[list[i].id] = r.value?.stats ?? r.value;
+                    if (r.status === 'fulfilled' && r.value?.stats) {
+                        next[list[i].id] = r.value.stats;
                     }
                 });
                 setStatsById(next);
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ events: [], loading: false, error: err.message || 'Could not load your events.' });
+                setState({ events: [], loading: false, error: err instanceof Error ? err.message : 'Could not load your events.' });
             });
 
         return () => {
@@ -137,11 +151,18 @@ const HomePage = () => {
 
     useEffect(() => loadDashboard(), [loadDashboard]);
 
-    const eventsById = useMemo(() => Object.fromEntries(state.events.map((e) => [e.id, e])), [state.events]);
+    const eventsById = useMemo<Record<string, CackleEvent>>(
+        () => Object.fromEntries(state.events.map((e) => [e.id, e])),
+        [state.events],
+    );
 
     const totals = useMemo(() => {
         const entries = Object.entries(statsById);
-        const base = { sold: 0, admitted: 0, revenueByCurrency: {} };
+        const base: { sold: number; admitted: number; revenueByCurrency: Record<string, number> } = {
+            sold: 0,
+            admitted: 0,
+            revenueByCurrency: {},
+        };
         return entries.reduce((acc, [eventId, s]) => {
             const currency = eventsById[eventId]?.currency || '';
             return {
@@ -159,7 +180,7 @@ const HomePage = () => {
         const now = Date.now();
         const upcoming = state.events
             .filter((e) => e.status === 'published' && e.starts_at && new Date(e.starts_at).getTime() >= now)
-            .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+            .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
         return upcoming[0] ?? null;
     }, [state.events]);
 
