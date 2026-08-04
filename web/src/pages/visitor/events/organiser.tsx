@@ -1,8 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { events as eventsApi } from '@/lib/api';
-import { orgForEvent, showsOrgLabels } from '@/lib/host';
+import { orgForEvent, showsOrgLabels, type MaybeHost, type EventOrgRef } from '@/lib/host';
 import { orgPageHref } from '@/lib/org-page';
+
+export interface OrganiserAttributionEvent extends EventOrgRef {
+    slug?: unknown;
+}
+
+export interface OrganiserAttributionProps {
+    event: OrganiserAttributionEvent | null | undefined;
+    className?: string;
+}
 
 /**
  * "Presented by X" on an event page, linking to that organiser's own page.
@@ -32,8 +41,8 @@ import { orgPageHref } from '@/lib/org-page';
  * near-identical copy of the listing they are already on. A single venue is not
  * dressed up as a directory, here or anywhere else.
  */
-export default function OrganiserAttribution({ event, className = '' }) {
-    const [host, setHost] = useState(null);
+export default function OrganiserAttribution({ event, className = '' }: OrganiserAttributionProps) {
+    const [host, setHost] = useState<MaybeHost>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -57,6 +66,7 @@ export default function OrganiserAttribution({ event, className = '' }) {
     const org = orgForEvent(host, event);
     const href = orgPageHref(org);
     if (!org || !href) return null;
+    const orgName = typeof org.name === 'string' ? org.name : null;
 
     return (
         <p className={`text-sm text-muted-foreground ${className}`}>
@@ -65,7 +75,7 @@ export default function OrganiserAttribution({ event, className = '' }) {
                 href={href}
                 className="inline-flex min-h-[44px] items-center gap-1.5 font-medium text-foreground underline underline-offset-4 hover:text-primary sm:min-h-0"
             >
-                {org.name}
+                {orgName}
                 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </a>
         </p>
