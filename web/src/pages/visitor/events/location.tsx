@@ -30,13 +30,20 @@ const TILE_ATTRIBUTION = import.meta.env.VITE_CACKLE_MAP_TILE_ATTRIBUTION || '';
 
 const SelfHostedMap = lazy(() => import('./self-hosted-map'));
 
+export interface LocationSectionProps {
+    venueName?: string | null;
+    address?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+}
+
 /**
  * Venue/location block. The address plus an explicit "open in maps" link is
  * the source of truth and always renders with zero network dependency. An
  * embedded map appears only when the deployment configured a tile server it
  * controls.
  */
-const LocationSection = ({ venueName, address, lat, lng }) => {
+const LocationSection = ({ venueName, address, lat, lng }: LocationSectionProps) => {
     const [mapFailed, setMapFailed] = useState(false);
     const hasCoords = typeof lat === 'number' && typeof lng === 'number' && !(lat === 0 && lng === 0);
     const showMap = hasCoords && Boolean(TILE_URL) && !mapFailed;
@@ -85,8 +92,8 @@ const LocationSection = ({ venueName, address, lat, lng }) => {
                 <div className="aspect-video border-t border-border">
                     <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
                         <SelfHostedMap
-                            lat={lat}
-                            lng={lng}
+                            lat={lat as number}
+                            lng={lng as number}
                             label={venueName || address}
                             tileUrl={TILE_URL}
                             attribution={TILE_ATTRIBUTION}
