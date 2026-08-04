@@ -1,4 +1,4 @@
-import React from 'react';
+import type { CSSProperties } from 'react';
 import { Home, CalendarDays, Settings, QrCode } from 'lucide-react';
 import { NavItem } from './nav-item';
 import { BrandLockup } from '@/components/brand/wordmark';
@@ -10,7 +10,12 @@ const navItems = [
     { to: '/admin/settings', icon: Settings, text: 'Settings' },
 ];
 
-const SideNav = ({ isExpanded, isMobile }) => {
+interface SideNavProps {
+    isExpanded: boolean;
+    isMobile: boolean;
+}
+
+const SideNav = ({ isExpanded, isMobile }: SideNavProps) => {
     return (
         <div
             className={`flex h-full w-full flex-col overflow-hidden bg-sidebar transition-opacity duration-300 ${isMobile && !isExpanded ? 'invisible opacity-0' : 'visible opacity-100'}`}
@@ -34,7 +39,7 @@ const SideNav = ({ isExpanded, isMobile }) => {
             <div className="shrink-0 px-4 pb-5 pt-1">
                 <div
                     className="ticket-perforation mb-4"
-                    style={{ '--notch': 'var(--sidebar-background)' }}
+                    style={{ '--notch': 'var(--sidebar-background)' } as CSSProperties}
                     aria-hidden="true"
                 />
                 <BrandLockup
