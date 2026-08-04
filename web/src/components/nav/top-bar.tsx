@@ -1,4 +1,4 @@
-import React from 'react';
+import type { RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, User, ChevronDown, Building2, LogOut, Moon, Sun, Check } from 'lucide-react';
 import { useAuth } from '@/context/use-auth';
@@ -14,7 +14,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BrandLockup } from '@/components/brand/wordmark';
 
-const TopBar = ({ onMenuClick, toggleButtonRef }) => {
+interface TopBarProps {
+    onMenuClick: () => void;
+    toggleButtonRef: RefObject<HTMLButtonElement>;
+}
+
+const TopBar = ({ onMenuClick, toggleButtonRef }: TopBarProps) => {
     const { user, signOut, orgs, activeOrg, switchOrg } = useAuth();
     const { theme, setTheme } = useTheme();
 
