@@ -1,10 +1,21 @@
+import type { Category } from '@/lib/api-types';
+
+/** A category option for the organiser-side pickers: the fallback list has
+ * no live `count`, so it is optional here even though the server's own
+ * `Category` always carries one. */
+export interface CategoryOption {
+    slug: string;
+    label: string;
+    count?: number;
+}
+
 // Fallback event category list shown when GET /api/categories has nothing
 // to offer yet (a brand-new org with no events, or the endpoint failing —
 // categories are a filter convenience, never a hard requirement to create
 // an event). Organisers can still type any label; these just seed sensible
 // choices and keep slugs consistent with what the public browse/landing
 // category filter (owned by the visitor pages) expects.
-export const FALLBACK_CATEGORIES = [
+export const FALLBACK_CATEGORIES: CategoryOption[] = [
     { slug: 'music', label: 'Music' },
     { slug: 'nightlife', label: 'Nightlife & Club' },
     { slug: 'arts-theatre', label: 'Arts & Theatre' },
@@ -23,14 +34,14 @@ export const FALLBACK_CATEGORIES = [
  * fallback list (so a new org always has something to pick from), de-duped
  * by slug, server entries winning on conflict.
  */
-export function mergeCategories(serverCategories) {
-    const bySlug = new Map(FALLBACK_CATEGORIES.map((c) => [c.slug, c]));
+export function mergeCategories(serverCategories: Array<Partial<Category>> | null | undefined): CategoryOption[] {
+    const bySlug = new Map<string, CategoryOption>(FALLBACK_CATEGORIES.map((c) => [c.slug, c]));
     for (const c of serverCategories ?? []) {
         if (c?.slug) bySlug.set(c.slug, { slug: c.slug, label: c.label || c.slug, count: c.count });
     }
     return Array.from(bySlug.values());
 }
 
-export function categoryLabel(slug) {
+export function categoryLabel(slug: string): string {
     return FALLBACK_CATEGORIES.find((c) => c.slug === slug)?.label ?? slug;
 }
