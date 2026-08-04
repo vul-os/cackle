@@ -5,14 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Check, ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, Clock, XCircle, RotateCcw, Hash } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Calendar, MapPin, Ticket, Clock, XCircle, RotateCcw, Hash, type LucideIcon } from 'lucide-react';
 import Header from '@/pages/visitor/header';
 import { orders as ordersApi, events as eventsApi, tickets as ticketsApi } from '@/lib/api';
 import { Money } from '@/components/ui/money';
 import Footer from '@/pages/visitor/landing/footer';
 import { humanError } from '@/pages/visitor/errors';
+import type { Order, CackleEvent, TicketType, Ticket as TicketRecord } from '@/lib/api-types';
 
-function formatWhen(iso) {
+function formatWhen(iso: string | null | undefined): string | null {
     if (!iso) return null;
     try {
         return new Date(iso).toLocaleString(undefined, {
@@ -28,7 +29,7 @@ function formatWhen(iso) {
     }
 }
 
-function statusColor(status) {
+function statusColor(status: string): string {
     switch (status) {
         case 'paid':
             return 'bg-success/15 text-success';
@@ -48,12 +49,21 @@ function statusColor(status) {
     }
 }
 
+type TimelineTone = 'done' | 'current' | 'error';
+
+interface TimelineStep {
+    key: string;
+    label: string;
+    at: string | null | undefined;
+    tone: TimelineTone;
+}
+
 // Order status is a small state machine, not a free-form log — the API
 // exposes only `status` plus `created_at`/`paid_at` timestamps, so the
 // timeline below is derived, not fetched. It's still accurate: every
 // terminal status implies exactly one path through "placed → ...".
-function buildTimeline(order) {
-    const steps = [{ key: 'created', label: 'Order placed', at: order.created_at, tone: 'done' }];
+function buildTimeline(order: Order): TimelineStep[] {
+    const steps: TimelineStep[] = [{ key: 'created', label: 'Order placed', at: order.created_at, tone: 'done' }];
     switch (order.status) {
         case 'paid':
             steps.push({ key: 'paid', label: 'Payment confirmed', at: order.paid_at, tone: 'done' });
@@ -77,14 +87,14 @@ function buildTimeline(order) {
     return steps;
 }
 
-const TIMELINE_ICON = { done: Check, current: Clock, error: XCircle };
-const TIMELINE_DOT_CLASS = {
+const TIMELINE_ICON: Record<TimelineTone, LucideIcon> = { done: Check, current: Clock, error: XCircle };
+const TIMELINE_DOT_CLASS: Record<TimelineTone, string> = {
     done: 'border-success bg-success text-success-foreground',
     current: 'border-warning bg-warning text-warning-foreground',
     error: 'border-destructive bg-destructive text-destructive-foreground',
 };
 
-function OrderTimeline({ order }) {
+function OrderTimeline({ order }: { order: Order }) {
     const steps = buildTimeline(order);
     return (
         <ol className="space-y-0">
@@ -122,29 +132,38 @@ function OrderDetailSkeleton() {
     );
 }
 
+interface OrderPageState {
+    order: Order | null;
+    loading: boolean;
+    error: string | null;
+}
+
+/** The event this order is for, with its ticket types folded in so ticketTypeName() can read from one place. */
+type OrderEvent = CackleEvent & { ticket_types: TicketType[] };
+
 export default function OrderPage() {
     const { id } = useParams();
     const navigate = useNavigate();
-    const [state, setState] = useState({ order: null, loading: true, error: null });
+    const [state, setState] = useState<OrderPageState>({ order: null, loading: true, error: null });
     const [reloadToken, setReloadToken] = useState(0);
     // GET /api/orders/{id} returns bare order_id/ticket_type_id foreign keys,
     // no nested event/ticket-type — enrich client-side against the public
     // event endpoint, which also carries ticket_types (id -> name).
-    const [event, setEvent] = useState(null);
-    const [myTickets, setMyTickets] = useState(null);
+    const [event, setEvent] = useState<OrderEvent | null>(null);
+    const [myTickets, setMyTickets] = useState<TicketRecord[] | undefined | null>(null);
 
     useEffect(() => {
         let cancelled = false;
         setState((s) => ({ ...s, loading: true, error: null }));
         ordersApi
-            .get(id)
+            .get(id ?? '')
             .then((data) => {
                 if (cancelled) return;
-                setState({ order: data?.order ?? data, loading: false, error: null });
+                setState({ order: data.order, loading: false, error: null });
             })
             .catch((err) => {
                 if (cancelled) return;
-                setState({ order: null, loading: false, error: err.message || 'Order not found.' });
+                setState({ order: null, loading: false, error: err?.message || 'Order not found.' });
             });
         return () => {
             cancelled = true;
@@ -152,7 +171,7 @@ export default function OrderPage() {
     }, [id, reloadToken]);
 
     const { order, loading, error } = state;
-    const items = order?.items ?? order?.order_items ?? [];
+    const items = order?.items ?? [];
 
     useEffect(() => {
         if (!order?.event_id) return;
@@ -165,8 +184,7 @@ export default function OrderPage() {
                 // — flatten into one object with ticket_types attached so
                 // callers can read event.title and look up ticket type names
                 // from the same fetch.
-                const ev = data?.event ?? data;
-                setEvent(ev ? { ...ev, ticket_types: data?.ticket_types ?? [] } : null);
+                setEvent({ ...data.event, ticket_types: data.ticket_types ?? [] });
             })
             .catch(() => {
                 if (!cancelled) setEvent(null);
@@ -189,8 +207,7 @@ export default function OrderPage() {
             .list()
             .then((data) => {
                 if (cancelled) return;
-                const list = Array.isArray(data) ? data : (data?.tickets ?? []);
-                setMyTickets(list.filter((t) => t.order_id === order.id));
+                setMyTickets((data.tickets ?? []).filter((t) => t.order_id === order.id));
             })
             .catch(() => {
                 if (!cancelled) setMyTickets([]);
@@ -200,7 +217,7 @@ export default function OrderPage() {
         };
     }, [order]);
 
-    const ticketTypeName = (ticketTypeId) => event?.ticket_types?.find((t) => t.id === ticketTypeId)?.name ?? 'Ticket';
+    const ticketTypeName = (ticketTypeId: string): string => event?.ticket_types?.find((t) => t.id === ticketTypeId)?.name ?? 'Ticket';
 
     return (
         <div className="flex min-h-screen flex-col bg-background">
