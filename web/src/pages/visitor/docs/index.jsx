@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Header from '@/pages/visitor/header';
-import Footer from '@/pages/visitor/landing/footer.tsx';
+import Footer from '@/pages/visitor/landing/footer';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

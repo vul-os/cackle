@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/error-state';
 import { CalendarX2 } from 'lucide-react';
 import Header from '@/pages/visitor/header';
-import Footer from '@/pages/visitor/landing/footer.tsx';
+import Footer from '@/pages/visitor/landing/footer';
 import { events as eventsApi } from '@/lib/api';
 import { humanError } from '@/pages/visitor/errors';
 

@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { BookOpen, Github, Ticket, Building2, ArrowRight, ExternalLink } from 'lucide-react';
-import Footer from '@/pages/visitor/landing/footer.tsx';
-import Header from '@/pages/visitor/header.tsx';
+import Footer from '@/pages/visitor/landing/footer';
+import Header from '@/pages/visitor/header';
 
 // ── Why there is no contact form on this page ─────────────────────────────
 //
