@@ -1,13 +1,13 @@
 import React from 'react';
 import { useAuth } from '@/context/use-auth';
-import { useTheme } from '@/components/theme-provider';
+import { useTheme, type Theme } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Building2, Mail, Moon, Sun, Monitor, LogOut, Users, Banknote, ChevronRight, Plus, Link2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const THEME_OPTIONS = [
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
     { value: 'light', label: 'Light', icon: Sun },
     { value: 'dark', label: 'Dark', icon: Moon },
     { value: 'system', label: 'System', icon: Monitor },
