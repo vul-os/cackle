@@ -132,7 +132,7 @@ test('nothing in the invite flow claims an email was sent', () => {
     // waiting for something that never arrives.
     const files = {
         'pages/organizers/team/index.jsx': read('pages/organizers/team/index.jsx'),
-        'pages/organizers/team/invite-link-card.jsx': read('pages/organizers/team/invite-link-card.jsx'),
+        'pages/organizers/team/invite-link-card.tsx': read('pages/organizers/team/invite-link-card.tsx'),
         'pages/organizers/invite-accept.tsx': read('pages/organizers/invite-accept.tsx'),
     };
     const forbidden = [
@@ -155,7 +155,7 @@ test('nothing in the invite flow claims an email was sent', () => {
 });
 
 test('the team page states the expiry and the shown-once rule', () => {
-    const card = read('pages/organizers/team/invite-link-card.jsx');
+    const card = read('pages/organizers/team/invite-link-card.tsx');
     assert.match(card, /stops working on/i, 'the expiry must be stated plainly');
     assert.match(card, /only time the link is shown/i, 'the shown-once rule must be stated');
     assert.match(card, /revoke the invite/i, 'the recovery path for a lost link must be stated');
@@ -164,7 +164,7 @@ test('the team page states the expiry and the shown-once rule', () => {
 test('the invite token is never written to storage', () => {
     // A bearer credential persisted on a shared venue laptop outlives the
     // person who created it. Component state only.
-    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.jsx', 'pages/organizers/team/invite-link.ts']) {
+    for (const p of ['pages/organizers/team/index.jsx', 'pages/organizers/team/invite-link-card.tsx', 'pages/organizers/team/invite-link.ts']) {
         const source = read(p);
         assert.equal(/localStorage|sessionStorage|document\.cookie/.test(source), false, `${p} persists the invite token`);
     }

@@ -1,8 +1,16 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState, type FocusEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, Copy, KeyRound, X } from 'lucide-react';
 import { copyTextToClipboard } from './invite-link';
+
+interface InviteLinkCardProps {
+    url: string;
+    email: string;
+    roleLabel: string;
+    expiresAt?: string | null;
+    onDismiss?: () => void;
+}
 
 /**
  * The invite link, shown once, for the owner to send themselves.
@@ -24,10 +32,10 @@ import { copyTextToClipboard } from './invite-link';
  *     built without downgrading a credential to plaintext at rest. The
  *     recovery path is revoke-and-reinvite, and it is stated here.
  */
-const InviteLinkCard = ({ url, email, roleLabel, expiresAt, onDismiss }) => {
+const InviteLinkCard = ({ url, email, roleLabel, expiresAt, onDismiss }: InviteLinkCardProps) => {
     const [copied, setCopied] = useState(false);
     const [copyFailed, setCopyFailed] = useState(false);
-    const inputRef = useRef(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const handleCopy = async () => {
         const ok = await copyTextToClipboard(url);
@@ -72,7 +80,7 @@ const InviteLinkCard = ({ url, email, roleLabel, expiresAt, onDismiss }) => {
                         readOnly
                         value={url}
                         aria-label="Invite link"
-                        onFocus={(e) => e.target.select()}
+                        onFocus={(e: FocusEvent<HTMLInputElement>) => e.target.select()}
                         className="min-h-11 w-full flex-1 rounded-md border border-input bg-background px-3 py-2 font-mono text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                     <Button type="button" onClick={handleCopy} className="shrink-0 sm:w-36">
