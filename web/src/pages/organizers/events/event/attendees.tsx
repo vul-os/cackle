@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Skeleton, SkeletonList } from '@/components/ui/skeleton';
-import { ArrowLeft, Users, Ticket, Coins, ShieldCheck, Search, Download } from 'lucide-react';
+import { ArrowLeft, Users, Ticket, Coins, ShieldCheck, Search, Download, type LucideIcon } from 'lucide-react';
 import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
 import { formatMoney } from '@/lib/money';
 import { Money } from '@/components/ui/money';
+import type { CackleEvent, EventStats, AttendeeRow, TicketTypeStats } from '@/lib/api-types';
 
 const PAGE_SIZE = 50;
 
@@ -31,13 +32,13 @@ const STATUS_OPTIONS = [
 
 /** Hand-rolled CSV — no dependency. Wraps any field containing a comma,
  * quote or newline in quotes and escapes embedded quotes by doubling them. */
-function toCsvField(value) {
+function toCsvField(value: unknown): string {
     const s = value === undefined || value === null ? '' : String(value);
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
 }
 
-function downloadCsv(filename, rows) {
+function downloadCsv(filename: string, rows: unknown[][]) {
     const csv = rows.map((row) => row.map(toCsvField).join(',')).join('\r\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -50,14 +51,14 @@ function downloadCsv(filename, rows) {
     URL.revokeObjectURL(url);
 }
 
-function statusBadge(row) {
+function statusBadge(row: AttendeeRow) {
     if (row.status === 'void') return <Badge variant="destructive">Void</Badge>;
     if (row.status === 'refunded') return <Badge variant="destructive">Refunded</Badge>;
     if (row.admitted) return <Badge variant="secondary">Admitted</Badge>;
     return <Badge variant="outline">Valid</Badge>;
 }
 
-const StatTile = ({ icon: Icon, label, value }) => (
+const StatTile = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: React.ReactNode }) => (
     <Card>
         <CardContent className="flex items-center gap-4 p-5">
             <div className="rounded-xl bg-primary/10 p-3 text-primary-emphasis">
@@ -71,37 +72,52 @@ const StatTile = ({ icon: Icon, label, value }) => (
     </Card>
 );
 
+interface SummaryState {
+    event: CackleEvent | null;
+    stats: EventStats | null;
+    priceByTypeId: Record<string, number>;
+    loading: boolean;
+    error: string | null;
+}
+
+interface RosterState {
+    attendees: AttendeeRow[];
+    total: number;
+    loading: boolean;
+    error: string | null;
+}
+
 const EventAttendeesPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
 
     // Event + ticket-type breakdown (aggregate summary, unchanged from before).
-    const [summary, setSummary] = useState({ event: null, stats: null, priceByTypeId: {}, loading: true, error: null });
+    const [summary, setSummary] = useState<SummaryState>({ event: null, stats: null, priceByTypeId: {}, loading: true, error: null });
 
     // The real per-attendee roster.
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
     const [status, setStatus] = useState('all');
     const [offset, setOffset] = useState(0);
-    const [roster, setRoster] = useState({ attendees: [], total: 0, loading: true, error: null });
+    const [roster, setRoster] = useState<RosterState>({ attendees: [], total: 0, loading: true, error: null });
 
     const fetchSummary = useCallback(() => {
         setSummary((s) => ({ ...s, loading: true, error: null }));
-        Promise.all([eventsApi.get(id), eventsApi.stats(id), ticketTypesApi.list(id)])
+        Promise.all([eventsApi.get(id ?? ''), eventsApi.stats(id ?? ''), ticketTypesApi.list(id ?? '')])
             .then(([eventData, statsData, ticketTypesData]) => {
-                const types = Array.isArray(ticketTypesData) ? ticketTypesData : (ticketTypesData?.ticket_types ?? []);
-                const priceByTypeId = {};
+                const types = ticketTypesData.ticket_types ?? [];
+                const priceByTypeId: Record<string, number> = {};
                 for (const t of types) priceByTypeId[t.id] = t.price_minor;
                 setSummary({
-                    event: eventData?.event ?? eventData,
-                    stats: statsData?.stats ?? statsData,
+                    event: eventData.event,
+                    stats: statsData.stats,
                     priceByTypeId,
                     loading: false,
                     error: null,
                 });
             })
             .catch((err) => {
-                setSummary({ event: null, stats: null, priceByTypeId: {}, loading: false, error: err.message || 'Could not load event summary.' });
+                setSummary({ event: null, stats: null, priceByTypeId: {}, loading: false, error: err?.message || 'Could not load event summary.' });
             });
     }, [id]);
 
@@ -123,7 +139,7 @@ const EventAttendeesPage = () => {
     const fetchRoster = useCallback(() => {
         setRoster((r) => ({ ...r, loading: true, error: null }));
         eventsApi
-            .attendees(id, {
+            .attendees(id ?? '', {
                 q: debouncedQuery || undefined,
                 status: status === 'all' ? undefined : status,
                 limit: PAGE_SIZE,
@@ -133,7 +149,7 @@ const EventAttendeesPage = () => {
                 setRoster({ attendees: data?.attendees ?? [], total: data?.total ?? 0, loading: false, error: null });
             })
             .catch((err) => {
-                setRoster({ attendees: [], total: 0, loading: false, error: err.message || 'Could not load the attendee list.' });
+                setRoster({ attendees: [], total: 0, loading: false, error: err?.message || 'Could not load the attendee list.' });
             });
     }, [id, debouncedQuery, status, offset]);
 
@@ -150,9 +166,9 @@ const EventAttendeesPage = () => {
     const pageCount = Math.max(1, Math.ceil(rosterTotal / PAGE_SIZE));
 
     const handleExportTypeCsv = () => {
-        const rows = [
+        const rows: unknown[][] = [
             ['Ticket type', 'Price', 'Sold', 'Capacity', 'Remaining', 'Revenue'],
-            ...byType.map((t) => [
+            ...byType.map((t: TicketTypeStats) => [
                 t.name ?? '',
                 formatMoney(priceByTypeId[t.ticket_type_id], currency),
                 t.sold ?? 0,
@@ -169,7 +185,7 @@ const EventAttendeesPage = () => {
     // roster, under the active search/filter) — not a silent full-table
     // dump the organiser didn't ask to download.
     const handleExportAttendeesCsv = () => {
-        const rows = [
+        const rows: unknown[][] = [
             ['Holder name', 'Ticket type', 'Serial', 'Order reference', 'Status', 'Issued', 'Admitted at'],
             ...attendees.map((a) => [
                 a.holder_name ?? '',
