@@ -2,6 +2,18 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+export interface WizardStep {
+    key: string;
+    label: string;
+}
+
+export interface WizardStepperProps {
+    steps: WizardStep[];
+    currentStep: number;
+    maxStepReached: number;
+    onStepClick: (index: number) => void;
+}
+
 /**
  * Horizontal step indicator for the create-event wizard. A step is
  * clickable once the wizard has reached it at least once (`maxStepReached`)
@@ -16,7 +28,7 @@ import { cn } from '@/lib/utils';
  * suite's 44px touch-target floor, measured at 390px; a text-sm pill with
  * only `py-1.5` padding renders at ~32px and would fail that bar.
  */
-const WizardStepper = ({ steps, currentStep, maxStepReached, onStepClick }) => {
+const WizardStepper = ({ steps, currentStep, maxStepReached, onStepClick }: WizardStepperProps) => {
     return (
         <div className="mb-8">
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
