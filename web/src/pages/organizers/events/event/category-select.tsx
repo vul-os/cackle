@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { categories as categoriesApi } from '@/lib/api';
-import { mergeCategories } from '../categories';
+import { mergeCategories, type CategoryOption } from '../categories';
+
+export interface CategorySelectProps {
+    value?: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    id?: string;
+}
 
 /**
  * Category picker for the event editor + create wizard. Backed by
@@ -10,8 +17,8 @@ import { mergeCategories } from '../categories';
  * from) still has something to choose from — a failed fetch here degrades
  * to the fallback list silently rather than blocking the form.
  */
-const CategorySelect = ({ value, onChange, disabled, id }) => {
-    const [options, setOptions] = useState(() => mergeCategories([]));
+const CategorySelect = ({ value, onChange, disabled, id }: CategorySelectProps) => {
+    const [options, setOptions] = useState<CategoryOption[]>(() => mergeCategories([]));
 
     useEffect(() => {
         let cancelled = false;
@@ -19,7 +26,9 @@ const CategorySelect = ({ value, onChange, disabled, id }) => {
             .list()
             .then((data) => {
                 if (cancelled) return;
-                const list = Array.isArray(data) ? data : (data?.categories ?? []);
+                // docs/API.md specifies a bare array; tolerate a {categories: [...]}
+                // envelope too, same as pages/visitor/events/use-categories.ts.
+                const list = Array.isArray(data) ? data : Array.isArray(data?.categories) ? data.categories : [];
                 setOptions(mergeCategories(list));
             })
             .catch(() => {
