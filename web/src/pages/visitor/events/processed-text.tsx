@@ -1,6 +1,11 @@
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+export interface ProcessedTextProps {
+    content?: string | null;
+    className?: string;
+}
 
 // Every colour below comes from a semantic token, so this flips with the
 // theme instead of needing a `dark:` patch per element. Links and the
@@ -8,10 +13,16 @@ import remarkGfm from 'remark-gfm';
 // the token index.css already defines separately per theme (RED-INK 5.87:1
 // on light, a lifted red in dark) — rather than a hand-picked hex repeated in
 // both a light and a dark class.
-const ProcessedText = ({ content, className = '' }) => {
+const ProcessedText = ({ content, className = '' }: ProcessedTextProps) => {
   if (!content) return null;
 
-  const components = {
+  // react-markdown v9's typed `code`/`li` component props no longer declare
+  // `inline`/`ordered` (see its Components type in node_modules — both
+  // component slots are just plain ComponentProps<tag> & ExtraProps now).
+  // These extended locally rather than dropped, to keep the existing
+  // rendering exactly as it was under the untyped .jsx version — changing
+  // that behaviour is out of scope for this conversion.
+  const components: Components = {
     h1: ({ children }) => (
       <h1 className="mb-4 mt-8 text-2xl font-bold text-foreground">{children}</h1>
     ),
@@ -31,15 +42,17 @@ const ProcessedText = ({ content, className = '' }) => {
     ol: ({ children }) => (
       <ol className="mt-4 list-decimal space-y-2 pl-5 marker:text-muted-foreground">{children}</ol>
     ),
-    li: ({ children, ordered }) =>
-      ordered ? (
+    li: ({ children, ...props }) => {
+      const ordered = (props as { ordered?: boolean }).ordered;
+      return ordered ? (
         <li className="text-foreground">{children}</li>
       ) : (
         <li className="flex items-center gap-2">
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground" />
           <span className="text-foreground">{children}</span>
         </li>
-      ),
+      );
+    },
     a: ({ href, children }) => (
       <a
         href={href}
@@ -50,13 +63,16 @@ const ProcessedText = ({ content, className = '' }) => {
         {children}
       </a>
     ),
-    code: ({ inline, children }) => (
-      inline ?
-        <code className="rounded bg-muted px-1.5 py-0.5 text-sm text-foreground">{children}</code> :
+    code: ({ children, ...props }) => {
+      const inline = (props as { inline?: boolean }).inline;
+      return inline ? (
+        <code className="rounded bg-muted px-1.5 py-0.5 text-sm text-foreground">{children}</code>
+      ) : (
         <pre className="mb-4 mt-4 overflow-x-auto rounded-lg bg-muted p-4">
           <code className="text-sm text-foreground">{children}</code>
         </pre>
-    ),
+      );
+    },
     blockquote: ({ children }) => (
       <blockquote className="my-4 border-l-4 border-primary-emphasis pl-4 italic text-muted-foreground">
         {children}
