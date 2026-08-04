@@ -4,6 +4,23 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AlertCircle } from 'lucide-react';
 
+export interface BillingDetails {
+    name: string;
+    email: string;
+}
+
+export interface BillingErrors {
+    name?: string;
+    email?: string;
+}
+
+interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id'> {
+    id: string;
+    label: string;
+    hint?: string;
+    error?: string;
+}
+
 /**
  * The two things Cackle needs to issue a ticket, and nothing else. No
  * address, no card fields — the money is handled by whatever rail the
@@ -14,7 +31,7 @@ import { AlertCircle } from 'lucide-react';
  * says "missing details" does not tell anybody WHICH field, and on a phone
  * it disappears before they have scrolled back up to look.
  */
-const Field = ({ id, label, hint, error, ...inputProps }) => (
+const Field = ({ id, label, hint, error, ...inputProps }: FieldProps) => (
     <div className="space-y-2">
         <Label htmlFor={id}>{label}</Label>
         <Input
@@ -38,7 +55,13 @@ const Field = ({ id, label, hint, error, ...inputProps }) => (
     </div>
 );
 
-const BillingForm = ({ billingDetails, handleInputChange, errors = {} }) => (
+export interface BillingFormProps {
+    billingDetails: BillingDetails;
+    handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    errors?: BillingErrors;
+}
+
+const BillingForm = ({ billingDetails, handleInputChange, errors = {} }: BillingFormProps) => (
     <Card>
         <CardHeader>
             <CardTitle>Your details</CardTitle>
