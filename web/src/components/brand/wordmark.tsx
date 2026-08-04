@@ -1,6 +1,9 @@
-import React from 'react';
+import type { HTMLAttributes, ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import logo from '/cackle.svg';
+
+type Size = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+type Tone = 'auto' | 'onDark' | 'onLight';
 
 // The one place Cackle's identity is drawn.
 //
@@ -35,7 +38,7 @@ import logo from '/cackle.svg';
  * white in dark. The other two are for surfaces that pin their own ground
  * regardless of theme: the console chrome (always ink) and the gate screen.
  */
-const TONES = {
+const TONES: Record<Tone, string> = {
     auto: 'text-foreground',
     onDark: 'text-sidebar-foreground',
     // `text-brand-2` is the registered utility for INK-as-identity (see
@@ -52,7 +55,7 @@ const TONES = {
  * SIZES pairs a type step with the tile size that balances it. Every step is
  * at or above the suite's 12px floor.
  */
-const SIZES = {
+const SIZES: Record<Size, { text: string; tile: string; gap: string }> = {
     xs: { text: 'text-sm', tile: 'h-6 w-6', gap: 'gap-1.5' },
     sm: { text: 'text-lg', tile: 'h-7 w-7', gap: 'gap-2' },
     md: { text: 'text-2xl', tile: 'h-8 w-8', gap: 'gap-2' },
@@ -71,7 +74,7 @@ const SIZES = {
  *
  * @param {string} size
  */
-const stepFor = (size) => SIZES[size] ?? SIZES['md'];
+const stepFor = (size: Size) => SIZES[size] ?? SIZES['md'];
 
 /**
  * Wordmark renders `Cackle.` — the type half of the identity.
@@ -82,7 +85,13 @@ const stepFor = (size) => SIZES[size] ?? SIZES['md'];
  * @param {boolean} [props.hideWordBelowSm] collapse to the tile on narrow
  *   screens (the console top bar does this to protect the 390px layout)
  */
-export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }) {
+interface WordmarkProps extends HTMLAttributes<HTMLSpanElement> {
+    size?: Size;
+    tone?: Tone;
+    hideWordBelowSm?: boolean;
+}
+
+export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }: WordmarkProps) {
     const step = stepFor(size);
     return (
         <span
@@ -116,7 +125,11 @@ export function Wordmark({ size = 'md', tone = 'auto', hideWordBelowSm = false, 
  * @param {'xs'|'sm'|'md'|'lg'|'xl'} [props.size]
  * @param {string} [props.alt]
  */
-export function LogoTile({ size = 'md', alt = '', className, ...props }) {
+interface LogoTileProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'width' | 'height' | 'size'> {
+    size?: Size;
+}
+
+export function LogoTile({ size = 'md', alt = '', className, ...props }: LogoTileProps) {
     const step = stepFor(size);
     return (
         <img
@@ -143,7 +156,13 @@ export function LogoTile({ size = 'md', alt = '', className, ...props }) {
  * @param {'auto'|'onDark'|'onLight'} [props.tone]
  * @param {boolean} [props.hideWordBelowSm]
  */
-export function BrandLockup({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }) {
+interface BrandLockupProps extends HTMLAttributes<HTMLSpanElement> {
+    size?: Size;
+    tone?: Tone;
+    hideWordBelowSm?: boolean;
+}
+
+export function BrandLockup({ size = 'md', tone = 'auto', hideWordBelowSm = false, className, ...props }: BrandLockupProps) {
     const step = stepFor(size);
     return (
         <span className={cn('inline-flex items-center', step.gap, className)} {...props}>
