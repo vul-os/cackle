@@ -126,7 +126,7 @@ const EventCard = ({ event, org, pricing, index = 0, featured = false }: EventCa
                                     'Free'
                                 ) : (
                                     <>
-                                        From <Money minor={price as number} currency={event.currency} />
+                                        From <Money minor={price} currency={event.currency} />
                                     </>
                                 )}
                             </div>
