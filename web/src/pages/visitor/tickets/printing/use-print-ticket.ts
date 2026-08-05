@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** `null` (nothing being printed), `'all'`, or a single ticket id. */
-export type PrintTarget = string | 'all' | null;
+/** `null` (nothing being printed), `'all'`, or a single ticket id. `'all'` is
+ * a plain string, not a distinct type — TypeScript collapses a string
+ * literal into its wider `string` in a union, so this is documented here
+ * rather than in the type itself. */
+export type PrintTarget = string | null;
 
 export interface UsePrintTicketResult {
     isPrinting: boolean;
