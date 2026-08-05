@@ -47,7 +47,12 @@ const SignIn = () => {
     // navigate() unmounts the page that triggered it is exactly the kind of
     // message that is easy to miss, and this is the one page it matters most
     // to see.
-    const [passwordUpdated] = useState(() => Boolean(location.state?.passwordUpdated));
+    const [passwordUpdated] = useState(() => {
+        // react-router types location.state as any — narrowed here rather
+        // than trusted (see the identical note in ./auth-redirect.tsx).
+        const state = location.state as { passwordUpdated?: unknown } | null | undefined;
+        return Boolean(state?.passwordUpdated);
+    });
 
     // A provider sign-in comes back to this page with ?sso=<reason>. The
     // session, when there is one, arrives as a cookie — never in this URL,
