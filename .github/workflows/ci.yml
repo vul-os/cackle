@@ -96,6 +96,14 @@ jobs:
         working-directory: web
         run: npm ci
 
+      # vite build (below) strips types without checking them, so a green
+      # build proves the bundle emits, not that the code typechecks. This
+      # runs the real compiler in --noEmit mode as a hard gate — no
+      # continue-on-error, no loosened tsconfig.
+      - name: Typecheck
+        working-directory: web
+        run: npm run typecheck
+
       - name: Lint
         working-directory: web
         run: npm run lint
