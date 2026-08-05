@@ -59,6 +59,15 @@ export function useEventPricing(events: PricedEvent[]): Record<string, EventPric
                 });
                 return next;
             });
+        }).catch((err: unknown) => {
+            // Promise.allSettled itself never rejects — every individual
+            // fetch's outcome is already captured in `results` above. A
+            // rejection here can only mean the .then callback itself threw
+            // (a real bug in this file), so this is surfaced rather than
+            // silently swallowed; it must not crash the page either, since
+            // this hook's whole contract is "a failure degrades to no price
+            // shown for that one card, not a broken page".
+            if (!cancelled) console.error('useEventPricing: failed to apply fetched pricing', err);
         });
         return () => {
             cancelled = true;
