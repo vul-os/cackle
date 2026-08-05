@@ -97,7 +97,23 @@ export function showsPeerEvents(host: MaybeHost) {
 
 /** Every organisation this listing can contain. Always an array. */
 export function hostOrgs(host: MaybeHost): HostOrgRef[] {
-    return Array.isArray(host?.organisations) ? host.organisations : [];
+    // Array.isArray narrows to any[] (a known imprecision in TS's own
+    // Array.isArray typing, not something local to this file), so returning
+    // it directly as HostOrgRef[] would be an unverified cast. Filtering to
+    // non-null objects is the real (if loose) guarantee HostOrgRef asks
+    // for — every field on it is optional, so any plain object structurally
+    // satisfies it, and this at least rejects a malformed element that
+    // isn't an object at all (a string, a number, null).
+    if (!Array.isArray(host?.organisations)) return [];
+    return host.organisations.filter((o: unknown): o is HostOrgRef => typeof o === 'object' && o !== null);
+}
+
+/** The organisation's own name, or '' when absent or not actually a string —
+ * every field on the wire envelope is `unknown` (see the file doc comment),
+ * so this is the one place that turns `org.name` into text, and it never
+ * hands back anything but a string a visitor could read. */
+function orgName(org: HostOrgRef | null | undefined): string {
+    return typeof org?.name === 'string' ? org.name : '';
 }
 
 /**
@@ -122,7 +138,8 @@ export function orgForEvent(host: MaybeHost, event: EventOrgRef | null | undefin
  * quietly collapsed into one.
  */
 export function orgHref(org: HostOrgRef | null | undefined) {
-    return org?.slug ? `/events?host=${encodeURIComponent(String(org.slug))}` : '/events';
+    const slug = typeof org?.slug === 'string' ? org.slug : '';
+    return slug ? `/events?host=${encodeURIComponent(slug)}` : '/events';
 }
 
 /** The operator's name for this host, or '' when they have not given one. */
@@ -137,8 +154,8 @@ export function hostName(host: MaybeHost) {
  * has narrowed the listing to one organisation on a box that hosts several.
  */
 export function hostHeading(host: MaybeHost) {
-    const org = host?.org;
-    if (org?.name) return `Events from ${org.name}`;
+    const org = orgName(host?.org);
+    if (org) return `Events from ${org}`;
     const name = hostName(host);
     return name ? `What's on at ${name}` : "What's on";
 }
@@ -148,12 +165,13 @@ export function hostHeading(host: MaybeHost) {
  * buyer actually needs, and claims nothing about anywhere else.
  */
 export function hostSubheading(host: MaybeHost) {
-    if (host?.org?.name) return `Tickets sold by ${host.org.name}.`;
+    const org = orgName(host?.org);
+    if (org) return `Tickets sold by ${org}.`;
     const orgs = hostOrgs(host);
     if (showsOrgLabels(host)) {
         return `Tickets for ${orgs.length} organisations on this site.`;
     }
-    const name = hostName(host) || orgs[0]?.name;
+    const name = hostName(host) || orgName(orgs[0]);
     return name ? `Tickets sold by ${name}.` : 'Tickets sold direct by the people running these events.';
 }
 
@@ -165,6 +183,6 @@ export function hostSubheading(host: MaybeHost) {
 export const EMPTY_HEADING = 'Nothing on sale right now';
 
 export function emptyDescription(host: MaybeHost) {
-    const name = host?.org?.name || hostName(host) || hostOrgs(host)[0]?.name;
+    const name = orgName(host?.org) || hostName(host) || orgName(hostOrgs(host)[0]);
     return name ? `${name} has no tickets on sale at the moment.` : 'There are no tickets on sale at the moment.';
 }
