@@ -6,9 +6,13 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // scripts/ is a standalone Node tooling script, out of scope for this
-  // pass; web/src is the app surface this config targets.
-  globalIgnores(['dist', 'node_modules', 'scripts']),
+  // scripts/contrast-report.mjs is a standalone Node tooling script, out of
+  // scope for this pass; web/src is the app surface this config targets.
+  // scripts/check-lint-config.mjs is carved OUT of this ignore (see the
+  // dedicated block below) — it's this repo's own CI gate script, and
+  // leaving it ignored is exactly what let it enumerate in `eslint .`'s
+  // count while having zero rules applied, hiding a dead import.
+  globalIgnores(['dist', 'node_modules', 'scripts/contrast-report.mjs']),
 
   // Shared across both JS and TS: the app's own plugin rules don't care
   // which language a file is written in.
@@ -99,6 +103,21 @@ export default defineConfig([
       // handleEnterScanMode, fixed separately) are unaffected: only the
       // attributes check is narrowed, `arguments`/`returns` stay on.
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+    },
+  },
+
+  // check-lint-config.mjs is ".mjs", matched by no `files` glob above (which
+  // covers .{js,jsx,ts,tsx}, never .mjs) — un-ignoring it above alone left it
+  // enumerated in `eslint .`'s count with zero rules applied (confirmed via
+  // --print-config showing 0 resolved rules, and an injected unused-var
+  // probe that went unflagged before this block existed). It runs under
+  // Node only.
+  {
+    files: ['scripts/check-lint-config.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: 'module',
     },
   },
 
