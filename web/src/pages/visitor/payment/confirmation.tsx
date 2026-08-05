@@ -43,12 +43,12 @@ export default function PaymentConfirmationPage() {
                 setStatus('success');
                 toast({ title: 'Payment received', description: 'Your tickets are ready.' });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
                 setStatus('failed');
                 toast({
                     title: 'Could not confirm payment',
-                    description: err.message || 'We could not verify this payment.',
+                    description: err instanceof Error ? err.message : 'We could not verify this payment.',
                     variant: 'destructive',
                 });
             });
