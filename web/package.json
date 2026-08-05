@@ -8,6 +8,7 @@
         "dev:force": "vite --force",
         "build": "vite build",
         "lint": "eslint .",
+        "check:lint-config": "node scripts/check-lint-config.mjs",
         "test": "node --test",
         "preview": "vite preview"
     },
