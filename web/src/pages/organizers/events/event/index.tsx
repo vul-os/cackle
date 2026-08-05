@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { CalendarX } from 'lucide-react';
-import { events as eventsApi, ticketTypes as ticketTypesApi } from '@/lib/api';
+import { events as eventsApi, ticketTypes as ticketTypesApi, ApiError } from '@/lib/api';
 import type { UpdateEventInput } from '@/lib/api-types';
 import { useAuth } from '@/context/use-auth';
 import { slugify } from '../slug';
@@ -97,16 +97,16 @@ const EventPage = () => {
                 initializeForm(data.event);
                 setLoading(false);
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
                 // A 404 means the event genuinely doesn't exist (deleted, bad
                 // link) — that's an empty state, not an error. Everything else
                 // (network blip, 5xx) is transient and deserves a retry rather
                 // than being told the event is gone.
-                if (err?.status === 404) {
+                if (err instanceof ApiError && err.status === 404) {
                     setNotFound(true);
                 } else {
-                    setLoadError(err?.message || 'Could not load this event.');
+                    setLoadError(err instanceof Error ? err.message : 'Could not load this event.');
                 }
                 setLoading(false);
             });
