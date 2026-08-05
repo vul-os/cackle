@@ -92,8 +92,8 @@ const LocationSection = ({ venueName, address, lat, lng }: LocationSectionProps)
                 <div className="aspect-video border-t border-border">
                     <Suspense fallback={<Skeleton className="h-full w-full rounded-none" />}>
                         <SelfHostedMap
-                            lat={lat as number}
-                            lng={lng as number}
+                            lat={lat}
+                            lng={lng}
                             label={venueName || address}
                             tileUrl={TILE_URL}
                             attribution={TILE_ATTRIBUTION}
