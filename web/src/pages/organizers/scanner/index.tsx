@@ -92,9 +92,19 @@ const ScannerPage = () => {
     }, [gateId]);
 
     const refreshCached = async () => {
-        const bundles = await listCachedBundles();
-        setCachedIds(new Set(bundles.map((b) => b.event_id)));
-        return bundles;
+        try {
+            const bundles = await listCachedBundles();
+            setCachedIds(new Set(bundles.map((b) => b.event_id)));
+            return bundles;
+        } catch {
+            // The local store read failed (evicted, over quota, a private
+            // mode that pretends IndexedDB works). This is called from
+            // loadEvents' offline fallback below, whose whole point is to
+            // keep working when there is nothing else to fall back to — an
+            // unhandled rejection here would have silently broken exactly
+            // the path a gate with no network is relying on.
+            return [];
+        }
     };
 
     // Factored out (rather than inlined in the mount effect) so the error
@@ -105,7 +115,7 @@ const ScannerPage = () => {
     // (or an unmount) avoid clobbering newer state.
     const loadEvents = useCallback((cancelledRef?: { current: boolean }) => {
         setState((s) => ({ ...s, loading: true, error: null }));
-        refreshCached();
+        void refreshCached();
         eventsApi
             .list()
             .then((data) => {
@@ -155,7 +165,17 @@ const ScannerPage = () => {
     };
 
     const handleEnterScanMode = async (event: ScannerListEvent) => {
-        let bundle: CachedBundle | ScanBundle | undefined = (await getBundle(event.id)) as CachedBundle | undefined;
+        let bundle: CachedBundle | ScanBundle | undefined;
+        try {
+            bundle = (await getBundle(event.id)) as CachedBundle | undefined;
+        } catch (err) {
+            // The local cache read itself failed — this used to be an
+            // unhandled rejection with no toast at all, which for the one
+            // button this offline-first page exists to make reliable meant
+            // tapping "Enter scan mode" could silently do nothing.
+            toast({ title: 'Could not read the local scan cache', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+            return;
+        }
         if (!bundle && online) {
             try {
                 bundle = await scanApi.bundle(event.id);
