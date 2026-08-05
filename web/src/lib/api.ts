@@ -127,6 +127,13 @@ function buildQuery(params: Record<string, unknown> | null | undefined): string 
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
         if (value === undefined || value === null || value === '') continue;
+        // Every query-params interface in this file widens to
+        // `[key: string]: unknown` for extensibility, but a real query
+        // param is always a primitive — an object/array here would silently
+        // become "[object Object]"/"a,b,c" in the URL. Skip rather than
+        // send it: a missing param the server treats as absent is a much
+        // smaller failure than a garbled one it tries to parse.
+        if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') continue;
         search.set(key, String(value));
     }
     const qs = search.toString();
@@ -291,6 +298,18 @@ export const auth = {
     // their link was missing one. `get`'s second parameter is `query`, so
     // the old form did not even fail loudly; it turned the option into a
     // querystring object and moved on.
+    // no-unnecessary-type-assertion flags the `as Promise<AuthMeResponse>`
+    // below, but it is NOT unnecessary — verified by removing it and
+    // running `tsc --noEmit` directly, which then fails with three real
+    // errors in context/use-auth.tsx (refresh()'s return type collapses to
+    // Promise<unknown>, which callers destructuring `.user`/`.orgs` don't
+    // type-check against). `request()`'s type parameter defaults to
+    // `unknown` with nothing here to infer it from, so this cast is what
+    // actually pins the return type; ESLint's isolated per-rule type
+    // resolution appears to disagree with the full-program compiler on
+    // this one expression shape (an assertion on an arrow function's
+    // implicit-return call expression, inside an untyped object literal).
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     me: (opts: Partial<RequestOptions> = {}) => request('/auth/me', { method: 'GET', ...opts }) as Promise<AuthMeResponse>,
     passwordReset: (email: string) => post('/auth/password-reset', { email }),
     passwordUpdate: (token: string, password: string) => post('/auth/password-update', { token, password }),
