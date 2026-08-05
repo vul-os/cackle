@@ -36,14 +36,18 @@ export function useEventPricing(events: PricedEvent[]): Record<string, EventPric
             setById((prev) => {
                 const next = { ...prev };
                 results.forEach((res, i) => {
+                    // `results` was built from `ids.map(...)` above, so index i
+                    // is always populated in `ids` too.
+                    const ref = ids[i];
+                    if (ref === undefined) return;
                     if (res.status !== 'fulfilled') {
-                        next[ids[i]] = null;
+                        next[ref] = null;
                         return;
                     }
                     const types = res.value?.ticket_types ?? [];
                     const available = visibleTicketTypes(types);
                     if (available.length === 0) {
-                        next[ids[i]] = { minPriceMinor: null, soldOut: false };
+                        next[ref] = { minPriceMinor: null, soldOut: false };
                         return;
                     }
                     const soldOut = available.every((t) => remainingFor(t) <= 0);
@@ -51,7 +55,7 @@ export function useEventPricing(events: PricedEvent[]): Record<string, EventPric
                         (min: number | null, t) => (min === null || t.price_minor < min ? t.price_minor : min),
                         null,
                     );
-                    next[ids[i]] = { minPriceMinor, soldOut };
+                    next[ref] = { minPriceMinor, soldOut };
                 });
                 return next;
             });

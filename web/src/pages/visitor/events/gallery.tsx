@@ -104,19 +104,20 @@ const EventGallery = ({ images = [], title = 'Event', className }: EventGalleryP
 
     // Single-image state: no controls, no slider chrome, just the image.
     if (count === 1) {
+        // count === images.length === 1, so this index is always populated.
+        const only = images[0];
+        if (!only) return null;
         return (
             <div className={cn('h-full w-full', className)}>
-                <img
-                    src={images[0].url}
-                    alt={images[0].alt || title}
-                    className="h-full w-full object-cover"
-                    loading="eager"
-                />
+                <img src={only.url} alt={only.alt || title} className="h-full w-full object-cover" loading="eager" />
             </div>
         );
     }
 
+    // `index` is only ever set via `goTo`, which wraps it into [0, count) —
+    // so with count >= 2 here, this index is always populated.
     const current = images[index];
+    if (!current) return null;
 
     return (
         <div

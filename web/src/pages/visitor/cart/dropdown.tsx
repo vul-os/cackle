@@ -70,7 +70,12 @@ const CartDropdown = () => {
                     <>
                         <div className="-mx-1 mt-3 max-h-[50vh] space-y-4 overflow-y-auto px-1">
                             {groups.map(([eventId, items]) => {
-                                const event = items[0].event;
+                                // A group only exists in itemsByEvent because at
+                                // least one item was pushed into it, so index 0
+                                // is always populated.
+                                const first = items[0];
+                                if (!first) return null;
+                                const event = first.event;
                                 return (
                                     <div key={eventId} className="border-b border-border pb-4 last:border-0 last:pb-0">
                                         <h3 className="text-sm font-semibold leading-snug">{event.title}</h3>

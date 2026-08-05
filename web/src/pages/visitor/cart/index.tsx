@@ -92,7 +92,12 @@ const CartPage = () => {
 
                 <div className="mt-8 space-y-8">
                     {groups.map(([eventId, eventItems]) => {
-                        const event = eventItems[0].event;
+                        // A group only exists in itemsByEvent because at least
+                        // one item was pushed into it, so index 0 is always
+                        // populated.
+                        const first = eventItems[0];
+                        if (!first) return null;
+                        const event = first.event;
                         const subtotal = eventTotal(eventId);
                         const when = whenLabel(event.starts_at);
 

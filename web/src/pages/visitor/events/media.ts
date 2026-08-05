@@ -23,9 +23,9 @@ export type ImageReference = string | ImageRef | null | undefined;
  * `CackleEvent` itself has no `gallery` field — this is the legacy/joined
  * shape described in the file banner, not part of the documented DTO. */
 export interface EventMediaSource {
-    title?: string;
+    title?: string | undefined;
     cover_image?: ImageReference;
-    cover_image_id?: string;
+    cover_image_id?: string | undefined;
     gallery?: ImageReference[];
 }
 

@@ -170,7 +170,12 @@ const EventAttendeesPage = () => {
             ['Ticket type', 'Price', 'Sold', 'Capacity', 'Remaining', 'Revenue'],
             ...byType.map((t: TicketTypeStats) => [
                 t.name ?? '',
-                formatMoney(priceByTypeId[t.ticket_type_id], currency),
+                // The stats endpoint and the ticket-types list are two separate
+                // calls (see fetchSummary above); a type that's since been
+                // deleted can appear in stats but not in priceByTypeId. There is
+                // no real price to show then, so fall back to 0 rather than
+                // fail the whole export.
+                formatMoney(priceByTypeId[t.ticket_type_id] ?? 0, currency),
                 t.sold ?? 0,
                 t.quantity_total ?? 0,
                 Math.max(0, (t.quantity_total ?? 0) - (t.sold ?? 0)),
@@ -277,7 +282,9 @@ const EventAttendeesPage = () => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <Money minor={priceByTypeId[t.ticket_type_id]} currency={currency} />
+                                                        {/* see the comment on the CSV export above: a deleted ticket
+                                                        type can be absent from priceByTypeId */}
+                                                        <Money minor={priceByTypeId[t.ticket_type_id] ?? 0} currency={currency} />
                                                     </TableCell>
                                                     <TableCell className="tnum text-right">{t.sold ?? 0}</TableCell>
                                                     <TableCell className="tnum text-right">{t.quantity_total ?? 0}</TableCell>

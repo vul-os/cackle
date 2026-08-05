@@ -374,12 +374,29 @@ export async function getAdmissionsForEvent(eventId: string) {
     return db.getAllFromIndex(STORE_ADMISSIONS, 'by_event', eventId);
 }
 
-export async function getTally(eventId: string) {
+/** getTally's return shape: named counts a caller can read without an
+ * indexed lookup (a plain `Record<string, number>` would make even
+ * `tally.admitted` read as `number | undefined` under
+ * noUncheckedIndexedAccess). */
+export interface Tally {
+    admitted: number;
+    duplicate: number;
+    invalid: number;
+    wrong_event: number;
+    total: number;
+}
+
+export async function getTally(eventId: string): Promise<Tally> {
     const rows = await getAdmissionsForEvent(eventId);
-    const tally: Record<string, number> = { admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: rows.length };
+    const tally: Tally = { admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: rows.length };
     for (const row of rows) {
-        const current = tally[row.result];
-        if (current !== undefined) tally[row.result] = current + 1;
+        // `result` is a plain `string` on the record (not the RESULT union),
+        // so branch explicitly rather than index into `tally` by it — an
+        // unrecognised value is silently not counted, same as before.
+        if (row.result === 'admitted') tally.admitted++;
+        else if (row.result === 'duplicate') tally.duplicate++;
+        else if (row.result === 'invalid') tally.invalid++;
+        else if (row.result === 'wrong_event') tally.wrong_event++;
     }
     return tally;
 }

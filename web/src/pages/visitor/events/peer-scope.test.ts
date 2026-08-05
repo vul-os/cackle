@@ -150,7 +150,9 @@ test('opting in does not lower the bar on which rows may be rendered', () => {
 test('a row that does not declare itself external is DROPPED, not rendered', () => {
     const kept = usablePeerRows({ events: [row(), row({ external: false }), row({ external: undefined }), row({ external: 'true' })] });
     assert.equal(kept.length, 1);
-    assert.equal(kept[0].title, 'Spring Fair');
+    const [only] = kept;
+    assert.ok(only);
+    assert.equal(only.title, 'Spring Fair');
 });
 
 test('a row with no link out is dropped — the link out is the only action there is', () => {

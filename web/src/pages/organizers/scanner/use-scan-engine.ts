@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { verifyWithRing, type KeyRing } from '@/lib/capability';
-import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced, type AdmissionRecord } from '@/lib/scan-store';
+import { recordScan, getTally, wasAdmitted, getPendingSync, markSynced, type AdmissionRecord, type Tally } from '@/lib/scan-store';
 import { scan as scanApi } from '@/lib/api';
 import { useOnline } from '@/lib/use-online';
 import { uuid } from '@/lib/utils';
@@ -102,7 +102,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
         () => new Set(Array.isArray(admittedIndex) ? admittedIndex : []),
         [admittedIndex],
     );
-    const [tally, setTally] = useState<Record<string, number>>({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
+    const [tally, setTally] = useState<Tally>({ admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: 0 });
     const [pendingCount, setPendingCount] = useState(0);
     const [lastResult, setLastResult] = useState<ScanResult | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);

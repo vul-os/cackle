@@ -75,7 +75,8 @@ const EventsPage = () => {
                 const results = await Promise.allSettled(list.map((ev) => eventsApi.stats(ev.id)));
                 const next: Record<string, EventStats> = {};
                 results.forEach((r, i) => {
-                    if (r.status === 'fulfilled') next[list[i].id] = r.value.stats;
+                    const ev = list[i];
+                    if (ev && r.status === 'fulfilled') next[ev.id] = r.value.stats;
                 });
                 setStatsById(next);
             })

@@ -19,7 +19,9 @@ export interface EventHeaderProps {
 // the ordinary theme tokens; only the on-photo layer reaches for `media-*`.
 const EventHeader = ({ title, venueName, category }: EventHeaderProps) => {
     const handleShare = async () => {
-        const shareData = { title, url: window.location.href };
+        // `ShareData` is a lib.dom type with `title?: string` (no explicit
+        // `| undefined`), so omit the key entirely rather than pass one.
+        const shareData: ShareData = { url: window.location.href, ...(title ? { title } : {}) };
         try {
             if (navigator.share) {
                 await navigator.share(shareData);

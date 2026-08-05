@@ -113,7 +113,14 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
             const next = [...current];
             const target = index + direction;
             if (target < 0 || target >= next.length) return current;
-            [next[index], next[target]] = [next[target], next[index]];
+            const a = next[index];
+            const b = next[target];
+            // Both indices were just bounds-checked above (index by the
+            // caller, target by the check on the line before), so both slots
+            // are populated — but noUncheckedIndexedAccess can't see that.
+            if (a === undefined || b === undefined) return current;
+            next[index] = b;
+            next[target] = a;
             if (eventId) {
                 eventsApi.update(eventId, { gallery_order: next.map((img) => img.id) } as UpdateEventInput).catch(() => {
                     // best-effort persistence only — see comment above

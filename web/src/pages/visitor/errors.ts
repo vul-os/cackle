@@ -24,7 +24,10 @@ export function humanError(raw: string | null | undefined, fallback: string): st
     if (BARE_STATUS.test(msg)) return fallback;
     if (NOT_AUTHORISED.test(msg)) return 'You need to be signed in as the person who bought this to see it.';
     // Sentence-case and terminate, so a lowercase fragment from the wire
-    // still reads as prose next to the ones written by hand.
-    const sentence = msg[0].toUpperCase() + msg.slice(1);
+    // still reads as prose next to the ones written by hand. `msg` was just
+    // checked non-empty above, so index 0 always exists.
+    const first = msg[0];
+    if (first === undefined) return fallback;
+    const sentence = first.toUpperCase() + msg.slice(1);
     return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }

@@ -18,12 +18,14 @@ interface StatusStyle {
     icon: LucideIcon;
 }
 
+// `text-warning` (the base token), not `text-warning-foreground` — the
+// latter is white-on-solid-fill (badge.tsx) and is nearly invisible on this
+// 15%-tint wash in both themes. `bg-X/15 text-X` is the pattern used
+// everywhere else a status gets a soft badge (alert.tsx, quick-info.tsx).
+const DEFAULT_STYLE: StatusStyle = { className: 'bg-warning/15 text-warning', icon: Clock };
+
 const STATUS_STYLE: Record<string, StatusStyle> = {
-    // `text-warning` (the base token), not `text-warning-foreground` — the
-    // latter is white-on-solid-fill (badge.tsx) and is nearly invisible on
-    // this 15%-tint wash in both themes. `bg-X/15 text-X` is the pattern
-    // used everywhere else a status gets a soft badge (alert.tsx, quick-info.tsx).
-    pending: { className: 'bg-warning/15 text-warning', icon: Clock },
+    pending: DEFAULT_STYLE,
     paid: { className: 'bg-success/15 text-success', icon: CheckCircle2 },
     failed: { className: 'bg-destructive/15 text-destructive', icon: XCircle },
     refunded: { className: 'bg-muted text-muted-foreground', icon: XCircle },
@@ -82,7 +84,11 @@ export default function OrdersPage() {
             setEventsById((prev) => {
                 const next = { ...prev };
                 results.forEach((res, i) => {
-                    next[missing[i]] = res.status === 'fulfilled' ? res.value.event : null;
+                    // `results` was built from `missing.map(...)` above, so
+                    // index i is always populated in `missing` too.
+                    const eventId = missing[i];
+                    if (eventId === undefined) return;
+                    next[eventId] = res.status === 'fulfilled' ? res.value.event : null;
                 });
                 return next;
             });
@@ -134,7 +140,7 @@ export default function OrdersPage() {
                 {!state.loading && !state.error && state.orders.length > 0 && (
                     <div className="space-y-3">
                         {state.orders.map((order) => {
-                            const style = STATUS_STYLE[order.status] ?? STATUS_STYLE.pending;
+                            const style = STATUS_STYLE[order.status] ?? DEFAULT_STYLE;
                             const StatusIcon = style.icon;
                             const event = eventsById[order.event_id];
                             const title = event?.title ?? `Order ${order.id.slice(0, 8)}`;

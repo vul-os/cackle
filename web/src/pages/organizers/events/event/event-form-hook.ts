@@ -65,7 +65,7 @@ export interface EventFormSeed {
     ends_at?: string | null;
     timezone?: string | null;
     cover_image?: string | null;
-    cover_image_id?: string | null;
+    cover_image_id?: string | null | undefined;
     category?: string | null;
     currency?: string | null;
     status?: string | null;

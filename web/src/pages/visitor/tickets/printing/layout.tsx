@@ -21,10 +21,10 @@ export type TicketLayoutTicket = Ticket & { seat?: string };
 
 /** The event fields this card actually reads — a view-model subset, not the full CackleEvent. */
 export interface TicketLayoutEvent {
-    starts_at?: string;
-    title?: string;
-    venue_name?: string;
-    address?: string;
+    starts_at?: string | undefined;
+    title?: string | undefined;
+    venue_name?: string | undefined;
+    address?: string | undefined;
 }
 
 /** The ticket-type fields this card actually reads. */

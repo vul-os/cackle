@@ -128,7 +128,7 @@ export interface CackleEvent {
     status: string;
     currency: string;
     category: string;
-    cover_image_id?: string;
+    cover_image_id?: string | undefined;
     created_at: string;
     updated_at: string;
 }
