@@ -41,6 +41,8 @@
  * half of a link somebody might type or read aloud.
  */
 export function orgPageHref(org: { id?: unknown; slug?: unknown; name?: unknown } | null | undefined) {
-    const ref = org?.slug || org?.id;
-    return ref ? `/o/${encodeURIComponent(String(ref))}` : null;
+    const slug = typeof org?.slug === 'string' ? org.slug : '';
+    const id = typeof org?.id === 'string' ? org.id : '';
+    const ref = slug || id;
+    return ref ? `/o/${encodeURIComponent(ref)}` : null;
 }
