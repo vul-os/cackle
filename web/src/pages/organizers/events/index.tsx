@@ -80,7 +80,7 @@ const EventsPage = () => {
                 });
                 setStatsById(next);
             })
-            .catch((err) => setState({ events: [], loading: false, error: err?.message || 'Could not load events.' }));
+            .catch((err: unknown) => setState({ events: [], loading: false, error: err instanceof Error ? err.message : 'Could not load events.' }));
     }, [activeOrg?.id]);
 
     useEffect(() => {
