@@ -59,7 +59,7 @@ const EventImagesPage = () => {
     }, [eventId]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     const handleCoverChange = async (imageId: string | null) => {
