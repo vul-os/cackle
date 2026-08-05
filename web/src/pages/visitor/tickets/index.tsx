@@ -74,9 +74,9 @@ export default function TicketsListPage() {
                 if (cancelled) return;
                 setState({ tickets: data.tickets ?? [], loading: false, error: null });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ tickets: [], loading: false, error: err?.message || 'Could not load your tickets.' });
+                setState({ tickets: [], loading: false, error: err instanceof Error ? err.message : 'Could not load your tickets.' });
             });
         return () => {
             cancelled = true;
