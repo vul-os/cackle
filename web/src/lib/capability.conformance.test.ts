@@ -68,7 +68,12 @@ interface Vectors {
 const here = dirname(fileURLToPath(import.meta.url));
 const vectorsPath = resolve(here, '../../../docs/ticket-format-vectors.json');
 
-const vectors: Vectors = JSON.parse(readFileSync(vectorsPath, 'utf8'));
+// A trusted, repo-local fixture (not external input) — cast through unknown
+// rather than left as JSON.parse's bare `any`, so this is an explicit,
+// visible "we trust this file's shape" rather than an unverified assignment.
+// The MIN_ISSUE/MIN_VERIFY/MIN_RING floors below are the actual guard
+// against a truncated or mis-shaped corpus passing silently.
+const vectors = JSON.parse(readFileSync(vectorsPath, 'utf8')) as unknown as Vectors;
 
 // Floors, not targets. They exist so a truncated or mis-parsed vectors file
 // fails loudly instead of passing by running nothing. Raise them when the
@@ -155,9 +160,9 @@ test('verify vectors', (t) => {
                 `expected a CapabilityError, got ${(thrown as Error | undefined)?.name}: ${(thrown as Error | undefined)?.message}`,
             );
             assert.equal(
-                (thrown as CapabilityError).code,
+                thrown.code,
                 vec.error,
-                `expected code "${vec.error}", got "${(thrown as CapabilityError).code}" (${(thrown as CapabilityError).message})`,
+                `expected code "${vec.error}", got "${thrown.code}" (${thrown.message})`,
             );
         });
         ran++;
@@ -189,10 +194,14 @@ test('verify_with_ring vectors', (t) => {
                 thrown = err;
             }
             assert.ok(thrown, `expected error "${vec.error}", got success`);
+            assert.ok(
+                thrown instanceof CapabilityError,
+                `expected a CapabilityError, got ${(thrown as Error | undefined)?.name}: ${(thrown as Error | undefined)?.message}`,
+            );
             assert.equal(
-                (thrown as CapabilityError).code,
+                thrown.code,
                 vec.error,
-                `expected code "${vec.error}", got "${(thrown as CapabilityError).code}" (${(thrown as CapabilityError).message})`,
+                `expected code "${vec.error}", got "${thrown.code}" (${thrown.message})`,
             );
         });
         ran++;
