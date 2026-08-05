@@ -13,7 +13,14 @@ export const useAuthRedirect = () => {
   const location = useLocation();
 
   const handleSuccessfulAuth = () => {
-    const stateReturnTo = location.state?.returnTo;
+    // react-router types `location.state` as `any` (it carries whatever
+    // shape a caller's `navigate(path, { state })` gave it) — narrowed here
+    // rather than trusted, since the only caller that matters is
+    // AuthProvider's 401 handler passing `{ returnTo: path }` with `path` a
+    // real string (see use-auth.tsx), but nothing enforces that at the type
+    // level.
+    const state = location.state as { returnTo?: unknown } | null | undefined;
+    const stateReturnTo = typeof state?.returnTo === 'string' ? state.returnTo : undefined;
     const storedPath = (() => {
       try {
         return localStorage.getItem(REDIRECT_STORAGE_KEY);
