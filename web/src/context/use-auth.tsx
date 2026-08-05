@@ -38,14 +38,14 @@ const authContextDefault = {
     user: null as User | null,
     orgs: [] as OrgMembership[],
     activeOrg: null as OrgMembership | null,
-    signUp: async () => undefined as unknown as User,
-    signIn: async () => undefined as unknown as User,
+    signUp: () => Promise.resolve(undefined as unknown as User),
+    signIn: () => Promise.resolve(undefined as unknown as User),
     signOut: async () => {},
     requestPasswordReset: async () => {},
     updatePassword: async () => {},
     switchOrg: () => {},
-    createOrg: async () => undefined as Org | undefined,
-    refresh: async () => null as AuthMeResponse | null,
+    createOrg: () => Promise.resolve(undefined as Org | undefined),
+    refresh: () => Promise.resolve(null as AuthMeResponse | null),
 };
 
 export const AuthContext = createContext<AuthContextValue>(authContextDefault);
@@ -80,7 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [applySession]);
 
     useEffect(() => {
-        (async () => {
+        // refresh() catches its own errors (see below) and never rejects, so
+        // this is a deliberate fire-and-forget: the effect itself can't be
+        // async, and nothing here needs to block on the result.
+        void (async () => {
             setLoading(true);
             await refresh();
             setLoading(false);
