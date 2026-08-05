@@ -193,7 +193,10 @@ export function verifyCapability(token: unknown, publicKey: unknown, now = new D
     if (parts.length !== 3) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `expected 3 dot-separated segments, got ${parts.length}`);
     }
-    const [prefix, encPayload, encSig] = parts;
+    // parts.length === 3 was just checked above (and threw otherwise), so
+    // all three indices are populated — these assertions narrow past
+    // noUncheckedIndexedAccess, not around a real gap.
+    const [prefix, encPayload, encSig] = parts as [string, string, string];
     if (prefix !== TOKEN_PREFIX) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `bad prefix "${prefix}"`);
     }
@@ -255,7 +258,8 @@ export function peekKid(token: unknown): string | undefined {
     }
     let partial: unknown;
     try {
-        partial = JSON.parse(bytesToUtf8(base64UrlToBytes(parts[1])));
+        // parts.length === 3 was just checked above, so index 1 exists.
+        partial = JSON.parse(bytesToUtf8(base64UrlToBytes(parts[1] as string)));
     } catch (err) {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, `bad payload json: ${(err as Error).message}`);
     }

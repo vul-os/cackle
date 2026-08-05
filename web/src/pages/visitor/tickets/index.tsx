@@ -37,8 +37,8 @@ interface TicketsState {
 interface TicketEventViewModel {
     id: string;
     title: string;
-    venue_name?: string;
-    starts_at?: string;
+    venue_name?: string | undefined;
+    starts_at?: string | undefined;
 }
 
 interface TicketTypeViewModel {

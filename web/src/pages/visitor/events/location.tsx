@@ -31,10 +31,10 @@ const TILE_ATTRIBUTION = import.meta.env.VITE_CACKLE_MAP_TILE_ATTRIBUTION || '';
 const SelfHostedMap = lazy(() => import('./self-hosted-map'));
 
 export interface LocationSectionProps {
-    venueName?: string | null;
-    address?: string | null;
-    lat?: number | null;
-    lng?: number | null;
+    venueName?: string | null | undefined;
+    address?: string | null | undefined;
+    lat?: number | null | undefined;
+    lng?: number | null | undefined;
 }
 
 /**

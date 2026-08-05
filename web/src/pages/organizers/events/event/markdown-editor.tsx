@@ -47,9 +47,9 @@ export interface MarkdownEditorProps {
     value: string;
     onChange: (value: string) => void;
     name: string;
-    placeholder?: string;
-    minHeight?: string;
-    disabled?: boolean;
+    placeholder?: string | undefined;
+    minHeight?: string | undefined;
+    disabled?: boolean | undefined;
 }
 
 export const MarkdownEditor = ({ value, onChange, name, placeholder, minHeight = '200px', disabled }: MarkdownEditorProps) => {

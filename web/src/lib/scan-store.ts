@@ -114,12 +114,12 @@ function getDB(): Promise<IDBPDatabase<ScanDB>> {
                 if (oldVersion < 2) {
                     const rows = await store.getAll();
                     rows.sort(compareLegacy);
-                    for (let i = 0; i < rows.length; i++) {
+                    for (const [i, row] of rows.entries()) {
                         // 1..N, assigned unconditionally: at v1 no row can
                         // already carry a seq, so these are distinct by
                         // construction and no row can collide with another.
-                        rows[i].seq = i + 1;
-                        await store.put(rows[i]);
+                        row.seq = i + 1;
+                        await store.put(row);
                     }
                 }
             },
@@ -378,7 +378,8 @@ export async function getTally(eventId: string) {
     const rows = await getAdmissionsForEvent(eventId);
     const tally: Record<string, number> = { admitted: 0, duplicate: 0, invalid: 0, wrong_event: 0, total: rows.length };
     for (const row of rows) {
-        if (tally[row.result] !== undefined) tally[row.result]++;
+        const current = tally[row.result];
+        if (current !== undefined) tally[row.result] = current + 1;
     }
     return tally;
 }

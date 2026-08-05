@@ -136,7 +136,7 @@ function buildQuery(params: Record<string, unknown> | null | undefined): string 
 export interface RequestOptions extends Omit<RequestInit, 'method' | 'body' | 'headers'> {
     method?: string;
     /** query-string params, falsy values dropped */
-    query?: Record<string, unknown> | null;
+    query?: Record<string, unknown> | null | undefined;
     /** JSON-serialisable request body */
     body?: unknown;
     /** don't fire onUnauthorized for this call */
@@ -172,8 +172,13 @@ export async function request<T = unknown>(path: string, options: RequestOptions
         response = await fetch(url, {
             method,
             headers,
-            body: payload,
             credentials: 'include',
+            // `RequestInit` is a lib.dom type we can't widen, and
+            // `exactOptionalPropertyTypes` treats an explicit `body:
+            // undefined` differently from omitting the key — so omit it
+            // outright when there is no payload rather than setting it to
+            // undefined.
+            ...(payload !== undefined ? { body: payload } : {}),
             ...rest,
         });
     } catch (cause) {
@@ -296,17 +301,17 @@ export const auth = {
 // ---------------------------------------------------------------------------
 
 export interface EventListParams {
-    category?: string;
-    host?: string;
-    q?: string;
+    category?: string | undefined;
+    host?: string | undefined;
+    q?: string | undefined;
     [key: string]: unknown;
 }
 
 export interface AttendeesParams {
-    q?: string;
-    status?: string;
-    limit?: number;
-    offset?: number;
+    q?: string | undefined;
+    status?: string | undefined;
+    limit?: number | undefined;
+    offset?: number | undefined;
     [key: string]: unknown;
 }
 
@@ -432,15 +437,15 @@ export const currencies = {
 
 /** Body of POST /api/events/{id}/ticket-types and PATCH /api/ticket-types/{id}. */
 export interface TicketTypeInput {
-    name?: string;
-    description?: string;
-    price_minor?: number;
-    quantity_total?: number;
-    sales_start?: string | null;
-    sales_end?: string | null;
-    max_per_order?: number;
-    status?: string;
-    sort_order?: number;
+    name?: string | undefined;
+    description?: string | undefined;
+    price_minor?: number | undefined;
+    quantity_total?: number | undefined;
+    sales_start?: string | null | undefined;
+    sales_end?: string | null | undefined;
+    max_per_order?: number | undefined;
+    status?: string | undefined;
+    sort_order?: number | undefined;
 }
 
 export const ticketTypes = {
@@ -456,8 +461,8 @@ export const ticketTypes = {
 
 export interface CreateOrgInput {
     name: string;
-    slug?: string;
-    default_currency?: string;
+    slug?: string | undefined;
+    default_currency?: string | undefined;
 }
 
 export const orgs = {

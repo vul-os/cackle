@@ -14,9 +14,9 @@ import { Loader2 } from 'lucide-react';
 export interface DeleteEventDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    eventTitle?: string;
+    eventTitle?: string | undefined;
     onConfirm: () => void;
-    isDeleting?: boolean;
+    isDeleting?: boolean | undefined;
 }
 
 /**

@@ -35,10 +35,10 @@ const markerIcon = L.divIcon({
 export interface SelfHostedMapProps {
     lat: number;
     lng: number;
-    label?: string | null;
+    label?: string | null | undefined;
     tileUrl: string;
-    attribution?: string;
-    onFailed?: () => void;
+    attribution?: string | undefined;
+    onFailed?: (() => void) | undefined;
 }
 
 export default function SelfHostedMap({ lat, lng, label, tileUrl, attribution, onFailed }: SelfHostedMapProps) {

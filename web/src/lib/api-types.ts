@@ -191,8 +191,8 @@ export interface CreateEventInput {
     description: string;
     venue_name: string;
     address: string;
-    lat?: number | null;
-    lng?: number | null;
+    lat?: number | null | undefined;
+    lng?: number | null | undefined;
     starts_at: string;
     ends_at: string;
     timezone: string;
@@ -203,22 +203,22 @@ export interface CreateEventInput {
 
 /** Body of PATCH /api/events/{id} — every field optional, absent/undefined means "leave unchanged". */
 export interface UpdateEventInput {
-    slug?: string;
-    title?: string;
-    summary?: string;
-    description?: string;
-    venue_name?: string;
-    address?: string;
-    lat?: number | null;
-    lng?: number | null;
-    starts_at?: string;
-    ends_at?: string;
-    timezone?: string;
-    cover_image?: string;
-    currency?: string;
-    status?: string;
-    category?: string;
-    cover_image_id?: string;
+    slug?: string | undefined;
+    title?: string | undefined;
+    summary?: string | undefined;
+    description?: string | undefined;
+    venue_name?: string | undefined;
+    address?: string | undefined;
+    lat?: number | null | undefined;
+    lng?: number | null | undefined;
+    starts_at?: string | undefined;
+    ends_at?: string | undefined;
+    timezone?: string | undefined;
+    cover_image?: string | undefined;
+    currency?: string | undefined;
+    status?: string | undefined;
+    category?: string | undefined;
+    cover_image_id?: string | undefined;
 }
 
 // ── Ticket types ─────────────────────────────────────────────────────────

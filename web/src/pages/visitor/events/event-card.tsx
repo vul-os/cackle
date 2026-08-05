@@ -28,10 +28,10 @@ export interface EventCardPricing {
 
 export interface EventCardProps {
     event: EventCardEvent;
-    org?: HostOrgRef | null;
-    pricing?: EventCardPricing | null;
-    index?: number;
-    featured?: boolean;
+    org?: HostOrgRef | null | undefined;
+    pricing?: EventCardPricing | null | undefined;
+    index?: number | undefined;
+    featured?: boolean | undefined;
 }
 
 /**

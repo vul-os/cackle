@@ -54,14 +54,17 @@ test('a configured provider becomes exactly one button pointed at this box', () 
         providers: [{ id: 'google', label: 'Google', start_path: '/api/auth/oauth/google/start' }],
     });
     assert.equal(shaped.length, 1);
-    assert.equal(shaped[0].id, 'google');
-    assert.equal(shaped[0].label, 'Google');
-    assert.equal(shaped[0].startPath, '/api/auth/oauth/google/start');
-    assert.ok(shaped[0].startPath.startsWith('/'), 'the button must navigate to a path on this box');
+    const [first] = shaped;
+    assert.ok(first);
+    assert.equal(first.id, 'google');
+    assert.equal(first.label, 'Google');
+    assert.equal(first.startPath, '/api/auth/oauth/google/start');
+    assert.ok(first.startPath.startsWith('/'), 'the button must navigate to a path on this box');
 });
 
 test('a provider with no label falls back to its id rather than to nothing', () => {
     const [only] = signInProvidersFrom({ providers: [{ id: 'google', start_path: '/api/auth/oauth/google/start' }] });
+    assert.ok(only);
     assert.equal(only.label, 'google');
 });
 

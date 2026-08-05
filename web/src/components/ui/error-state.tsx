@@ -4,10 +4,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface ErrorStateProps extends Omit<HTMLAttributes<HTMLDivElement>, 'title'> {
-    icon?: LucideIcon;
+    icon?: LucideIcon | undefined;
     title?: ReactNode;
     description?: ReactNode;
-    onRetry?: () => void;
+    onRetry?: (() => void) | undefined;
     retryLabel?: ReactNode;
 }
 

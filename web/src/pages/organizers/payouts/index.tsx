@@ -74,8 +74,8 @@ const PayoutsOverview = () => {
             const results = await Promise.allSettled(eventList.map((ev) => payoutsApi.forEvent(ev.id)));
             const rows: PayoutRow[] = eventList.map((ev, i) => {
                 const r = results[i];
-                const payout = r.status === 'fulfilled' ? (r.value?.payouts ?? null) : null;
-                return { event: ev, payout, failed: r.status === 'rejected' };
+                const payout = r && r.status === 'fulfilled' ? (r.value?.payouts ?? null) : null;
+                return { event: ev, payout, failed: r?.status === 'rejected' };
             });
             setState({ rows, loading: false, error: null });
         } catch (err) {

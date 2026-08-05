@@ -6,7 +6,7 @@ import type { Category } from '@/lib/api-types';
 export interface CategoryOption {
     slug: string;
     label: string;
-    count?: number;
+    count?: number | undefined;
 }
 
 // Fallback event category list shown when GET /api/categories has nothing

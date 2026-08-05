@@ -161,11 +161,11 @@ export function composite(fg: ColorInput, bg: ColorInput): Rgba {
  */
 export function relativeLuminance(color: ColorInput): number {
     const { r, g, b } = toRgb(color);
-    const lin = [r, g, b].map((channel) => {
+    const linearize = (channel: number) => {
         const c = channel / 255;
         return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-    });
-    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+    };
+    return 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b);
 }
 
 /**

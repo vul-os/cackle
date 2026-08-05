@@ -32,9 +32,9 @@ export interface EventMediaSource {
 export interface ResolvedImage {
     id: string;
     url: string;
-    width?: number;
-    height?: number;
-    alt?: string;
+    width?: number | undefined;
+    height?: number | undefined;
+    alt?: string | undefined;
 }
 
 /** Turns a single image reference (string URL, or {id,url,...}) into a URL. */

@@ -111,15 +111,20 @@ test('summarize: an incomplete report says so rather than defaulting to "done"',
 test('orderClaims: marks the earliest claim as not-extra and every later one as extra', () => {
     const ordered = orderClaims(twoGateConflict());
     assert.equal(ordered.length, 2);
-    assert.equal(ordered[0].device_id, 'device-A');
-    assert.equal(ordered[0].extra, false);
-    assert.equal(ordered[0].downgraded, false);
-    assert.equal(ordered[1].device_id, 'device-B');
-    assert.equal(ordered[1].extra, true);
+    const [first, second] = ordered;
+    assert.ok(first);
+    assert.ok(second);
+    assert.equal(first.device_id, 'device-A');
+    assert.equal(first.extra, false);
+    assert.equal(first.downgraded, false);
+    assert.equal(second.device_id, 'device-B');
+    assert.equal(second.extra, true);
 });
 
 test('orderClaims: downgraded is only true when server_result is present and differs from result', () => {
     const [winner, loser] = orderClaims(twoGateConflict());
+    assert.ok(winner);
+    assert.ok(loser);
     assert.equal(winner.downgraded, false, 'the winning claim was not rewritten by the server');
     assert.equal(loser.downgraded, true, 'the losing claim was downgraded to duplicate server-side');
 
@@ -128,7 +133,9 @@ test('orderClaims: downgraded is only true when server_result is present and dif
     const echoed = orderClaims({
         claims: [{ device_id: 'd1', gate_id: 'North', scanned_at: '2026-01-01T00:00:00Z', result: 'admitted', server_result: 'admitted' }],
     });
-    assert.equal(echoed[0].downgraded, false);
+    const [echoedFirst] = echoed;
+    assert.ok(echoedFirst);
+    assert.equal(echoedFirst.downgraded, false);
 });
 
 test('orderClaims: tolerates a conflict with no claims array', () => {

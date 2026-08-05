@@ -73,13 +73,14 @@ const StatTile = ({ icon: Icon, label, value, loading }: StatTileProps) => (
 // several — there is no single meaningful "total" to blend them into.
 const RevenueValue = ({ revenueByCurrency }: { revenueByCurrency: Record<string, number> }) => {
     const entries = Object.entries(revenueByCurrency);
-    if (entries.length === 0) return <>—</>;
+    const [firstEntry] = entries;
+    if (!firstEntry) return <>—</>;
     // Only surface currencies that actually earned something. An org whose
     // events span currencies it has made no sales in would otherwise pad the
     // figure with "€0.00 · $0.00" noise. If every currency is genuinely at
     // zero, show a single zero in one real currency rather than a dash.
     const earning = entries.filter(([, minor]) => minor > 0);
-    const shown = earning.length > 0 ? earning : [entries[0]];
+    const shown = earning.length > 0 ? earning : [firstEntry];
     return (
         <>
             {shown.map(([currency, minor], i) => (
@@ -133,8 +134,9 @@ const HomePage = () => {
                 if (cancelled) return;
                 const next: Record<string, EventStats> = {};
                 results.forEach((r, i) => {
-                    if (r.status === 'fulfilled' && r.value?.stats) {
-                        next[list[i].id] = r.value.stats;
+                    const ev = list[i];
+                    if (ev && r.status === 'fulfilled' && r.value?.stats) {
+                        next[ev.id] = r.value.stats;
                     }
                 });
                 setStatsById(next);
@@ -272,12 +274,17 @@ const HomePage = () => {
                                                     </span>
                                                 )}
                                             </div>
-                                            {statsById[nextEvent.id] && (
-                                                <p className="mt-2 text-sm text-muted-foreground">
-                                                    {statsById[nextEvent.id].sold ?? 0} sold ·{' '}
-                                                    <Money minor={statsById[nextEvent.id].revenue_minor} currency={nextEvent.currency} /> revenue
-                                                </p>
-                                            )}
+                                            {(() => {
+                                                const stats = statsById[nextEvent.id];
+                                                return (
+                                                    stats && (
+                                                        <p className="mt-2 text-sm text-muted-foreground">
+                                                            {stats.sold ?? 0} sold ·{' '}
+                                                            <Money minor={stats.revenue_minor} currency={nextEvent.currency} /> revenue
+                                                        </p>
+                                                    )
+                                                );
+                                            })()}
                                         </div>
                                         <div className="flex shrink-0 gap-2">
                                             <Button

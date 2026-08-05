@@ -28,12 +28,12 @@ interface UploadItem {
 }
 
 export interface ImageUploaderProps {
-    eventId?: string;
+    eventId?: string | undefined;
     images: EventImage[];
-    coverImageId?: string | null;
-    onImagesChange?: (updater: (current: EventImage[]) => EventImage[]) => void;
-    onCoverChange?: (imageId: string | null) => void;
-    disabled?: boolean;
+    coverImageId?: string | null | undefined;
+    onImagesChange?: ((updater: (current: EventImage[]) => EventImage[]) => void) | undefined;
+    onCoverChange?: ((imageId: string | null) => void) | undefined;
+    disabled?: boolean | undefined;
 }
 
 /**

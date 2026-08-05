@@ -48,8 +48,8 @@ type MarkAction = 'paid' | 'failed';
 interface MarkOrderDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    action?: MarkAction;
-    order?: Order | null;
+    action?: MarkAction | undefined;
+    order?: Order | null | undefined;
     currency: string;
     isSubmitting: boolean;
     onConfirm: () => void;

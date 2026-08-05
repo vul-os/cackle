@@ -17,8 +17,8 @@ export interface BillingErrors {
 interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id'> {
     id: string;
     label: string;
-    hint?: string;
-    error?: string;
+    hint?: string | undefined;
+    error?: string | undefined;
 }
 
 /**

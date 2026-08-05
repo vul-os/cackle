@@ -5,8 +5,8 @@ import { formatMoney } from '@/lib/money';
 interface MoneyProps extends HTMLAttributes<HTMLElement> {
     minor: number;
     currency: string | null | undefined;
-    locale?: string;
-    as?: ElementType;
+    locale?: string | undefined;
+    as?: ElementType | undefined;
 }
 
 // The one way money is rendered in this app.

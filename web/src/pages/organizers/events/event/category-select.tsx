@@ -4,10 +4,10 @@ import { categories as categoriesApi } from '@/lib/api';
 import { mergeCategories, type CategoryOption } from '../categories';
 
 export interface CategorySelectProps {
-    value?: string;
+    value?: string | undefined;
     onChange: (value: string) => void;
-    disabled?: boolean;
-    id?: string;
+    disabled?: boolean | undefined;
+    id?: string | undefined;
 }
 
 /**

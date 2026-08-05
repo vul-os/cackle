@@ -7,9 +7,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 
 interface DatePickerWithRangeProps {
-    date?: DateRange;
+    date?: DateRange | undefined;
     setDate: (date: DateRange | undefined) => void;
-    className?: string;
+    className?: string | undefined;
 }
 
 const DatePickerWithRange = ({ date, setDate, className }: DatePickerWithRangeProps) => {

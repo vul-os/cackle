@@ -53,7 +53,12 @@ function parseCustomProperties(body: string): Record<string, string> {
     const re = /(--[a-zA-Z0-9-]+)\s*:\s*([^;]+);/g;
     let m;
     while ((m = re.exec(withoutComments)) !== null) {
-        out[m[1]] = m[2].trim();
+        const [, name, value] = m;
+        // Both groups are mandatory in the pattern above (neither is `?`), so
+        // a successful match always populates them — this is a narrowing
+        // check against noUncheckedIndexedAccess, not a real possibility.
+        if (name === undefined || value === undefined) continue;
+        out[name] = value.trim();
     }
     return out;
 }
