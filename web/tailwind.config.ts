@@ -22,8 +22,13 @@ import tailwindcssTypography from '@tailwindcss/typography';
 // carry, the largest value that still guarantees adjacent controls' areas
 // abut rather than intersect. Raising it here would quietly break that
 // guarantee everywhere at once — see checkbox.jsx.
-const hitArea = plugin(({ addUtilities }) => {
-    addUtilities({
+const hitArea = plugin((api) => {
+    // Called through `api` rather than destructured — Tailwind's own
+    // PluginAPI types addUtilities as an interface method, which
+    // no-unbound-method treats as potentially `this`-dependent regardless
+    // of whether it actually is; calling it through its receiver sidesteps
+    // that rather than asserting it away.
+    api.addUtilities({
         '.hit-area-24': {
             position: 'relative',
             '&::after': {
