@@ -1,5 +1,7 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
 import plugin from 'tailwindcss/plugin';
+import tailwindcssAnimate from 'tailwindcss-animate';
+import tailwindcssTypography from '@tailwindcss/typography';
 
 // WCAG 2.5.8 (Target Size, Minimum, AA) sizes the TARGET, not the artwork.
 // A checkbox and a radio are drawn at 16px because that is what reads
@@ -255,5 +257,5 @@ module.exports = {
             },
         },
     },
-    plugins: [require('tailwindcss-animate'), require('@tailwindcss/typography'), hitArea],
+    plugins: [tailwindcssAnimate, tailwindcssTypography, hitArea],
 };

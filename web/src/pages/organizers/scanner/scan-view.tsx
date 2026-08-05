@@ -8,7 +8,6 @@ import { ConnectionState, SyncState } from '@/components/ui/connection-state';
 import useScanEngine, { type ScanResult } from './use-scan-engine';
 import { verdictFor, verdictHoldMs, describeDuplicate } from './verdict';
 import type { KeyRing } from '@/lib/capability';
-import type { AdmissionRecord } from '@/lib/scan-store';
 
 /** The minimal event shape this screen needs — `id` to key the scan engine
  * and `title` for the header. `index.tsx` builds this from either a real

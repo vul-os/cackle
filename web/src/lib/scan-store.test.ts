@@ -30,7 +30,7 @@ import 'fake-indexeddb/auto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { recordScan, getPendingSync, markSynced, orderForUpload, type SortableRow } from './scan-store.ts';
+import { recordScan, getPendingSync, markSynced, orderForUpload } from './scan-store.ts';
 
 // ── Scripted ids ────────────────────────────────────────────────────────────
 
