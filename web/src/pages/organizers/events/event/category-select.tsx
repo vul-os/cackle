@@ -40,7 +40,7 @@ const CategorySelect = ({ value, onChange, disabled, id }: CategorySelectProps) 
     }, []);
 
     return (
-        <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
+        <Select onValueChange={onChange} disabled={!!disabled} {...(value ? { value } : {})}>
             <SelectTrigger id={id} className="w-full sm:w-64">
                 <SelectValue placeholder="Choose a category" />
             </SelectTrigger>

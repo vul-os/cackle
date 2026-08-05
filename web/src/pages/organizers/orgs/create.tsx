@@ -191,9 +191,9 @@ const CreateOrgPage = () => {
                             <div className="space-y-2">
                                 <Label htmlFor="org-default-currency">Currency you usually sell in</Label>
                                 <Select
-                                    value={form.watch('default_currency')}
                                     onValueChange={(value: string) => form.setValue('default_currency', value, { shouldDirty: true })}
-                                    disabled={submitting}
+                                    disabled={!!submitting}
+                                    {...(form.watch('default_currency') ? { value: form.watch('default_currency') } : {})}
                                 >
                                     <SelectTrigger id="org-default-currency">
                                         <SelectValue placeholder="Pick a currency" />

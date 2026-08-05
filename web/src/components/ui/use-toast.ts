@@ -22,8 +22,8 @@ type ActionType = {
 type Action =
   | { type: ActionType["ADD_TOAST"]; toast: ToasterToast }
   | { type: ActionType["UPDATE_TOAST"]; toast: Partial<ToasterToast> & { id: string } }
-  | { type: ActionType["DISMISS_TOAST"]; toastId?: ToasterToast["id"] }
-  | { type: ActionType["REMOVE_TOAST"]; toastId?: ToasterToast["id"] }
+  | { type: ActionType["DISMISS_TOAST"]; toastId?: ToasterToast["id"] | undefined }
+  | { type: ActionType["REMOVE_TOAST"]; toastId?: ToasterToast["id"] | undefined }
 
 interface State {
   toasts: ToasterToast[]

@@ -59,7 +59,7 @@ const BankSelect = ({ value, onChange, disabled }: BankSelectProps) => {
     }
 
     return (
-        <Select value={value || undefined} onValueChange={onChange} disabled={disabled || loading}>
+        <Select onValueChange={onChange} disabled={disabled || loading} {...(value ? { value } : {})}>
             <SelectTrigger>
                 <SelectValue placeholder={loading ? 'Loading banks…' : 'Choose your bank'} />
             </SelectTrigger>

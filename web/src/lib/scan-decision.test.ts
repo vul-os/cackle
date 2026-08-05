@@ -153,6 +153,7 @@ test('a ticket that does not verify is refused', async (t) => {
     await t.test('a tampered payload', async () => {
         const good = mintTicket();
         const [prefix, payload, sig] = good.split('.');
+        if (!prefix || !payload || !sig) throw new Error('mintTicket() must produce a 3-part token');
         const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
         decoded.tid = 'tkt_forged';
         const tampered = b64url(new TextEncoder().encode(JSON.stringify(decoded)));

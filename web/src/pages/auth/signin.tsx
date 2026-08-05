@@ -21,8 +21,8 @@ const RAIL_POINTS = [
 ];
 
 interface SignInFieldErrors {
-    email?: string;
-    password?: string;
+    email?: string | undefined;
+    password?: string | undefined;
 }
 
 const SignIn = () => {

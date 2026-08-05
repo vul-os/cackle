@@ -192,7 +192,16 @@ test('a clock that jumps backwards does not reorder the batch', async () => {
         Date.UTC(2026, 6, 31, 22, 15, 0),
     ];
     await withScriptedIDs(stamps.length, async () => {
-        await recordSeries(eventID, { count: stamps.length, at: (i) => isoAt(stamps[i]) });
+        await recordSeries(eventID, {
+            count: stamps.length,
+            at: (i) => {
+                const ms = stamps[i];
+                // `at` is only ever called for i in [0, count), and count is
+                // stamps.length, so this index is always populated.
+                if (ms === undefined) throw new Error(`no stamp at index ${i}`);
+                return isoAt(ms);
+            },
+        });
     });
 
     const pending = await getPendingSync(eventID);
@@ -260,8 +269,10 @@ function permutations<T>(xs: T[]): T[][] {
     if (xs.length <= 1) return [xs];
     const out: T[][] = [];
     for (let i = 0; i < xs.length; i++) {
+        // i < xs.length by the loop condition above, so this index is always populated.
+        const item = xs[i] as T;
         const rest = [...xs.slice(0, i), ...xs.slice(i + 1)];
-        for (const p of permutations(rest)) out.push([xs[i], ...p]);
+        for (const p of permutations(rest)) out.push([item, ...p]);
     }
     return out;
 }

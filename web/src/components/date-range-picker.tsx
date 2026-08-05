@@ -37,7 +37,17 @@ const DatePickerWithRange = ({ date, setDate, className }: DatePickerWithRangePr
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        selected={date}
+                        onSelect={setDate}
+                        numberOfMonths={2}
+                        // `defaultMonth` is a third-party (react-day-picker) prop
+                        // typed without `| undefined`; omit the key entirely
+                        // rather than pass an explicit undefined.
+                        {...(date?.from ? { defaultMonth: date.from } : {})}
+                    />
                 </PopoverContent>
             </Popover>
         </div>

@@ -21,7 +21,7 @@ const BlankLayout = () => {
         <MotionConfig reducedMotion="user">
             <div className="flex min-h-screen flex-col">
                 <div className="flex-1">
-                    <PageTransition className={undefined}>
+                    <PageTransition>
                         <Outlet />
                     </PageTransition>
                 </div>

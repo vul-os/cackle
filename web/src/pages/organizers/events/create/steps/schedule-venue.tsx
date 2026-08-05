@@ -202,7 +202,7 @@ const ScheduleVenueStep = ({ defaultValues, onSubmit, onBack, submitting }: Sche
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Currency</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange} disabled={submitting}>
+                            <Select value={field.value} onValueChange={field.onChange} disabled={!!submitting}>
                                 <FormControl>
                                     <SelectTrigger className="w-64">
                                         <SelectValue placeholder="Select a currency" />
