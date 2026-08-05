@@ -194,15 +194,25 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
 
     useEffect(() => {
         let cancelled = false;
-        (async () => {
+        void (async () => {
             if (!videoRef.current) return;
             try {
-                scannerRef.current = new QrScanner(videoRef.current, (result) => handleDecode(result.data), {
-                    preferredCamera: 'environment',
-                    highlightScanRegion: true,
-                    highlightCodeOutline: true,
-                    maxScansPerSecond: 6,
-                });
+                scannerRef.current = new QrScanner(
+                    videoRef.current,
+                    (result) => {
+                        // QrScanner's own callback type expects void, not a
+                        // Promise — handleDecode is safe to fire-and-forget
+                        // (see use-scan-engine.ts: decideAdmission and
+                        // recordScan each catch their own failures).
+                        void handleDecode(result.data);
+                    },
+                    {
+                        preferredCamera: 'environment',
+                        highlightScanRegion: true,
+                        highlightCodeOutline: true,
+                        maxScansPerSecond: 6,
+                    },
+                );
                 await scannerRef.current.start();
                 if (cancelled) scannerRef.current.stop();
             } catch (err) {
@@ -233,7 +243,7 @@ const ScanView = ({ event, keyRing, ticketIndex, ticketIndexPresent, admittedInd
             e.preventDefault();
             const value = manualValue.trim();
             if (!value) return;
-            handleDecode(value);
+            void handleDecode(value);
             setManualValue('');
         },
         [manualValue, handleDecode],

@@ -113,9 +113,9 @@ export default function TicketPage() {
                 if (cancelled) return;
                 setState({ ticket: data.ticket, loading: false, error: null });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ ticket: null, loading: false, error: err?.message || 'Ticket not found' });
+                setState({ ticket: null, loading: false, error: err instanceof Error ? err.message : 'Ticket not found' });
             });
         return () => {
             cancelled = true;

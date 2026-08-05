@@ -65,9 +65,9 @@ export default function OrdersPage() {
                 if (cancelled) return;
                 setState({ orders: data.orders ?? [], loading: false, error: null });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ orders: [], loading: false, error: err?.message || 'Could not load your orders.' });
+                setState({ orders: [], loading: false, error: err instanceof Error ? err.message : 'Could not load your orders.' });
             });
         return () => {
             cancelled = true;
@@ -92,6 +92,14 @@ export default function OrdersPage() {
                 });
                 return next;
             });
+        }).catch((err: unknown) => {
+            // Promise.allSettled itself never rejects — every individual
+            // fetch's outcome is already in `results` above. A rejection
+            // here can only mean the .then callback threw (a real bug in
+            // this file); logged rather than silently swallowed, but must
+            // not crash the page either — a missing event title/date per
+            // row already degrades gracefully.
+            if (!cancelled) console.error('OrdersPage: failed to apply fetched event details', err);
         });
         return () => {
             cancelled = true;

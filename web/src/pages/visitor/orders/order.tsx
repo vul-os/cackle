@@ -161,9 +161,9 @@ export default function OrderPage() {
                 if (cancelled) return;
                 setState({ order: data.order, loading: false, error: null });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ order: null, loading: false, error: err?.message || 'Order not found.' });
+                setState({ order: null, loading: false, error: err instanceof Error ? err.message : 'Order not found.' });
             });
         return () => {
             cancelled = true;

@@ -111,13 +111,21 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
 
     const refreshCounts = useCallback(async () => {
         if (!eventId) return;
-        const [t, pending] = await Promise.all([getTally(eventId), getPendingSync(eventId)]);
-        setTally(t);
-        setPendingCount(pending.length);
+        try {
+            const [t, pending] = await Promise.all([getTally(eventId), getPendingSync(eventId)]);
+            setTally(t);
+            setPendingCount(pending.length);
+        } catch {
+            // The local store read failed (evicted, over quota, a private
+            // mode that pretends IndexedDB works) — this was previously an
+            // unhandled rejection with no catch anywhere in the call chain.
+            // The tally just stays stale rather than crashing; it corrects
+            // itself on the next successful scan or sync.
+        }
     }, [eventId]);
 
     useEffect(() => {
-        refreshCounts();
+        void refreshCounts();
     }, [refreshCounts]);
 
     const syncNow = useCallback(async () => {
@@ -148,7 +156,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
     }, [eventId, isSyncing, refreshCounts]);
 
     useEffect(() => {
-        if (online) syncNow();
+        if (online) void syncNow();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [online]);
 
@@ -205,7 +213,7 @@ export function useScanEngine({ eventId, keyRing, ticketIndex, ticketIndexPresen
 
                 setLastResult({ ...record, at: Date.now() });
                 await refreshCounts();
-                if (navigator.onLine) syncNow();
+                if (navigator.onLine) void syncNow();
             } finally {
                 setTimeout(() => {
                     busy.current = false;

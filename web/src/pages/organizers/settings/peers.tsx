@@ -151,7 +151,7 @@ function PeerRow({ peer, onChanged }: PeerRowProps) {
     }, [peer.id, peer.feed_subscribe]);
 
     useEffect(() => {
-        loadListings();
+        void loadListings();
     }, [loadListings]);
 
     const setSwitches = async (publish: boolean, subscribe: boolean) => {
@@ -332,7 +332,7 @@ const PeersPage = () => {
     }, [orgId]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     const form = useForm<{ name?: string; url: string; public_key: string }>({

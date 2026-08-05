@@ -77,9 +77,9 @@ const EventStatsPage = () => {
                     error: null,
                 });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ stats: null, currency: '', eventTitle: '', loading: false, error: err?.message || 'Could not load stats.' });
+                setState({ stats: null, currency: '', eventTitle: '', loading: false, error: err instanceof Error ? err.message : 'Could not load stats.' });
             });
         return () => {
             cancelled = true;

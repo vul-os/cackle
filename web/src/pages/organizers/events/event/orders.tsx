@@ -130,8 +130,8 @@ const EventOrdersPage = () => {
                 setEvent(eventData.event);
                 setState({ orders: ordersData.orders ?? [], loading: false, error: null });
             })
-            .catch((err) => {
-                setState({ orders: [], loading: false, error: err?.message || 'Could not load orders.' });
+            .catch((err: unknown) => {
+                setState({ orders: [], loading: false, error: err instanceof Error ? err.message : 'Could not load orders.' });
             });
     }, [id]);
 

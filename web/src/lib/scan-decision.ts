@@ -184,9 +184,10 @@ export async function decideAdmission({
         // browser in a private mode that pretends IndexedDB exists. Refuse.
         // Guessing in the admitting direction here is how one broken phone
         // turns into an unbounded number of duplicate entries.
+        const reason = err instanceof Error ? err.message : String(err);
         return {
             result: RESULT.INVALID,
-            note: `Local dedupe check failed: ${(err as { message?: unknown } | null | undefined)?.message || err}`,
+            note: `Local dedupe check failed: ${reason}`,
             ticketId: null,
             holderName: null,
         };

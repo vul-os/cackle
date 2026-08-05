@@ -24,7 +24,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openDB } from 'idb';
 
-import type { AdmissionRecord } from './scan-store.ts';
+import type { AdmissionRecord, ScanDB } from './scan-store.ts';
 
 const DB_NAME = 'cackle-scanner';
 const EVENT_ID = 'evt_field_device';
@@ -104,7 +104,11 @@ const { recordScan, getPendingSync, getAdmissionsForEvent, orderForUpload } = aw
 
 /** Read the store back through a plain connection, not through the module. */
 async function rawRows(): Promise<AdmissionRecord[]> {
-    const db = await openDB(DB_NAME);
+    // Typed against the CURRENT schema (unlike seedVersion1 above, which
+    // deliberately stays untyped/hand-written to keep describing the OLD
+    // shape) — this reads the store back AFTER the real module's upgrade
+    // has run, so it should conform to what scan-store.ts itself expects.
+    const db = await openDB<ScanDB>(DB_NAME);
     const rows = await db.getAll('admissions');
     db.close();
     return rows;

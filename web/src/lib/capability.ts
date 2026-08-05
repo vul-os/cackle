@@ -181,10 +181,9 @@ export function verifyCapability(token: unknown, publicKey: unknown, now = new D
     // Key size first, exactly like Go's Verify: a caller that pinned a broken
     // key should hear about it regardless of what was scanned.
     if (!(publicKey instanceof Uint8Array) || publicKey.length !== 32) {
-        throw new CapabilityError(
-            CapabilityErrorCode.MALFORMED,
-            `invalid public key length ${(publicKey as { length?: unknown } | null | undefined)?.length}`,
-        );
+        const length = (publicKey as { length?: unknown } | null | undefined)?.length;
+        const shown = typeof length === 'number' || typeof length === 'string' ? length : typeof publicKey;
+        throw new CapabilityError(CapabilityErrorCode.MALFORMED, `invalid public key length ${shown}`);
     }
     if (typeof token !== 'string') {
         throw new CapabilityError(CapabilityErrorCode.MALFORMED, 'token must be a string');

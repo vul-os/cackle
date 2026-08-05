@@ -103,8 +103,8 @@ const EventAdmissionsPage = () => {
         eventsApi
             .admissionConflicts(id ?? '')
             .then((data) => setState({ data, loading: false, error: null }))
-            .catch((err) =>
-                setState({ data: null, loading: false, error: err?.message || 'Could not load the admission reconciliation report.' }),
+            .catch((err: unknown) =>
+                setState({ data: null, loading: false, error: err instanceof Error ? err.message : 'Could not load the admission reconciliation report.' }),
             );
     }, [id]);
 

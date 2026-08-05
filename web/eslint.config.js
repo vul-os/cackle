@@ -40,13 +40,20 @@ export default defineConfig([
   },
 
   // web/src is TS/TSX end to end — parse it with the typescript-eslint
-  // parser and lint it with the recommended TS rule set.
+  // parser and lint it with the type-aware TS rule set. projectService
+  // resolves real type information from tsconfig.json so no-floating-promises
+  // and the no-unsafe-* family actually run — the untyped `recommended` set
+  // used previously silently skipped every type-aware rule.
   {
     files: ['**/*.{ts,tsx}'],
-    extends: [...tseslint.configs.recommended, reactHooks.configs.flat.recommended],
+    extends: [...tseslint.configs.recommendedTypeChecked, reactHooks.configs.flat.recommended],
     languageOptions: {
       globals: globals.browser,
-      parserOptions: { ecmaFeatures: { jsx: true } },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
     rules: {
       // eslint-plugin-react-hooks v7's "recommended" set ships several rules
@@ -73,6 +80,39 @@ export default defineConfig([
       'react-hooks/purity': 'warn',
       'react-hooks/refs': 'warn',
       'react-hooks/static-components': 'warn',
+
+      // no-misused-promises' `attributes` check fired 51 times, 50 of them
+      // an async handler (or react-hook-form's `form.handleSubmit(cb)`,
+      // which always returns a Promise-returning wrapper regardless of
+      // whether `cb` is async) passed straight to a DOM/React prop typed
+      // `(e) => void` — onClick, onSubmit, onCheckedChange, ErrorState's
+      // onRetry. Every one of those 50 was read in full by hand: each
+      // wraps its risky `await` in its own try/catch (or, for signOut,
+      // calls a function that already swallows its own rejection), so
+      // none can actually produce an unhandled rejection — this is
+      // TypeScript's own documented void-returning-context allowance for
+      // exactly this fire-and-forget event-handler shape, which
+      // typescript-eslint's docs name `checksVoidReturn.attributes` for.
+      // The 51st (scan-view.tsx passing handleDecode to QrScanner's
+      // constructor — an ARGUMENT, not an attribute) and the one genuine
+      // bug found in this rule's output (scanner/index.tsx's
+      // handleEnterScanMode, fixed separately) are unaffected: only the
+      // attributes check is narrowed, `arguments`/`returns` stay on.
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+    },
+  },
+
+  // node:test's `test(name, fn)` / `t.test(name, fn)` registers a test and
+  // returns a Promise that the test runner tracks internally — awaiting or
+  // voiding it at every call site would not change behaviour, only add
+  // noise. This fired 134 times across all 15 test files, every one of them
+  // a bare `test(...)`/`t.test(...)` registration call (verified: none was a
+  // real await-shaped mistake). Scoped to *.test.ts only — no-floating-promises
+  // stays on for every non-test file.
+  {
+    files: ['**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'off',
     },
   },
 ])

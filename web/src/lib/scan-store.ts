@@ -36,7 +36,7 @@ export interface AdmissionRecord {
     seq?: number;
 }
 
-interface ScanDB extends DBSchema {
+export interface ScanDB extends DBSchema {
     bundles: {
         key: string;
         value: BundleRecord;
@@ -68,6 +68,17 @@ let dbPromise: Promise<IDBPDatabase<ScanDB>> | undefined;
 function getDB(): Promise<IDBPDatabase<ScanDB>> {
     if (!dbPromise) {
         dbPromise = openDB(DB_NAME, DB_VERSION, {
+            // idb's own .d.ts types `upgrade` as `(...) => void`, so
+            // no-misused-promises flags this as a Promise-returning function
+            // handed to a void-expecting property — but idb's actual
+            // behaviour (not just its types) supports an async upgrade:
+            // every await below is on an IDB request promise from the SAME
+            // versionchange transaction (`tx`/`store`), which is exactly
+            // what keeps that transaction alive across the awaits, not a
+            // network call or timer that would let it auto-commit early.
+            // The v1→v2 migration this enables is exercised end to end by
+            // scan-store.upgrade.test.ts.
+            // eslint-disable-next-line @typescript-eslint/no-misused-promises
             async upgrade(db, oldVersion, newVersion, tx) {
                 if (!db.objectStoreNames.contains(STORE_BUNDLES)) {
                     db.createObjectStore(STORE_BUNDLES, { keyPath: 'event_id' });

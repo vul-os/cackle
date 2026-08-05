@@ -84,7 +84,7 @@ const PayoutsOverview = () => {
     }, [activeOrg?.id]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     // Events can be denominated in different currencies (Cackle has no
@@ -221,7 +221,7 @@ const BankAccountCard = () => {
     }, [activeOrg?.id, isOwner]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     const handleSave = async (data: { bank_code: string; account_number: string; account_name: string }) => {
@@ -231,7 +231,7 @@ const BankAccountCard = () => {
             toast({ title: 'Bank details saved' });
             form.reset({ bank_code: '', account_number: '', account_name: '' });
             setEditing(false);
-            load();
+            void load();
         } catch (err) {
             toast({ title: 'Could not save bank details', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {

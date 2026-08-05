@@ -94,7 +94,7 @@ const TeamPage = () => {
     }, [activeOrg?.id, canManage]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     // Creating an invite mints a token the server returns EXACTLY ONCE and
@@ -124,7 +124,7 @@ const TeamPage = () => {
                 description: `Copy it and send it to ${data.email} yourself — Cackle does not send email.`,
             });
             form.reset({ email: '', role: 'scanner' });
-            load();
+            void load();
         } catch (err) {
             toast({ title: 'Could not create invite', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
         } finally {

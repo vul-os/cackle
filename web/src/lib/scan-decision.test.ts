@@ -94,7 +94,7 @@ function decide(overrides: Partial<DecideAdmissionArgs> = {}) {
         ticketIndexPresent: true,
         admittedIndexSet: new Set(),
         verify: verifyWithRing,
-        wasAdmitted: async () => false,
+        wasAdmitted: () => Promise.resolve(false),
         ...overrides,
     });
 }
@@ -121,7 +121,7 @@ test('a valid ticket at the right gate is admitted', async (t) => {
             ticketIndexPresent: true,
             admittedIndexSet: new Set(),
             verify: verifyWithRing,
-            wasAdmitted: async () => false,
+            wasAdmitted: () => Promise.resolve(false),
             now: new Date(),
         });
         assert.equal(out.result, RESULT.ADMITTED);
@@ -154,7 +154,7 @@ test('a ticket that does not verify is refused', async (t) => {
         const good = mintTicket();
         const [prefix, payload, sig] = good.split('.');
         if (!prefix || !payload || !sig) throw new Error('mintTicket() must produce a 3-part token');
-        const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString());
+        const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString()) as Record<string, unknown>;
         decoded.tid = 'tkt_forged';
         const tampered = b64url(new TextEncoder().encode(JSON.stringify(decoded)));
         const out = await decide({ token: `${prefix}.${tampered}.${sig}` });
@@ -233,7 +233,7 @@ test('the ticket index decides what a signature cannot', async (t) => {
 
 test('duplicates are detected and distinguished by where they happened', async (t) => {
     await t.test('a second scan on THIS device is a duplicate', async () => {
-        const out = await decide({ wasAdmitted: async () => true });
+        const out = await decide({ wasAdmitted: () => Promise.resolve(true) });
         assert.equal(out.result, RESULT.DUPLICATE);
         assert.equal(out.ticketId, 'tkt_001');
         assert.match(out.note!, /this gate/i);
@@ -248,7 +248,7 @@ test('duplicates are detected and distinguished by where they happened', async (
     });
 
     await t.test('the two duplicate notes are distinguishable to the operator', async () => {
-        const local = await decide({ wasAdmitted: async () => true });
+        const local = await decide({ wasAdmitted: () => Promise.resolve(true) });
         const remote = await decide({ admittedIndexSet: new Set(['tkt_001']) });
         assert.notEqual(local.note, remote.note);
     });
@@ -258,7 +258,7 @@ test('duplicates are detected and distinguished by where they happened', async (
         // admits, and SO DOES the other one. That is the documented,
         // unavoidable behaviour of two partitioned gates, and this test pins
         // it so nobody "fixes" it into a false promise.
-        const out = await decide({ admittedIndexSet: new Set(), wasAdmitted: async () => false });
+        const out = await decide({ admittedIndexSet: new Set(), wasAdmitted: () => Promise.resolve(false) });
         assert.equal(out.result, RESULT.ADMITTED);
     });
 
@@ -267,9 +267,7 @@ test('duplicates are detected and distinguished by where they happened', async (
         // reported as already inside even though this device never saw it.
         const out = await decide({
             admittedIndexSet: new Set(['tkt_001']),
-            wasAdmitted: async () => {
-                throw new Error('local store must not be consulted once the bundle already answered');
-            },
+            wasAdmitted: () => Promise.reject(new Error('local store must not be consulted once the bundle already answered')),
         });
         assert.equal(out.result, RESULT.DUPLICATE);
     });
@@ -283,9 +281,7 @@ test('a broken local store refuses rather than guesses', async (t) => {
         // IndexedDB works. Admitting here would turn one broken phone into an
         // unbounded number of duplicate entries.
         const out = await decide({
-            wasAdmitted: async () => {
-                throw new Error('QuotaExceededError');
-            },
+            wasAdmitted: () => Promise.reject(new Error('QuotaExceededError')),
         });
         assert.equal(out.result, RESULT.INVALID);
         assert.match(out.note!, /dedupe check failed/i);
@@ -294,9 +290,7 @@ test('a broken local store refuses rather than guesses', async (t) => {
 
     await t.test('the fail-closed path records no ticket id either', async () => {
         const out = await decide({
-            wasAdmitted: async () => {
-                throw new Error('boom');
-            },
+            wasAdmitted: () => Promise.reject(new Error('boom')),
         });
         assert.equal(out.ticketId, null);
     });
@@ -304,6 +298,10 @@ test('a broken local store refuses rather than guesses', async (t) => {
     await t.test('a verifier that throws a bare value does not crash the gate', async () => {
         const out = await decide({
             verify: () => {
+                // Deliberately not an Error — this test's entire point is
+                // that decideAdmission survives a badly-behaved verify
+                // callback throwing a bare value, not just a well-formed one.
+                // eslint-disable-next-line @typescript-eslint/only-throw-error
                 throw 'not an Error object';
             },
         });

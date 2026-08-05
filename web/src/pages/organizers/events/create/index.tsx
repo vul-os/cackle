@@ -129,7 +129,10 @@ const CreateEventWizard = () => {
     useEffect(() => {
         if (!routeId) return;
         let cancelled = false;
-        (async () => {
+        // Deliberate fire-and-forget: the IIFE's own try/catch (below)
+        // handles every failure by setting loadError, so nothing here can
+        // produce an unhandled rejection.
+        void (async () => {
             try {
                 const [eventData, ttData] = await Promise.all([eventsApi.get(routeId), ticketTypesApi.list(routeId)]);
                 if (cancelled) return;

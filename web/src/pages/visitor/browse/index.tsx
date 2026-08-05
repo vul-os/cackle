@@ -188,9 +188,9 @@ export default function BrowsePage() {
                     error: null,
                 });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ events: [], host: null, loading: false, error: err?.message || 'Could not load events.' });
+                setState({ events: [], host: null, loading: false, error: err instanceof Error ? err.message : 'Could not load events.' });
             });
         return () => {
             cancelled = true;

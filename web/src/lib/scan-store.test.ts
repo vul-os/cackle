@@ -277,7 +277,7 @@ function permutations<T>(xs: T[]): T[][] {
     return out;
 }
 
-test('orderForUpload is a total order: every permutation sorts identically', async () => {
+test('orderForUpload is a total order: every permutation sorts identically', () => {
     // Deliberately degenerate: two rows share a seq, two more share a
     // scanned_at with no seq at all. Only a comparator with a final tiebreaker
     // on the primary key can answer the same way for every input order.

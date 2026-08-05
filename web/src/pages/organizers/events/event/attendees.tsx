@@ -33,6 +33,12 @@ const STATUS_OPTIONS = [
 /** Hand-rolled CSV — no dependency. Wraps any field containing a comma,
  * quote or newline in quotes and escapes embedded quotes by doubling them. */
 function toCsvField(value: unknown): string {
+    // Deliberately universal: every caller in this file passes a string,
+    // number or boolean (attendee name, ticket type, status, price) — there
+    // is no object-shaped field in a CSV row — so String(value) here is the
+    // intended "stringify whatever a cell holds" behaviour, not a narrowing
+    // that was missed.
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     const s = value === undefined || value === null ? '' : String(value);
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
@@ -116,8 +122,8 @@ const EventAttendeesPage = () => {
                     error: null,
                 });
             })
-            .catch((err) => {
-                setSummary({ event: null, stats: null, priceByTypeId: {}, loading: false, error: err?.message || 'Could not load event summary.' });
+            .catch((err: unknown) => {
+                setSummary({ event: null, stats: null, priceByTypeId: {}, loading: false, error: err instanceof Error ? err.message : 'Could not load event summary.' });
             });
     }, [id]);
 
@@ -148,8 +154,8 @@ const EventAttendeesPage = () => {
             .then((data) => {
                 setRoster({ attendees: data?.attendees ?? [], total: data?.total ?? 0, loading: false, error: null });
             })
-            .catch((err) => {
-                setRoster({ attendees: [], total: 0, loading: false, error: err?.message || 'Could not load the attendee list.' });
+            .catch((err: unknown) => {
+                setRoster({ attendees: [], total: 0, loading: false, error: err instanceof Error ? err.message : 'Could not load the attendee list.' });
             });
     }, [id, debouncedQuery, status, offset]);
 

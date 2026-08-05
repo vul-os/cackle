@@ -84,7 +84,9 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
         e.preventDefault();
         setDragOver(false);
         if (disabled) return;
-        uploadFiles(e.dataTransfer?.files);
+        // uploadFiles catches every failure per-file (sets an inline error
+        // on that upload item) — deliberate fire-and-forget.
+        void uploadFiles(e.dataTransfer?.files);
     };
 
     const dismissUpload = (key: string) => setUploads((prev) => prev.filter((u) => u.key !== key));
@@ -158,7 +160,7 @@ const ImageUploader = ({ eventId, images, coverImageId, onImagesChange, onCoverC
                     multiple
                     className="sr-only"
                     onChange={(e) => {
-                        uploadFiles(e.target.files);
+                        void uploadFiles(e.target.files);
                         e.target.value = '';
                     }}
                     aria-label="Upload images"
