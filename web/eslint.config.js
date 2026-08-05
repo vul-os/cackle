@@ -6,13 +6,12 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // scripts/contrast-report.mjs is a standalone Node tooling script, out of
-  // scope for this pass; web/src is the app surface this config targets.
-  // scripts/check-lint-config.mjs is carved OUT of this ignore (see the
-  // dedicated block below) — it's this repo's own CI gate script, and
-  // leaving it ignored is exactly what let it enumerate in `eslint .`'s
-  // count while having zero rules applied, hiding a dead import.
-  globalIgnores(['dist', 'node_modules', 'scripts/contrast-report.mjs']),
+  // scripts/check-lint-config.mjs and scripts/contrast-report.mjs are both
+  // carved OUT of this ignore (see their dedicated blocks below) — leaving
+  // either ignored is exactly what let it enumerate in `eslint .`'s file
+  // count while having zero rules applied, hiding real bugs (a dead import
+  // in one, an unused import in the other).
+  globalIgnores(['dist', 'node_modules']),
 
   // Shared across both JS and TS: the app's own plugin rules don't care
   // which language a file is written in.
@@ -103,6 +102,21 @@ export default defineConfig([
       // handleEnterScanMode, fixed separately) are unaffected: only the
       // attributes check is narrowed, `arguments`/`returns` stay on.
       '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+    },
+  },
+
+  // scripts/contrast-report.mjs: standalone Node CLI reporting script (the
+  // evidence side of the accessibility work — prints measured WCAG contrast
+  // read from src/index.css). Read in full: no DOM/browser API, no
+  // page.evaluate, nothing but node:fs/node:path and local src/lib imports —
+  // Node globals only, unlike pango's screenshot scripts which genuinely mix
+  // Node and browser globals via Playwright's page.evaluate.
+  {
+    files: ['scripts/contrast-report.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: 'module',
     },
   },
 
