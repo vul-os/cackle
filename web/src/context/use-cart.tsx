@@ -37,16 +37,32 @@ type CartAction =
     | { type: typeof ACTIONS.CLEAR_EVENT; payload: { eventId: string } }
     | { type: typeof ACTIONS.CLEAR_CART };
 
+// localStorage is outside TypeScript's reach — an older app version, a
+// hand-edited value, or a future schema change can all leave something here
+// that JSON.parse happily returns but isn't a real CartItem. The previous
+// filter only checked TRUTHINESS (`item.quantity > 0`), which a string like
+// `"5"` also passes via JS's numeric coercion — silently letting a
+// wrong-typed quantity into state that later arithmetic (existing.quantity +
+// quantity, in the reducer below) assumes is a number. This checks the
+// actual type of every field the reducer and checkout rely on.
+function isValidCartItem(item: unknown): item is CartItem {
+    if (typeof item !== 'object' || item === null) return false;
+    const candidate = item as Record<string, unknown>;
+    const { ticket_type_id, ticket_type, event, quantity } = candidate;
+    if (typeof ticket_type_id !== 'string' || !ticket_type_id) return false;
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity <= 0 || quantity > MAX_PER_TYPE) return false;
+    if (typeof ticket_type !== 'object' || ticket_type === null) return false;
+    if (typeof event !== 'object' || event === null || !('id' in event) || !event.id) return false;
+    return true;
+}
+
 function loadInitialState(): CartState {
     try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) return { items: [] };
-        const parsed = JSON.parse(saved);
+        const parsed: unknown = JSON.parse(saved);
         if (!Array.isArray(parsed)) return { items: [] };
-        const valid: CartItem[] = parsed.filter(
-            (item) => item?.ticket_type_id && item?.event?.id && item?.ticket_type && item.quantity > 0 && item.quantity <= MAX_PER_TYPE,
-        );
-        return { items: valid };
+        return { items: parsed.filter(isValidCartItem) };
     } catch {
         return { items: [] };
     }
