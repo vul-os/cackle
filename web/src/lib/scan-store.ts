@@ -36,7 +36,7 @@ export interface AdmissionRecord {
     seq?: number;
 }
 
-interface ScanDB extends DBSchema {
+export interface ScanDB extends DBSchema {
     bundles: {
         key: string;
         value: BundleRecord;
