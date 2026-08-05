@@ -91,9 +91,9 @@ const EventPage = () => {
                 const event: PageEvent = { ...data.event, gallery: data.gallery };
                 setState({ event, ticketTypes: data.ticket_types ?? [], loading: false, error: null });
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 if (cancelled) return;
-                setState({ event: null, ticketTypes: [], loading: false, error: err?.message || 'Event not found.' });
+                setState({ event: null, ticketTypes: [], loading: false, error: err instanceof Error ? err.message : 'Event not found.' });
             });
         return () => {
             cancelled = true;
