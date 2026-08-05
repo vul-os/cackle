@@ -59,7 +59,7 @@ const EventTicketTypesPage = () => {
     }, [eventId]);
 
     useEffect(() => {
-        fetchAll();
+        void fetchAll();
     }, [fetchAll]);
 
     const handleSubmit = async (data: TicketTypeInput) => {
@@ -77,7 +77,7 @@ const EventTicketTypesPage = () => {
                 toast({ title: 'Created', description: 'Ticket type created.' });
             }
             setDialog({ open: false, editing: null });
-            fetchAll();
+            void fetchAll();
         } catch (err) {
             const message = err instanceof Error ? err.message : undefined;
             toast({ title: 'Could not save', description: message, variant: 'destructive' });
@@ -93,7 +93,7 @@ const EventTicketTypesPage = () => {
             await ticketTypesApi.remove(deleteTarget.id);
             toast({ title: 'Deleted', description: 'Ticket type removed.' });
             setDeleteTarget(null);
-            fetchAll();
+            void fetchAll();
         } catch (err) {
             const message = err instanceof Error ? err.message : undefined;
             toast({ title: 'Could not delete', description: message, variant: 'destructive' });
@@ -174,7 +174,7 @@ const EventTicketTypesPage = () => {
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault();
-                                handleDelete();
+                                void handleDelete();
                             }}
                             disabled={isDeleting}
                             className="h-11 bg-destructive text-destructive-foreground hover:bg-destructive/90"
