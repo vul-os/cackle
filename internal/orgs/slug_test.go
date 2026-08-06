@@ -10,7 +10,7 @@ import (
 )
 
 // sharedSlugCases mirrors SHARED_CASES in
-// web/src/pages/organizers/orgs/slug.test.js. The create-org form shows
+// web/src/pages/organizers/orgs/slug.test.ts. The create-org form shows
 // the organiser the web address their name will become BEFORE they
 // submit; this function is what actually mints it. If the two rules drift,
 // the form promises one address and the product publishes another — so
@@ -92,7 +92,7 @@ func TestSlugifyOutputShapeAndLengthCap(t *testing.T) {
 // crude but it is the whole point — the check has to fail when the FILE
 // changes, not when a duplicated Go copy of it changes.
 func TestSlugifyTableIsInSyncWithTheFrontend(t *testing.T) {
-	path := filepath.Join("..", "..", "web", "src", "pages", "organizers", "orgs", "slug.test.js")
+	path := filepath.Join("..", "..", "web", "src", "pages", "organizers", "orgs", "slug.test.ts")
 	src, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read %s: %v — if the frontend preview moved, update this test rather than deleting it", path, err)
