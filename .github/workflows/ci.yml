@@ -104,6 +104,16 @@ jobs:
         working-directory: web
         run: npm run typecheck
 
+      # check:lint-config below is itself the gate that proves the lint config
+      # is genuinely type-aware — but the gate script was unchecked JavaScript.
+      # scripts/tsconfig.json (allowJs+checkJs+strict) type-checks it via JSDoc
+      # without dragging script files into the app's own tsconfig.json/build
+      # surface. BLOCKING: an unwired typecheck cannot fail a build, which is the
+      # same hollow-gate shape this file's other steps exist to catch.
+      - name: Typecheck CI scripts (check-lint-config.mjs)
+        working-directory: web
+        run: npm run typecheck:scripts
+
       - name: Lint
         working-directory: web
         run: npm run lint
