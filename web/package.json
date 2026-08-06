@@ -8,6 +8,7 @@
         "dev:force": "vite --force",
         "build": "vite build",
         "typecheck": "tsc --noEmit -p tsconfig.json",
+        "typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
         "lint": "eslint .",
         "check:lint-config": "node scripts/check-lint-config.mjs",
         "test": "node --test",
