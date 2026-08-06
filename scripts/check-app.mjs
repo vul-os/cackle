@@ -13,7 +13,7 @@
  * that ships INSIDE the binary — what the organiser reads while staffing a
  * door and what the buyer reads while paying. That half was gated by nothing,
  * and the difference showed: `site/index.html` got the honesty exactly right,
- * while `web/src/pages/organizers/pricing.jsx` shipped an invented fee
+ * while `web/src/pages/organizers/pricing.tsx` shipped an invented fee
  * ("Our Fee (0.85%)"), an invented competitive claim, hardcoded ZAR rates for
  * one processor named as though it were the default, and no build-status
  * notice at all. Nothing caught any of it, because nothing was looking.
@@ -27,9 +27,9 @@
  * # What it asserts
  *
  *  1. The two load-bearing claims exist, verbatim, in one place
- *     (`web/src/components/honesty/claims.js`) and still say what they must.
+ *     (`web/src/components/honesty/claims.ts`) and still say what they must.
  *  2. Those claims reach every route — proven structurally, by parsing
- *     `routes.jsx` and showing every `<Route>` descends from a layout that
+ *     `routes.tsx` and showing every `<Route>` descends from a layout that
  *     renders them. A claim mounted per page is a claim that drifts per page.
  *  3. Nothing anywhere in `web/src/` upgrades "detected" into "prevented".
  *  4. No fabricated fee, price or superlative marketing claim.
@@ -62,12 +62,15 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const appDir = join(repoRoot, 'web', 'src');
 const quiet = process.argv.includes('--quiet');
 
-// The floor. `web/src` holds 151 .js/.jsx files today; a glob that silently
-// stops matching, a moved directory or a botched refactor all show up as a
-// collapse in this number rather than as a green run over an empty list.
-const MIN_FILES_SCANNED = 100;
-// routes.jsx declares 36 paths. Same reasoning: a parser that stops finding
-// routes must fail, not report that all zero of them are covered.
+// The floor. `web/src` holds 180 .ts/.tsx files today (post .jsx→.tsx
+// migration); a glob that silently stops matching, a moved directory or a
+// botched refactor all show up as a collapse in this number rather than as a
+// green run over an empty list. Set at roughly 65% of the observed count —
+// the same margin the previous .js/.jsx-era floor (100 of 151) used — so
+// ordinary churn does not trip it and a collapsed glob does.
+const MIN_FILES_SCANNED = 120;
+// routes.tsx declares 37 paths today. Same reasoning: a parser that stops
+// finding routes must fail, not report that all zero of them are covered.
 const MIN_ROUTES = 30;
 // The theme rule's own floors, and the same argument again. A `className=`
 // extractor that silently stops matching — a JSX refactor, a prop rename, a
@@ -86,13 +89,13 @@ const MIN_ROUTES = 30;
 const MIN_STYLE_REGIONS = 1200;
 const MIN_COLOUR_CLASSES = 1150;
 
-const CLAIMS_FILE = join(appDir, 'components', 'honesty', 'claims.js');
-const STRIP_FILE = join(appDir, 'components', 'honesty', 'honesty-strip.jsx');
-const ROUTES_FILE = join(appDir, 'routes.jsx');
-const TAILWIND_CONFIG = join(repoRoot, 'web', 'tailwind.config.js');
+const CLAIMS_FILE = join(appDir, 'components', 'honesty', 'claims.ts');
+const STRIP_FILE = join(appDir, 'components', 'honesty', 'honesty-strip.tsx');
+const ROUTES_FILE = join(appDir, 'routes.tsx');
+const TAILWIND_CONFIG = join(repoRoot, 'web', 'tailwind.config.ts');
 const LAYOUTS = [
-  join(appDir, 'components', 'layout', 'blank-layout.jsx'),
-  join(appDir, 'components', 'layout', 'main-layout.jsx'),
+  join(appDir, 'components', 'layout', 'blank-layout.tsx'),
+  join(appDir, 'components', 'layout', 'main-layout.tsx'),
 ];
 const LAYOUT_COMPONENTS = ['BlankLayout', 'MainLayout'];
 
@@ -172,8 +175,8 @@ function unnegatedClaims(text, patterns = FORBIDDEN_CLAIMS) {
 // There is no discovery mechanism anywhere in the stack — no directory, no
 // DHT, no rendezvous, no geo index, no search — and none is planned. Peer
 // event feeds only show organisers a box operator explicitly enrolled by key,
-// out of band. `web/src/pages/visitor/events/peer-scope.test.js` already
-// holds this line for `peer-events.jsx`, the one component that renders
+// out of band. `web/src/pages/visitor/events/peer-scope.test.ts` already
+// holds this line for `peer-events.tsx`, the one component that renders
 // borrowed listings, but nothing held it repo-wide, so a discovery claim
 // anywhere else — a marketing blurb on an unrelated settings page, an empty
 // state that got creative — would ship unnoticed.
@@ -209,12 +212,12 @@ const DISCOVERY_CLAIMS = [
 //
 // These patterns ended in `\bfee\b`, and `\b` does not fire between "fee" and
 // "fees" — so every one of them was blind to the plural. That is not a
-// hypothetical: `web/src/pages/organizers/payouts/index.jsx` shipped a column
+// hypothetical: `web/src/pages/organizers/payouts/index.tsx` shipped a column
 // described as "platform fees", implying Cackle takes a cut of every sale. It
 // takes none — `fee_minor` is hardcoded to 0 throughout internal/orders and
 // no code path ever sets it — and the gate said "no fabricated fee, price or
 // superlative". A PAGE AGENT found it by reading. Planting "Platform fees are
-// deducted from every payout." on pricing.jsx and re-running reproduced the
+// deducted from every payout." on pricing.tsx and re-running reproduced the
 // pass exactly.
 //
 // Fixed the same way the identifier matcher below was: by enumerating the
@@ -250,7 +253,7 @@ const THIRD_PARTY_FEE = /\b(?:processor|provider|gateway|acquirer|issuer|bank|ad
 // "fee", "fees", "fee's" — and the separator that precedes it, which allows a
 // space or a hyphen but NOT an underscore. `platform_fee` is an identifier,
 // belongs to FEE_IDENTIFIER below, and appears legitimately in this app's own
-// prose: pricing.jsx documents the very grep that proves no such identifier
+// prose: pricing.tsx documents the very grep that proves no such identifier
 // exists, and that grep names all four of them.
 const FEE = "fee(?:s|'s|’s)?";
 const FEE_OWNER = "our|platform|service|application|cackle(?:'s|’s)?";
@@ -389,7 +392,7 @@ const NAVIGATION_CONTEXT = [
 //
 // Every colour in this app is supposed to come from a semantic token, so it
 // flips when the theme does. `web/src/index.css` defines those tokens twice —
-// once under `:root`, once under `.dark` — and `lib/contrast.test.js` measures
+// once under `:root`, once under `.dark` — and `lib/contrast.test.ts` measures
 // both sets. All of that is worth nothing to a component that writes
 // `bg-gray-100`, because a raw palette class is the same colour in both
 // themes by construction. The measured, audited, theme-aware palette simply
@@ -511,7 +514,7 @@ const NAMED_CSS_COLOUR = new RegExp(`\\b(?:${RAW_PALETTE}|silver|maroon|navy|oli
  */
 const THEME_ALLOW = [
   {
-    file: 'web/src/pages/visitor/ticket/index.jsx',
+    file: 'web/src/pages/visitor/ticket/index.tsx',
     classes: ['bg-white'],
     why:
       'the QR plate behind the ticket code. A QR reader needs dark modules on a light ground with real ' +
@@ -520,7 +523,7 @@ const THEME_ALLOW = [
       'paired with `print-keep-color` for exactly the same reason on paper.',
   },
   {
-    file: 'web/src/pages/visitor/tickets/printing/layout.jsx',
+    file: 'web/src/pages/visitor/tickets/printing/layout.tsx',
     classes: ['bg-white'],
     why: 'the same QR plate on the printable ticket sheet, for the same physical scanning reason.',
   },
@@ -578,7 +581,7 @@ function styleRegions(src) {
 }
 
 /**
- * SEMANTIC_ROOTS is read from tailwind.config.js rather than restated here,
+ * SEMANTIC_ROOTS is read from tailwind.config.ts rather than restated here,
  * so the `dark:` rule keeps up with the palette by construction. It is used
  * for one job only: telling `dark:bg-card` (a redundant patch on a token that
  * already flips) apart from `dark:border-2` (a width) and `dark:prose-invert`
@@ -680,18 +683,18 @@ function walk(dir, out = []) {
     if (entry === 'node_modules' || entry.startsWith('.')) continue;
     const p = join(dir, entry);
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (/\.(?:js|jsx)$/.test(entry)) out.push(p);
+    else if (/\.(?:jsx?|tsx?)$/.test(entry)) out.push(p);
   }
   return out;
 }
 
 const rel = (p) => relative(repoRoot, p).split(sep).join('/');
-const isTest = (p) => /\.test\.jsx?$/.test(p);
+const isTest = (p) => /\.test\.(?:jsx?|tsx?)$/.test(p);
 
 // ── structural checks ───────────────────────────────────────────────────────
 
 /**
- * Parse routes.jsx and report which declared paths descend from a layout that
+ * Parse routes.tsx and report which declared paths descend from a layout that
  * renders the honesty strip. Brace- and quote-aware, because
  * `element={<LandingPage />}` contains a `>` that a naive `[^>]*` split on.
  */
@@ -855,7 +858,7 @@ function moneyMatcherSelfTest() {
     'The processor fees on that sale were deducted before payout.',
     'Your bank’s fees are not visible to Cackle.',
     'This column exists for whatever your payment processor may ever deduct.',
-    // A legitimate identifier grep, which pricing.jsx really does print. The
+    // A legitimate identifier grep, which pricing.tsx really does print. The
     // underscore forms belong to FEE_IDENTIFIER and are matched only in
     // uppercase, so this documentation of their ABSENCE is not a claim.
     "grep -rn 'platform_fee|service_fee|our_fee|application_fee|commission' internal/ cmd/",
@@ -976,10 +979,10 @@ function urlMatcherSelfTest() {
  */
 function themeMatcherSelfTest(roots) {
   const bad = [];
-  const F = 'web/src/pages/fixture.jsx';
+  const F = 'web/src/pages/fixture.tsx';
   const run = (src, file = F) => themeViolations(file, src, roots).hits;
 
-  if (!roots.length) return ['theme gate could not read any colour root out of web/tailwind.config.js'];
+  if (!roots.length) return ['theme gate could not read any colour root out of web/tailwind.config.ts'];
 
   const mustCatch = [
     ['raw palette fill', '<div className="rounded bg-gray-100 p-2" />'],
@@ -1164,7 +1167,7 @@ function main() {
   const themeBad = themeMatcherSelfTest(colourRoots);
   note(themeBad.length === 0,
     `theme matcher catches what it must and forgives what it must, over ${colourRoots.length} colour roots ` +
-      `read from web/tailwind.config.js${fail('problems', themeBad)}`);
+      `read from web/tailwind.config.ts${fail('problems', themeBad)}`);
 
   const parity = siblingParity();
   note(parity.length === 0, `every prevention pattern check-site.mjs gates is gated here too${fail('drift', parity)}`);
@@ -1204,7 +1207,7 @@ function main() {
   const routesSrc = readFileSyncSafe(ROUTES_FILE) || '';
   const { covered, orphaned } = routeCoverage(routesSrc);
   note(covered.length >= MIN_ROUTES,
-    `${covered.length} routes examined (floor ${MIN_ROUTES}) — an unparsed routes.jsx cannot pass by finding nothing`);
+    `${covered.length} routes examined (floor ${MIN_ROUTES}) — an unparsed routes.tsx cannot pass by finding nothing`);
   note(orphaned.length === 0,
     `every declared route descends from a layout that states both claims${fail('outside any layout', orphaned)}`);
 
@@ -1227,24 +1230,24 @@ function main() {
     const src = readFileSync(file, 'utf8');
     for (const hit of unnegatedClaims(src)) upgraded.push(`${rel(file)}: "${hit}"`);
     // Test files are exempt from THIS matcher only (the other three run over
-    // every file unchanged). `peer-scope.test.js` plants the literal phrase
+    // every file unchanged). `peer-scope.test.ts` plants the literal phrase
     // "Discover organisers near you" — both as regex source and as a
     // planted-defect fixture — to prove its OWN local guard over
-    // peer-events.jsx fires; that string never ships (vite does not bundle
-    // `*.test.js`) and is proof the guard works, not evidence of a claim.
+    // peer-events.tsx fires; that string never ships (vite does not bundle
+    // `*.test.ts`) and is proof the guard works, not evidence of a claim.
     if (!isTest(file)) for (const hit of unnegatedClaims(src, DISCOVERY_CLAIMS)) discovered.push(`${rel(file)}: "${hit}"`);
     for (const { hit, why } of unnegatedMoney(src)) money.push(`${rel(file)}: "${hit}" — ${why}`);
     for (const { re, why } of PRIVILEGED_DEFAULT) {
       const m = src.match(re);
       if (m) privileged.push(`${rel(file)}: "${m[0]}" — ${why}`);
     }
-    // The URL rule is about what the SHIPPED bundle reaches for, so `*.test.js`
+    // The URL rule is about what the SHIPPED bundle reaches for, so `*.test.ts`
     // is out of scope: `node --test` runs those files, vite never bundles them,
     // and their fixtures are deliberately full of unroutable URLs. Excluded
     // files are counted below so a tree that renamed itself into the exclusion
     // shows up as a collapse rather than as a clean run.
     // The theme rule is about what RENDERS, so it runs over every shipped
-    // .jsx/.js — component, page and lib alike — and skips `*.test.js` for
+    // .tsx/.ts — component, page and lib alike — and skips `*.test.ts` for
     // the same reason the URL rule does: those files are fixtures, several
     // of them deliberately contain the defects they assert against, and
     // vite never bundles them.
